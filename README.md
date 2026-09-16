@@ -44,7 +44,7 @@ corre dentro de contenedores.
 1. **Clona el repositorio:**
 
    ```bash
-   git clone <url-del-repositorio>
+   git clone https://github.com/ayorick23/odontotrack-fouees.git
    cd odontotrack-fouees
    ```
 
@@ -115,16 +115,24 @@ docker compose exec backend python manage.py migrate
 
 ## Flujo de trabajo con Git
 
-- `main` → rama estable/protegida. Solo se llega aquí por merge desde `develop`.
-- `develop` → rama de integración, donde se juntan las features antes de pasar a `main`.
+Usamos una sola rama larga, `main`, protegida en GitHub (no se puede
+hacer push directo ni force-push; todo cambio entra por Pull Request
+con al menos 1 aprobación). No usamos rama `develop`: con un equipo de
+3 personas y sin releases formales, mantener dos ramas protegidas
+implicaría revisar cada cambio dos veces sin ningún beneficio real.
 
 Convención de nombres de rama:
 
 - `feature/nombre-corto` → para funcionalidad nueva (ej. `feature/login-jwt`)
 - `fix/nombre-corto` → para corrección de bugs (ej. `fix/validacion-paciente`)
 
-Flujo sugerido: crea tu rama desde `develop`, trabaja ahí, y abre un
-Pull Request de vuelta hacia `develop`.
+Flujo para cada cambio:
+
+1. Crea tu rama desde `main` actualizado: `git checkout main && git pull && git checkout -b feature/mi-cambio`
+2. Trabaja y haz commits normales.
+3. Sube tu rama y abre un Pull Request hacia `main`.
+4. Pide que uno de tus 2 compañeros lo revise y apruebe.
+5. Mergea (recomendado: "Squash and merge" para mantener el historial de `main` limpio).
 
 ## Gestión de tareas
 
