@@ -1,0 +1,40 @@
+# ==== Variables de entorno ====
+.env
+.env.local
+.env.*.local
+
+# ==== Python / Django (backend) ====
+__pycache__/
+*.py[cod]
+*$py.class
+*.sqlite3
+backend/db.sqlite3
+.venv/
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+staticfiles/
+media/
+
+# ==== Node / React / Vite (frontend) ====
+node_modules/
+frontend/dist/
+frontend/dist-ssr/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# ==== Docker ====
+*.log
+
+# ==== IDEs y editores ====
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ==== Sistema operativo ====
+.DS_Store
+Thumbs.db
