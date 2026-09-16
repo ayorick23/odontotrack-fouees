@@ -1,0 +1,59 @@
+# Entorno de desarrollo local para los 3 desarrolladores del equipo.
+# Levanta base de datos, backend y frontend con un solo comando, para
+# que todos trabajemos con exactamente el mismo entorno.
+#
+# Comandos básicos (ver README.md para más detalle):
+#   docker compose up --build   -> levanta todo
+#   docker compose down         -> apaga todo
+#   docker compose logs -f backend -> ver logs de un servicio
+
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Dentro de la red de Docker, el backend se conecta a la base de
+      # datos usando el nombre del servicio ("db"), no localhost.
+      DB_HOST: db
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
