@@ -1,0 +1,5 @@
+# Los scripts que corren dentro de contenedores Linux (Docker) deben
+# mantener siempre saltos de línea estilo Unix (LF), sin importar el
+# sistema operativo de quien clone el repositorio. Si Windows los
+# convierte a CRLF, el contenedor falla al ejecutarlos.
+*.sh text eol=lf
