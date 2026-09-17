@@ -80,6 +80,13 @@ corre dentro de contenedores.
    Abre [http://localhost:8000/api/health/](http://localhost:8000/api/health/)
    en tu navegador. Deberías ver `{"status": "ok"}`.
 
+   La documentación interactiva de la API (Swagger) está en
+   [http://localhost:8000/api/docs/](http://localhost:8000/api/docs/).
+   El esquema OpenAPI crudo está en
+   [http://localhost:8000/api/schema/](http://localhost:8000/api/schema/).
+   Para probar endpoints protegidos: `POST /api/auth/token/`, copiá el
+   `access` y usá **Authorize** (Bearer JWT).
+
 5. **Abre el frontend:**
 
    Abre [http://localhost:5173](http://localhost:5173) en tu navegador.
