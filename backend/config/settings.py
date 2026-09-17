@@ -142,6 +142,12 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 
+# Fotos de paciente. El serving HTTP y el upload se agregan aparte.
+# MEDIA_ROOT relativo a BASE_DIR si no es una ruta absoluta.
+MEDIA_URL = config("MEDIA_URL", default="/media/")
+_media_root = config("MEDIA_ROOT", default="media")
+MEDIA_ROOT = Path(_media_root) if Path(_media_root).is_absolute() else BASE_DIR / _media_root
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 
@@ -159,8 +165,12 @@ REST_FRAMEWORK = {
 }
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
+    "ACCESS_TOKEN_LIFETIME": timedelta(
+        minutes=config("JWT_ACCESS_MINUTES", default=60, cast=int),
+    ),
+    "REFRESH_TOKEN_LIFETIME": timedelta(
+        days=config("JWT_REFRESH_DAYS", default=1, cast=int),
+    ),
     "ROTATE_REFRESH_TOKENS": True,
 }
 
