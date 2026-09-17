@@ -43,7 +43,7 @@ export function AppLayout() {
   }
 
   return (
-    <div className="flex min-h-svh gap-3 bg-[#eef3f8] p-3">
+    <div className="flex min-h-svh gap-3 bg-[#eef3f8] p-3 dark:bg-slate-950">
       <Sidebar user={user} />
       <div className="flex min-w-0 flex-1 flex-col gap-3">
         <Navbar user={user} onLogout={handleLogout} />

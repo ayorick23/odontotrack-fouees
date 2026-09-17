@@ -6,6 +6,7 @@ import {
   ROLE_LABELS,
   type AuthUser,
 } from "../context/AuthContext";
+import { ThemeToggle } from "./ThemeToggle";
 
 const PAGE_META: Record<string, { title: string; crumb: string }> = {
   "/dashboard": { title: "Panel Administrativo", crumb: "Dashboard › Inicio" },
@@ -38,14 +39,16 @@ export function Navbar({
   };
 
   return (
-    <header className="flex items-center justify-between rounded-2xl bg-white px-5 py-3 shadow-sm">
+    <header className="flex items-center justify-between rounded-2xl bg-white px-5 py-3 shadow-sm dark:bg-slate-900 dark:shadow-none dark:ring-1 dark:ring-white/10">
       <div>
-        <h1 className="text-lg font-semibold text-slate-800">{meta.title}</h1>
+        <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-100">
+          {meta.title}
+        </h1>
         <p className="text-xs text-slate-400">{meta.crumb}</p>
       </div>
 
       <div className="flex items-center gap-3">
-        <label className="hidden items-center gap-2 rounded-full bg-slate-50 px-3 py-2 text-sm text-slate-400 md:flex">
+        <label className="hidden items-center gap-2 rounded-full bg-slate-50 px-3 py-2 text-sm text-slate-400 dark:bg-slate-800 md:flex">
           <Search className="size-4" />
           <input
             disabled
@@ -53,16 +56,19 @@ export function Navbar({
             className="w-40 bg-transparent outline-none"
           />
         </label>
-        <button
-          type="button"
-          disabled
-          title="Próximamente"
-          className="rounded-full p-2 text-slate-400"
-        >
-          <Bell className="size-4" />
-        </button>
+        <div className="flex items-center">
+          <ThemeToggle />
+          <button
+            type="button"
+            disabled
+            title="Próximamente"
+            className="rounded-full p-2 text-slate-400"
+          >
+            <Bell className="size-4" />
+          </button>
+        </div>
         {user ? (
-          <p className="hidden text-right text-sm font-medium text-slate-700 sm:block">
+          <p className="hidden text-right text-sm font-medium text-slate-700 sm:block dark:text-slate-200">
             {displayName(user)}
             <span className="block text-xs font-normal text-slate-400">
               {ROLE_LABELS[user.role]}
@@ -72,7 +78,7 @@ export function Navbar({
         <button
           type="button"
           onClick={onLogout}
-          className="flex items-center gap-2 rounded-full border border-slate-200 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50"
+          className="flex items-center gap-2 rounded-full border border-slate-200 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
         >
           <LogOut className="size-4" />
           Salir
