@@ -22,12 +22,13 @@ class DashboardSummaryView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        patients = Patient.objects.in_period(request.query_params.get("period"))
         data = {
-            "total_patients": Patient.objects.count(),
+            "total_patients": patients.count(),
             "total_assignments": Assignment.objects.count(),
             "total_clinical_records": ClinicalRecord.objects.count(),
             "patients_by_status": dict(
-                Patient.objects.values_list("case_status").annotate(count=Count("id"))
+                patients.values_list("case_status").annotate(count=Count("id"))
             ),
         }
         return Response(data)

@@ -1,4 +1,21 @@
+from datetime import timedelta
+
 from django.db import models
+from django.utils import timezone
+
+PERIOD_DAYS = {
+    "1m": 30,
+    "6m": 182,
+    "1a": 365,
+}
+
+
+class PatientQuerySet(models.QuerySet):
+    def in_period(self, period: str | None):
+        days = PERIOD_DAYS.get(period or "")
+        if days is None:
+            return self
+        return self.filter(created_at__gte=timezone.now() - timedelta(days=days))
 
 
 class Patient(models.Model):
@@ -33,6 +50,8 @@ class Patient(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    objects = PatientQuerySet.as_manager()
 
     class Meta:
         ordering = ["last_name", "first_name"]

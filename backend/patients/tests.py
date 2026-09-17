@@ -1,4 +1,7 @@
+from datetime import timedelta
+
 from django.conf import settings
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -66,3 +69,121 @@ class ListingPaginationTests(APITestCase):
             )
             Assignment.objects.create(patient=patient, student=student)
         self._assert_paginated_list("/api/assignments/", expected_count=PAGE_SIZE + 1)
+
+
+class PatientDirectoryTests(APITestCase):
+    def setUp(self):
+        self.admin = User.objects.create_user(
+            username="admin",
+            password="pass12345",
+            role=User.Role.ADMIN,
+        )
+        self.client.force_authenticate(user=self.admin)
+
+    def test_search_matches_last_name_and_document(self):
+        Patient.objects.create(
+            first_name="María",
+            last_name="Gómez",
+            document_id="01234567-8",
+        )
+        Patient.objects.create(
+            first_name="Luis",
+            last_name="Pérez",
+            document_id="99999999-9",
+        )
+
+        by_name = self.client.get("/api/patients/", {"search": "Gómez"})
+        self.assertEqual(by_name.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            [row["last_name"] for row in by_name.json()["results"]],
+            ["Gómez"],
+        )
+
+        by_document = self.client.get("/api/patients/", {"search": "99999999-9"})
+        self.assertEqual(by_document.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            [row["document_id"] for row in by_document.json()["results"]],
+            ["99999999-9"],
+        )
+
+    def test_filter_by_case_status(self):
+        Patient.objects.create(
+            first_name="Ana",
+            last_name="Pendiente",
+            document_id="PEND-001",
+            case_status=Patient.CaseStatus.PENDIENTE,
+        )
+        Patient.objects.create(
+            first_name="Luis",
+            last_name="Cerrado",
+            document_id="FIN-001",
+            case_status=Patient.CaseStatus.FINALIZADO,
+        )
+
+        response = self.client.get(
+            "/api/patients/",
+            {"case_status": Patient.CaseStatus.FINALIZADO},
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        body = response.json()
+        self.assertEqual(body["count"], 1)
+        self.assertEqual(body["results"][0]["document_id"], "FIN-001")
+
+    def test_list_is_ordered_by_id(self):
+        Patient.objects.create(
+            first_name="Zaira",
+            last_name="Zelaya",
+            document_id="ZEL-001",
+        )
+        Patient.objects.create(
+            first_name="Ana",
+            last_name="Ábrego",
+            document_id="ABR-001",
+        )
+
+        response = self.client.get("/api/patients/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        ids = [row["id"] for row in response.json()["results"]]
+        self.assertEqual(ids, sorted(ids))
+
+    def test_list_period_1m_excludes_older_patients(self):
+        Patient.objects.create(
+            first_name="Reciente",
+            last_name="Hoy",
+            document_id="REC-001",
+        )
+        old = Patient.objects.create(
+            first_name="Antigua",
+            last_name="Año",
+            document_id="OLD-001",
+        )
+        Patient.objects.filter(pk=old.pk).update(
+            created_at=timezone.now() - timedelta(days=40),
+        )
+
+        response = self.client.get("/api/patients/", {"period": "1m"})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        body = response.json()
+        self.assertEqual(body["count"], 1)
+        self.assertEqual(body["results"][0]["document_id"], "REC-001")
+
+    def test_list_includes_active_assignment_name(self):
+        student = User.objects.create_user(
+            username="estudiante",
+            password="pass12345",
+            role=User.Role.ESTUDIANTE,
+            first_name="Ana",
+            last_name="López",
+        )
+        patient = Patient.objects.create(
+            first_name="Carlos",
+            last_name="Ruiz",
+            document_id="ASG-001",
+        )
+        Assignment.objects.create(patient=patient, student=student)
+
+        response = self.client.get("/api/patients/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        row = response.json()["results"][0]
+        self.assertEqual(row["assigned_to"], "Ana López")
+        self.assertNotIn("address", row)
