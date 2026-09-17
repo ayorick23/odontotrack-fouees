@@ -14,6 +14,6 @@ class UserViewSet(viewsets.ModelViewSet):
     permisos por rol en detalle.
     """
 
-    queryset = User.objects.all()
+    queryset = User.objects.all().order_by("id")
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated]
