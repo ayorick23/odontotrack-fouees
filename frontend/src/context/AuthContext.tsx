@@ -1,7 +1,7 @@
-import { createContext, useState, type ReactNode } from "react";
+import { createContext, useMemo, useState, type ReactNode } from "react";
 
-// Roles posibles de un usuario, deben coincidir con las choices de
-// accounts.models.User.Role en el backend.
+import { getStoredAccessToken } from "../services/tokens";
+
 export type UserRole =
   | "admin"
   | "docente"
@@ -19,23 +19,28 @@ interface AuthContextValue {
   user: AuthUser | null;
   setUser: (user: AuthUser | null) => void;
   isAuthenticated: boolean;
+  setAuthenticated: (value: boolean) => void;
 }
 
-// El valor real se arma dentro de AuthProvider; este contexto solo
-// declara la forma de los datos. La lógica de login/logout vive en el
-// hook useAuth (src/hooks/useAuth.ts) para no mezclar responsabilidades.
 export const AuthContext = createContext<AuthContextValue | undefined>(
   undefined,
 );
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [isAuthenticated, setAuthenticated] = useState(
+    () => getStoredAccessToken() !== null,
+  );
 
-  const value: AuthContextValue = {
-    user,
-    setUser,
-    isAuthenticated: user !== null,
-  };
+  const value = useMemo<AuthContextValue>(
+    () => ({
+      user,
+      setUser,
+      isAuthenticated,
+      setAuthenticated,
+    }),
+    [user, isAuthenticated],
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
