@@ -1,5 +1,12 @@
 import axios from "axios";
 
+export type PaginatedResponse<T> = {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: T[];
+};
+
 // URL base de la API de Django. Se lee de una variable de entorno de
 // Vite (definida en el archivo .env del frontend) para que cada
 // desarrollador pueda apuntar a su propio backend sin tocar el código.
