@@ -1,5 +1,7 @@
 import axios from "axios";
 
+import { getStoredAccessToken } from "./tokens";
+
 export type PaginatedResponse<T> = {
   count: number;
   next: string | null;
@@ -18,9 +20,9 @@ export const api = axios.create({
 });
 
 // Adjunta el access token JWT (si existe) a cada petición saliente.
-// El token se guarda en localStorage por useAuth al hacer login.
+// El token se guarda en localStorage o sessionStorage al hacer login.
 api.interceptors.request.use((requestConfig) => {
-  const accessToken = localStorage.getItem("accessToken");
+  const accessToken = getStoredAccessToken();
   if (accessToken) {
     requestConfig.headers.Authorization = `Bearer ${accessToken}`;
   }

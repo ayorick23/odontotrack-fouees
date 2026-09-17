@@ -1,9 +1,10 @@
 import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
 import { defineConfig } from 'vite'
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
   // Lee el archivo .env desde la raíz del monorepo (no desde
   // frontend/) para que backend y frontend compartan un solo archivo
   // de variables de entorno, tal como lo espera docker-compose.
