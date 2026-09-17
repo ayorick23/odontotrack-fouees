@@ -12,7 +12,23 @@ export type UserRole =
 export interface AuthUser {
   id: number;
   username: string;
+  first_name: string;
+  last_name: string;
+  email: string;
   role: UserRole;
+}
+
+export const ROLE_LABELS: Record<UserRole, string> = {
+  admin: "Administrador",
+  docente: "Docente supervisor",
+  estudiante: "Estudiante",
+  recepcion: "Recepción",
+  soporte: "Soporte técnico",
+};
+
+export function displayName(user: AuthUser): string {
+  const fullName = `${user.first_name} ${user.last_name}`.trim();
+  return fullName || user.username;
 }
 
 interface AuthContextValue {

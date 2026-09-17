@@ -33,14 +33,7 @@ export function Dashboard() {
   }, []);
 
   return (
-    <div className="min-h-svh bg-[#eef3f8] px-6 py-8">
-      <header className="mb-8">
-        <p className="text-sm text-slate-400">Dashboard › Inicio</p>
-        <h1 className="mt-1 text-2xl font-semibold text-slate-800">
-          Panel Administrativo
-        </h1>
-      </header>
-
+    <div>
       {state.status === "loading" ? <KpiSkeleton /> : null}
 
       {state.status === "error" ? (
