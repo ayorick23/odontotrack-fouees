@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from drf_spectacular.utils import extend_schema
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.views import TokenObtainPairView
@@ -13,10 +14,12 @@ from .serializers import (
 User = get_user_model()
 
 
+@extend_schema(tags=["auth"])
 class EmailOrUsernameTokenObtainPairView(TokenObtainPairView):
     serializer_class = EmailOrUsernameTokenObtainPairSerializer
 
 
+@extend_schema(tags=["accounts"])
 class UserViewSet(viewsets.ModelViewSet):
     """
     Listado para usuarios autenticados. El alta no es pública:

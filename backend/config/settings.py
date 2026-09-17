@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     # Librerías de terceros
     "rest_framework",
     "corsheaders",
+    "drf_spectacular",
     # Apps propias del proyecto
     "accounts",
     "patients",
@@ -164,6 +165,30 @@ REST_FRAMEWORK = {
     ),
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 20,
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+}
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "OdontoTrack FOUEES API",
+    "DESCRIPTION": (
+        "Banco digital de pacientes de la Facultad de Odontología "
+        "de la Universidad Evangélica de El Salvador (FOUEES). "
+        "Para probar endpoints autenticados: POST /api/auth/token/, "
+        "luego Authorize con el access token (Bearer)."
+    ),
+    "VERSION": "0.1.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    "SCHEMA_PATH_PREFIX": r"/api/",
+    "COMPONENT_SPLIT_REQUEST": True,
+    "TAGS": [
+        {"name": "health", "description": "Chequeo de que la API está viva."},
+        {"name": "auth", "description": "Login JWT y refresh del access token."},
+        {"name": "accounts", "description": "Usuarios del sistema."},
+        {"name": "patients", "description": "Directorio de pacientes."},
+        {"name": "assignments", "description": "Asignación paciente-estudiante."},
+        {"name": "clinical-records", "description": "Expediente clínico."},
+        {"name": "dashboard", "description": "KPIs e indicadores."},
+    ],
 }
 
 SIMPLE_JWT = {
