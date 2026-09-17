@@ -37,8 +37,8 @@ export function Dashboard() {
       {state.status === "loading" ? <KpiSkeleton /> : null}
 
       {state.status === "error" ? (
-        <div className="rounded-2xl bg-white p-6 shadow-sm">
-          <p className="text-sm text-red-700" role="alert">
+        <div className="rounded-2xl bg-white p-6 shadow-sm dark:bg-slate-900 dark:shadow-none dark:ring-1 dark:ring-white/10">
+          <p className="text-sm text-red-700 dark:text-red-400" role="alert">
             {state.message}
           </p>
           <div className="mt-4 flex gap-3">
@@ -51,7 +51,7 @@ export function Dashboard() {
             </button>
             <Link
               to="/login"
-              className="rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600"
+              className="rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 dark:border-slate-700 dark:text-slate-300"
             >
               Ir al login
             </Link>
@@ -103,7 +103,7 @@ function KpiCard({
   icon: ReactNode;
 }) {
   return (
-    <article className="rounded-2xl bg-white p-5 shadow-[0_10px_30px_rgba(15,40,80,0.06)]">
+    <article className="rounded-2xl bg-white p-5 shadow-[0_10px_30px_rgba(15,40,80,0.06)] dark:bg-slate-900 dark:shadow-none dark:ring-1 dark:ring-white/10">
       <div className="flex items-start justify-between gap-3">
         <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
           {label}
@@ -114,7 +114,7 @@ function KpiCard({
           {icon}
         </span>
       </div>
-      <p className="mt-4 text-3xl font-semibold tabular-nums text-slate-800">
+      <p className="mt-4 text-3xl font-semibold tabular-nums text-slate-800 dark:text-slate-100">
         {value.toLocaleString("es-SV")}
       </p>
     </article>
@@ -127,7 +127,7 @@ function KpiSkeleton() {
       {["registrados", "pendientes", "asignados", "finalizados"].map((key) => (
         <div
           key={key}
-          className="h-32 animate-pulse rounded-2xl bg-white shadow-sm"
+          className="h-32 animate-pulse rounded-2xl bg-white shadow-sm dark:bg-slate-900"
         />
       ))}
     </section>

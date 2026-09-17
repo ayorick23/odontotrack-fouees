@@ -2,6 +2,7 @@ import { Navigate, Route, BrowserRouter, Routes } from "react-router-dom";
 
 import { AppLayout } from "./components/AppLayout";
 import { AuthProvider } from "./context/AuthContext";
+import { ThemeProvider } from "./context/ThemeContext";
 import { Assignments } from "./pages/Assignments/Assignments";
 import { Calendar } from "./pages/Calendar/Calendar";
 import { Dashboard } from "./pages/Dashboard/Dashboard";
@@ -15,25 +16,27 @@ import { Support } from "./pages/Support/Support";
 
 function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Navigate to="/login" replace />} />
-          <Route path="/login" element={<Login />} />
-          <Route element={<AppLayout />}>
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/patients" element={<PatientList />} />
-            <Route path="/patients/new" element={<PatientForm />} />
-            <Route path="/patients/:id" element={<PatientDetail />} />
-            <Route path="/assignments" element={<Assignments />} />
-            <Route path="/calendar" element={<Calendar />} />
-            <Route path="/supervision" element={<Supervision />} />
-            <Route path="/students" element={<Students />} />
-            <Route path="/support" element={<Support />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Navigate to="/login" replace />} />
+            <Route path="/login" element={<Login />} />
+            <Route element={<AppLayout />}>
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/patients" element={<PatientList />} />
+              <Route path="/patients/new" element={<PatientForm />} />
+              <Route path="/patients/:id" element={<PatientDetail />} />
+              <Route path="/assignments" element={<Assignments />} />
+              <Route path="/calendar" element={<Calendar />} />
+              <Route path="/supervision" element={<Supervision />} />
+              <Route path="/students" element={<Students />} />
+              <Route path="/support" element={<Support />} />
+            </Route>
+          </Routes>
+        </BrowserRouter>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 

@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 html,
 body,
 #root {
@@ -8,4 +10,11 @@ body,
 
 body {
   margin: 0;
+  background-color: #eef3f8;
+  color: #1e293b;
+}
+
+html.dark body {
+  background-color: #020617;
+  color: #f1f5f9;
 }
