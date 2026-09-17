@@ -1,19 +1,38 @@
 from django.contrib.auth import get_user_model
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
+from rest_framework_simplejwt.views import TokenObtainPairView
 
-from .serializers import UserSerializer
+from .permissions import IsAdminOrSoporte
+from .serializers import (
+    EmailOrUsernameTokenObtainPairSerializer,
+    UserCreateSerializer,
+    UserSerializer,
+)
 
 User = get_user_model()
 
 
+class EmailOrUsernameTokenObtainPairView(TokenObtainPairView):
+    serializer_class = EmailOrUsernameTokenObtainPairSerializer
+
+
 class UserViewSet(viewsets.ModelViewSet):
     """
-    CRUD básico de usuarios, solo para uso administrativo desde el
-    frontend (o el admin de Django) mientras se define la lógica de
-    permisos por rol en detalle.
+    Listado para usuarios autenticados. El alta no es pública:
+    solo admin y soporte pueden crear o editar cuentas.
     """
 
     queryset = User.objects.all().order_by("id")
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated]
+
+    def get_serializer_class(self):
+        if self.action == "create":
+            return UserCreateSerializer
+        return UserSerializer
+
+    def get_permissions(self):
+        if self.action in ("create", "update", "partial_update", "destroy"):
+            return [IsAdminOrSoporte()]
+        return [IsAuthenticated()]
