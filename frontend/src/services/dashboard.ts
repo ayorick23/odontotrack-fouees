@@ -9,9 +9,14 @@ export type DashboardSummary = {
   patients_by_status: Partial<Record<CaseStatus, number>>;
 };
 
-export function getDashboardSummary(): Promise<DashboardSummary> {
+export type SummaryPeriod = "1m" | "6m" | "1a";
+
+export function getDashboardSummary(
+  params: { period?: SummaryPeriod } = {},
+): Promise<DashboardSummary> {
+  const query = params.period ? { period: params.period } : undefined;
   return api
-    .get<DashboardSummary>("/dashboard/summary/")
+    .get<DashboardSummary>("/dashboard/summary/", { params: query })
     .then((response) => response.data);
 }
 
