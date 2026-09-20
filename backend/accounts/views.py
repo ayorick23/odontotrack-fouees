@@ -61,12 +61,13 @@ class UserViewSet(viewsets.ModelViewSet):
 @extend_schema(tags=["accounts"])
 class RoleViewSet(
     mixins.ListModelMixin,
+    mixins.CreateModelMixin,
     mixins.RetrieveModelMixin,
     mixins.UpdateModelMixin,
     mixins.DestroyModelMixin,
     viewsets.GenericViewSet,
 ):
-    """Listado y matriz de permisos. Los roles de sistema no se borran."""
+    """CRUD de roles. Los de sistema no se eliminan."""
 
     queryset = Role.objects.prefetch_related("permissions").all()
     serializer_class = RoleSerializer
@@ -75,10 +76,11 @@ class RoleViewSet(
     acl_permissions = {
         "list": "roles.view",
         "retrieve": "roles.view",
+        "create": "roles.create",
         "update": "roles.edit",
         "partial_update": "roles.edit",
         "destroy": "roles.delete",
-        "catalog": "roles.view",
+        "catalog": ("roles.view", "roles.create", "roles.edit"),
     }
 
     def perform_destroy(self, instance):

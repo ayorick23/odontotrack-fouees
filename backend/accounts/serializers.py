@@ -8,6 +8,7 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 from .models import Role
 from .permissions_catalog import all_permission_names
+from .services import unique_role_slug
 
 User = get_user_model()
 
@@ -139,6 +140,23 @@ class RoleSerializer(serializers.ModelSerializer):
             )
         attrs["permissions"] = unique_names
         return attrs
+
+    def validate_name(self, value):
+        name = value.strip()
+        if not name:
+            raise serializers.ValidationError("El nombre es obligatorio.")
+        return name
+
+    def create(self, validated_data):
+        permission_names = validated_data.pop("permissions", [])
+        role = Role.objects.create(
+            name=validated_data["name"],
+            slug=unique_role_slug(validated_data["name"]),
+            description=validated_data.get("description", ""),
+            is_system=False,
+        )
+        role.sync_permissions(permission_names)
+        return role
 
     def update(self, instance, validated_data):
         permission_names = validated_data.pop("permissions", None)

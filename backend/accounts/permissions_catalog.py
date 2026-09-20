@@ -1,8 +1,8 @@
 """Catálogo ACL: fuente de verdad de permisos `{modulo}.{accion}`.
 
-No crear permisos a mano en BD. El comando `acl_sync_permissions`
-(y el signal post_migrate) sincroniza este archivo con las tablas Role
-y AclPermission.
+No crear permisos a mano en BD. En desarrollo local, el comando
+`acl_sync_permissions` carga este archivo en las tablas Role y
+AclPermission. No corre al migrar ni en producción.
 """
 
 from __future__ import annotations
@@ -156,7 +156,7 @@ PERMISSION_CATALOG: Final[tuple[SectionSpec, ...]] = (
                 key="roles",
                 label="Roles y permisos",
                 description="Catálogo ACL y matriz de permisos por rol.",
-                actions=(VIEW, EDIT, DELETE),
+                actions=(VIEW, CREATE, EDIT, DELETE),
             ),
             ModuleSpec(
                 key="support",

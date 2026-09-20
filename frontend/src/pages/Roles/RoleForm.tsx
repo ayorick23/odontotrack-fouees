@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useLocation, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { can } from "../../acl/can";
+import { ConfirmDeleteDialog } from "../../components/ConfirmDeleteDialog";
 import { useAuth } from "../../hooks/useAuth";
 import {
+  deleteRole,
   getPermissionCatalog,
   getRole,
   updateRole,
@@ -24,10 +26,14 @@ type LoadState =
 export function RoleForm() {
   const { id } = useParams();
   const location = useLocation();
+  const navigate = useNavigate();
   const roleId = Number(id);
   const { user, refreshUser } = useAuth();
   const isEditing = location.pathname.endsWith("/edit");
-  const canEdit = can(user, "roles.edit") && isEditing;
+  const justCreated = Boolean(
+    (location.state as { justCreated?: boolean } | null)?.justCreated,
+  );
+  const canWrite = can(user, "roles.edit") && isEditing;
 
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const [name, setName] = useState("");
@@ -37,6 +43,9 @@ export function RoleForm() {
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!Number.isInteger(roleId) || roleId < 1) {
@@ -110,7 +119,12 @@ export function RoleForm() {
   }
 
   async function handleSave() {
-    if (!canEdit || state.status !== "ready") {
+    if (!canWrite || state.status !== "ready") {
+      return;
+    }
+    const trimmedName = name.trim();
+    if (!trimmedName) {
+      setSaveError("El nombre es obligatorio.");
       return;
     }
     setSaving(true);
@@ -118,7 +132,7 @@ export function RoleForm() {
     setSaveError(null);
     try {
       const updated = await updateRole(state.role.id, {
-        name: name.trim(),
+        name: trimmedName,
         description: description.trim(),
         permissions: [...selected],
       });
@@ -129,9 +143,29 @@ export function RoleForm() {
         await refreshUser();
       }
     } catch {
-      setSaveError("No se pudo guardar. Revisa que los permisos existan en el catálogo.");
+      setSaveError(
+        "No se pudo guardar. Revisa que los permisos existan en el catálogo.",
+      );
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function confirmDelete() {
+    if (state.status !== "ready" || state.role.is_system) {
+      return;
+    }
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await deleteRole(state.role.id);
+      navigate("/roles");
+    } catch {
+      setDeleteError(
+        "No se pudo borrar el rol. Puede tener usuarios asignados.",
+      );
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -147,6 +181,8 @@ export function RoleForm() {
     );
   }
 
+  const canRemove = can(user, "roles.delete") && !state.role.is_system;
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -156,27 +192,58 @@ export function RoleForm() {
         >
           ← Volver a roles
         </Link>
-        {canEdit ? (
-          <button
-            type="button"
-            onClick={() => void handleSave()}
-            disabled={saving}
-            className="rounded-full bg-[#2ad4c5] px-5 py-2 text-sm font-semibold text-white hover:bg-teal-400 disabled:opacity-60"
-          >
-            {saving ? "Guardando..." : "Guardar matriz"}
-          </button>
-        ) : can(user, "roles.edit") ? (
-          <Link
-            to={`/roles/${state.role.id}/edit`}
-            className="rounded-full bg-[#2ad4c5] px-5 py-2 text-sm font-semibold text-white hover:bg-teal-400"
-          >
-            Editar
-          </Link>
-        ) : (
-          <p className="text-xs text-slate-400">Solo lectura</p>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {canRemove ? (
+            <button
+              type="button"
+              onClick={() => {
+                setPendingDelete(true);
+                setDeleteError(null);
+              }}
+              className="rounded-full border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-950/40"
+            >
+              Eliminar rol
+            </button>
+          ) : null}
+          {canWrite ? (
+            <button
+              type="button"
+              onClick={() => void handleSave()}
+              disabled={saving}
+              className="rounded-full bg-[#2ad4c5] px-5 py-2 text-sm font-semibold text-white hover:bg-teal-400 disabled:opacity-60"
+            >
+              {saving ? "Guardando..." : "Guardar matriz"}
+            </button>
+          ) : can(user, "roles.edit") ? (
+            <Link
+              to={`/roles/${state.role.id}/edit`}
+              className="rounded-full bg-[#2ad4c5] px-5 py-2 text-sm font-semibold text-white hover:bg-teal-400"
+            >
+              Editar
+            </Link>
+          ) : (
+            <p className="text-xs text-slate-400">Solo lectura</p>
+          )}
+        </div>
       </div>
 
+      <ConfirmDeleteDialog
+        open={pendingDelete}
+        title={`¿Eliminar el rol “${state.role.name}”?`}
+        error={deleteError}
+        busy={deleting}
+        onCancel={() => {
+          setPendingDelete(false);
+          setDeleteError(null);
+        }}
+        onConfirm={() => void confirmDelete()}
+      />
+
+      {justCreated && !feedback ? (
+        <p className="text-sm text-teal-700 dark:text-teal-300">
+          Rol creado. Ahora asigna los permisos y guarda la matriz.
+        </p>
+      ) : null}
       {feedback ? (
         <p className="text-sm text-teal-700 dark:text-teal-300">{feedback}</p>
       ) : null}
@@ -187,30 +254,22 @@ export function RoleForm() {
       ) : null}
 
       <section className="rounded-2xl bg-white p-5 shadow-sm dark:bg-slate-900 dark:ring-1 dark:ring-white/10">
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2">
           <label className="text-sm font-medium text-slate-600 dark:text-slate-300">
             Nombre
             <input
               value={name}
               onChange={(event) => setName(event.target.value)}
-              disabled={!canEdit}
+              disabled={!canWrite}
               className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-[#2ad4c5] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
             />
           </label>
           <label className="text-sm font-medium text-slate-600 dark:text-slate-300">
-            Clave
-            <input
-              value={state.role.slug}
-              readOnly
-              className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800"
-            />
-          </label>
-          <label className="text-sm font-medium text-slate-600 dark:text-slate-300 md:col-span-1">
             Descripción
             <input
               value={description}
               onChange={(event) => setDescription(event.target.value)}
-              disabled={!canEdit}
+              disabled={!canWrite}
               className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-[#2ad4c5] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
             />
           </label>
@@ -242,7 +301,7 @@ export function RoleForm() {
                   <input
                     type="checkbox"
                     className="size-4 accent-[#2ad4c5]"
-                    disabled={!canEdit}
+                    disabled={!canWrite}
                     checked={names.every((item) => selected.has(item))}
                     onChange={(event) => setMany(names, event.target.checked)}
                   />
@@ -252,7 +311,7 @@ export function RoleForm() {
             })}
             <button
               type="button"
-              disabled={!canEdit}
+              disabled={!canWrite}
               onClick={() => setMany(allNames, true)}
               className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300"
             >
@@ -260,7 +319,7 @@ export function RoleForm() {
             </button>
             <button
               type="button"
-              disabled={!canEdit}
+              disabled={!canWrite}
               onClick={() => setSelected(new Set())}
               className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300"
             >
@@ -281,7 +340,7 @@ export function RoleForm() {
                   <div className="flex gap-2">
                     <button
                       type="button"
-                      disabled={!canEdit}
+                      disabled={!canWrite}
                       onClick={() => setMany(sectionNames, true)}
                       className="rounded-lg border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 dark:border-slate-700 dark:text-slate-300"
                     >
@@ -289,7 +348,7 @@ export function RoleForm() {
                     </button>
                     <button
                       type="button"
-                      disabled={!canEdit}
+                      disabled={!canWrite}
                       onClick={() => setMany(sectionNames, false)}
                       className="rounded-lg border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 dark:border-slate-700 dark:text-slate-300"
                     >
@@ -319,7 +378,7 @@ export function RoleForm() {
                             <input
                               type="checkbox"
                               className="size-4 accent-[#2ad4c5]"
-                              disabled={!canEdit}
+                              disabled={!canWrite}
                               checked={allChecked}
                               onChange={(event) =>
                                 setMany(names, event.target.checked)
@@ -337,7 +396,7 @@ export function RoleForm() {
                               <input
                                 type="checkbox"
                                 className="size-4 accent-[#2ad4c5]"
-                                disabled={!canEdit}
+                                disabled={!canWrite}
                                 checked={selected.has(action.name)}
                                 onChange={(event) =>
                                   toggle(action.name, event.target.checked)

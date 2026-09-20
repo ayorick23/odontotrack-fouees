@@ -6,6 +6,8 @@ type TableRowActionsProps = {
   viewTo?: string;
   editTo?: string;
   onDelete?: () => void;
+  deleteDisabled?: boolean;
+  deleteHint?: string;
 };
 
 const baseClass =
@@ -15,8 +17,12 @@ export function TableRowActions({
   viewTo,
   editTo,
   onDelete,
+  deleteDisabled = false,
+  deleteHint,
 }: TableRowActionsProps) {
-  if (!viewTo && !editTo && !onDelete) {
+  const showDelete = Boolean(onDelete) || deleteDisabled;
+
+  if (!viewTo && !editTo && !showDelete) {
     return <span className="text-slate-300">—</span>;
   }
 
@@ -32,60 +38,22 @@ export function TableRowActions({
           <Pencil className="size-4" />
         </ActionLink>
       ) : null}
-      {onDelete ? (
+      {showDelete ? (
         <button
           type="button"
-          title="Borrar"
-          aria-label="Borrar"
+          title={deleteDisabled ? (deleteHint ?? "No se puede borrar") : "Borrar"}
+          aria-label={deleteDisabled ? (deleteHint ?? "No se puede borrar") : "Borrar"}
+          disabled={deleteDisabled}
           onClick={onDelete}
-          className={`${baseClass} hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-400`}
+          className={`${baseClass} ${
+            deleteDisabled
+              ? "cursor-not-allowed opacity-40"
+              : "hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-400"
+          }`}
         >
           <Trash2 className="size-4" />
         </button>
       ) : null}
-    </div>
-  );
-}
-
-export function ConfirmDeleteBar({
-  message,
-  error,
-  busy,
-  onCancel,
-  onConfirm,
-}: {
-  message: string;
-  error?: string | null;
-  busy?: boolean;
-  onCancel: () => void;
-  onConfirm: () => void;
-}) {
-  return (
-    <div className="mb-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 dark:border-red-900/40 dark:bg-red-950/30">
-      <p className="text-sm text-red-800 dark:text-red-200">{message}</p>
-      {error ? (
-        <p className="mt-1 text-sm text-red-600 dark:text-red-400" role="alert">
-          {error}
-        </p>
-      ) : null}
-      <div className="mt-3 flex gap-2">
-        <button
-          type="button"
-          onClick={onCancel}
-          disabled={busy}
-          className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
-        >
-          Cancelar
-        </button>
-        <button
-          type="button"
-          onClick={onConfirm}
-          disabled={busy}
-          className="rounded-full bg-red-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
-        >
-          {busy ? "Eliminando..." : "Borrar"}
-        </button>
-      </div>
     </div>
   );
 }

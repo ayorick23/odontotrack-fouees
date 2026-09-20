@@ -1,10 +1,24 @@
+from django.utils.text import slugify
+
 from .models import AclPermission, Role
 from .permissions_catalog import SYSTEM_ROLES, all_permission_names, iter_catalog_permissions
+
+
+def unique_role_slug(name: str) -> str:
+    base = slugify(name)[:40] or "rol"
+    candidate = base
+    index = 2
+    while Role.objects.filter(slug=candidate).exists():
+        suffix = f"-{index}"
+        candidate = f"{base[: 40 - len(suffix)]}{suffix}"
+        index += 1
+    return candidate
 
 
 def sync_acl(*, reset_role_defaults: bool = False) -> dict[str, int]:
     """Crea/actualiza permisos del catálogo y roles de sistema.
 
+    Solo desarrollo local (`acl_sync_permissions`). No corre al migrar.
     No pisa la matriz de un rol existente salvo `reset_role_defaults`.
     """
     catalog_names = all_permission_names()

@@ -10,6 +10,7 @@ from accounts.permissions import (
     IsRecepcion,
     IsSoporte,
 )
+from accounts.services import sync_acl
 
 TOKEN_URL = "/api/auth/token/"
 TOKEN_REFRESH_URL = "/api/auth/token/refresh/"
@@ -97,6 +98,7 @@ class LoginTests(APITestCase):
 
 class UserCreateTests(APITestCase):
     def setUp(self):
+        sync_acl()
         self.admin = User.objects.create_user(
             username="admin",
             email="admin@fouees.edu.sv",
@@ -171,6 +173,7 @@ class UserCreateTests(APITestCase):
 
 class CurrentUserTests(APITestCase):
     def setUp(self):
+        sync_acl()
         self.user = User.objects.create_user(
             username="mgomez",
             email="maria.gomez@fouees.edu.sv",
@@ -253,8 +256,16 @@ class RolePermissionTests(APITestCase):
         self.assertFalse(self._allows(permission, User.Role.RECEPCION))
 
 
+class AclSeedIsManualTests(APITestCase):
+    def test_migrate_does_not_create_system_roles(self):
+        from accounts.models import Role
+
+        self.assertFalse(Role.objects.exists())
+
+
 class AclMatrixTests(APITestCase):
     def setUp(self):
+        sync_acl()
         self.admin = User.objects.create_user(
             username="admin",
             email="admin@fouees.edu.sv",
@@ -358,3 +369,34 @@ class AclMatrixTests(APITestCase):
         response = self.client.delete(f"/api/accounts/roles/{role.id}/")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertTrue(Role.objects.filter(slug="estudiante").exists())
+
+    def test_admin_can_create_and_delete_custom_role(self):
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.post(
+            "/api/accounts/roles/",
+            {
+                "name": "Coordinador clínico",
+                "description": "Apoya supervisión.",
+                "permissions": ["patients.view", "supervision.view"],
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["name"], "Coordinador clínico")
+        self.assertFalse(response.data["is_system"])
+        self.assertCountEqual(
+            response.data["permissions"],
+            ["patients.view", "supervision.view"],
+        )
+        role_id = response.data["id"]
+        deleted = self.client.delete(f"/api/accounts/roles/{role_id}/")
+        self.assertEqual(deleted.status_code, status.HTTP_204_NO_CONTENT)
+
+    def test_estudiante_cannot_create_role(self):
+        self.client.force_authenticate(user=self.estudiante)
+        response = self.client.post(
+            "/api/accounts/roles/",
+            {"name": "Invitado"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)

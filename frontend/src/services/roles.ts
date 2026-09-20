@@ -45,6 +45,15 @@ export async function getPermissionCatalog(): Promise<CatalogSection[]> {
   return data.catalog;
 }
 
+export async function createRole(payload: {
+  name: string;
+  description: string;
+  permissions: string[];
+}): Promise<RoleRecord> {
+  const { data } = await api.post<RoleRecord>("/accounts/roles/", payload);
+  return data;
+}
+
 export async function updateRole(
   id: number,
   payload: {

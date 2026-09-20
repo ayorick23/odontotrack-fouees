@@ -6,6 +6,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from accounts.models import User
+from accounts.services import sync_acl
 from assignments.models import Assignment
 from patients.models import Patient
 
@@ -14,6 +15,7 @@ PAGE_SIZE = settings.REST_FRAMEWORK["PAGE_SIZE"]
 
 class ListingPaginationTests(APITestCase):
     def setUp(self):
+        sync_acl()
         self.admin = User.objects.create_user(
             username="admin",
             password="pass12345",
@@ -73,6 +75,7 @@ class ListingPaginationTests(APITestCase):
 
 class PatientDirectoryTests(APITestCase):
     def setUp(self):
+        sync_acl()
         self.admin = User.objects.create_user(
             username="admin",
             password="pass12345",
@@ -191,6 +194,7 @@ class PatientDirectoryTests(APITestCase):
 
 class RecepcionPatientPermissionTests(APITestCase):
     def setUp(self):
+        sync_acl()
         self.recepcion = User.objects.create_user(
             username="recepcion",
             password="pass12345",

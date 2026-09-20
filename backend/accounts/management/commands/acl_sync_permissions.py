@@ -5,8 +5,8 @@ from accounts.services import sync_acl
 
 class Command(BaseCommand):
     help = (
-        "Sincroniza permisos `{modulo}.{accion}` del catálogo a la BD. "
-        "No crear permisos a mano."
+        "Carga el catálogo ACL y los 5 roles de sistema. "
+        "Solo para desarrollo local; no corre al migrar ni en producción."
     )
 
     def add_arguments(self, parser):

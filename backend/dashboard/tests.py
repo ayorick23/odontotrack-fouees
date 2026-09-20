@@ -5,11 +5,13 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from accounts.models import User
+from accounts.services import sync_acl
 from patients.models import Patient
 
 
 class DashboardSummaryTests(APITestCase):
     def setUp(self):
+        sync_acl()
         self.admin = User.objects.create_user(
             username="admin",
             password="pass12345",

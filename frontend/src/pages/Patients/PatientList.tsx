@@ -13,11 +13,9 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
 import { can } from "../../acl/can";
+import { ConfirmDeleteDialog } from "../../components/ConfirmDeleteDialog";
 import { Table } from "../../components/Table";
-import {
-  ConfirmDeleteBar,
-  TableRowActions,
-} from "../../components/TableRowActions";
+import { TableRowActions } from "../../components/TableRowActions";
 import { useAuth } from "../../hooks/useAuth";
 import {
   countByStatus,
@@ -364,18 +362,6 @@ export function PatientList() {
       />
 
       <section className="rounded-2xl bg-white p-4 shadow-[0_10px_30px_rgba(15,40,80,0.06)] dark:bg-slate-900 dark:shadow-none dark:ring-1 dark:ring-white/10 sm:p-5">
-        {pendingDelete ? (
-          <ConfirmDeleteBar
-            message={`¿Borrar a ${patientFullName(pendingDelete)}? Esta acción no se puede deshacer.`}
-            error={deleteError}
-            busy={deleting}
-            onCancel={() => {
-              setPendingDelete(null);
-              setDeleteError(null);
-            }}
-            onConfirm={() => void confirmDelete()}
-          />
-        ) : null}
         <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div
             className="flex flex-wrap gap-2"
@@ -459,6 +445,22 @@ export function PatientList() {
           </>
         ) : null}
       </section>
+
+      <ConfirmDeleteDialog
+        open={pendingDelete !== null}
+        title={
+          pendingDelete
+            ? `¿Eliminar el paciente “${patientFullName(pendingDelete)}”?`
+            : "¿Eliminar paciente?"
+        }
+        error={deleteError}
+        busy={deleting}
+        onCancel={() => {
+          setPendingDelete(null);
+          setDeleteError(null);
+        }}
+        onConfirm={() => void confirmDelete()}
+      />
     </div>
   );
 }
