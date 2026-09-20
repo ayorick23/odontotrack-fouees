@@ -22,8 +22,29 @@ const PAGE_META: Record<string, { title: string; crumb: string }> = {
   "/calendar": { title: "Calendario de citas", crumb: "Dashboard › Calendario" },
   "/supervision": { title: "Supervisión", crumb: "Dashboard › Supervisión" },
   "/students": { title: "Base de estudiantes", crumb: "Dashboard › Estudiantes" },
+  "/roles": { title: "Roles y permisos", crumb: "Sistema › Roles" },
   "/support": { title: "Soporte técnico", crumb: "Dashboard › Soporte" },
 };
+
+function pageMeta(pathname: string): { title: string; crumb: string } {
+  const exact = PAGE_META[pathname];
+  if (exact) {
+    return exact;
+  }
+  if (/^\/patients\/\d+\/edit$/.test(pathname)) {
+    return { title: "Editar paciente", crumb: "Pacientes › Editar" };
+  }
+  if (/^\/patients\/\d+$/.test(pathname)) {
+    return { title: "Ficha de paciente", crumb: "Pacientes › Detalle" };
+  }
+  if (/^\/roles\/\d+\/edit$/.test(pathname)) {
+    return { title: "Editar rol", crumb: "Sistema › Roles › Editar" };
+  }
+  if (/^\/roles\/\d+$/.test(pathname)) {
+    return { title: "Ver rol", crumb: "Sistema › Roles › Detalle" };
+  }
+  return { title: "FOUEES", crumb: "Panel" };
+}
 
 export function Navbar({
   user,
@@ -33,10 +54,7 @@ export function Navbar({
   onLogout: () => void;
 }) {
   const location = useLocation();
-  const meta = PAGE_META[location.pathname] ?? {
-    title: "FOUEES",
-    crumb: "Panel",
-  };
+  const meta = pageMeta(location.pathname);
 
   return (
     <header className="flex items-center justify-between rounded-2xl bg-white px-5 py-3 shadow-sm dark:bg-slate-900 dark:shadow-none dark:ring-1 dark:ring-white/10">

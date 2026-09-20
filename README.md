@@ -72,10 +72,45 @@ corre dentro de contenedores.
    - `backend` → API de Django en [http://localhost:8000](http://localhost:8000)
    - `frontend` → React (Vite) en [http://localhost:5173](http://localhost:5173)
 
-   El backend espera automáticamente a que la base de datos esté lista
-   y aplica las migraciones antes de arrancar el servidor.
+   El backend espera a que la base de datos esté lista y levanta el
+   servidor. **No** aplica migraciones ni seeds al arrancar.
 
-4. **Verifica que el backend responde:**
+4. **Aplica el esquema de la base (manual):**
+
+   La primera vez, y cada vez que alguien agregue una migración, hay
+   que correrlo a mano. En otra terminal, con los contenedores ya
+   corriendo:
+
+   ```bash
+   docker compose exec backend python manage.py migrate
+   ```
+
+   Eso solo crea o altera tablas. No inserta roles, permisos ni
+   usuarios. Tampoco corre al levantar el contenedor: si no lo
+   ejecutas, la API falla por tablas inexistentes.
+
+5. **Carga el catálogo ACL (solo desarrollo local):**
+
+   Sin este paso, la app arranca pero nadie tiene permisos de
+   pantalla ni de API (menú vacío, 403):
+
+   ```bash
+   docker compose exec backend python manage.py acl_sync_permissions
+   ```
+
+   Eso inserta el catálogo de permisos (`patients.view`,
+   `diagnoses.validate`, …) y los 5 roles de sistema (`admin`,
+   `docente`, `estudiante`, `recepcion`, `soporte`). Es seed de
+   prueba. **No** lo corras en producción.
+
+   Si cambias la matriz por defecto de un rol de sistema y quieres
+   volver a aplicarla (pisa permisos de esos 5 roles):
+
+   ```bash
+   docker compose exec backend python manage.py acl_sync_permissions --reset-defaults
+   ```
+
+6. **Verifica que el backend responde:**
 
    Abre [http://localhost:8000/api/health/](http://localhost:8000/api/health/)
    en tu navegador. Deberías ver `{"status": "ok"}`.
@@ -87,11 +122,11 @@ corre dentro de contenedores.
    Para probar endpoints protegidos: `POST /api/auth/token/`, copiá el
    `access` y usá **Authorize** (Bearer JWT).
 
-5. **Abre el frontend:**
+7. **Abre el frontend:**
 
    Abre [http://localhost:5173](http://localhost:5173) en tu navegador.
 
-6. **Crea un superusuario** (para entrar al admin de Django y gestionar
+8. **Crea un superusuario** (para entrar al admin de Django y gestionar
    datos mientras no exista una pantalla propia para todo). En otra
    terminal, con los contenedores ya corriendo:
 
@@ -113,7 +148,27 @@ docker compose logs -f frontend   # ver logs del frontend en tiempo real
 docker compose exec backend python manage.py <comando>   # correr un comando de Django
 docker compose exec backend python manage.py makemigrations
 docker compose exec backend python manage.py migrate
+docker compose exec backend python manage.py acl_sync_permissions
 ```
+
+### Migraciones y seeds: solo a mano (no producción automática)
+
+El contenedor del backend **no** muta la base al arrancar. Hoy no hay
+signals `post_migrate`, fixtures ni otro seed oculto: lo único que
+existía automático era `migrate` en el `entrypoint`, y ya no corre
+solo.
+
+| Comando | Qué hace | Cuándo |
+| --- | --- | --- |
+| `migrate` | Crea/altera tablas vacías | Local, a mano, cuando hay migraciones nuevas |
+| `acl_sync_permissions` | Llena permisos y los 5 roles de sistema | Solo desarrollo local, a mano |
+| `createsuperuser` | Crea un usuario admin de Django | Solo desarrollo local, a mano |
+
+Nada de eso va en el arranque de producción. Si en un deploy hace
+falta aplicar esquema, se corre `migrate` de forma explícita en ese
+momento (no en cada restart del contenedor). El seed ACL no se usa
+en producción: los roles se crean desde la pantalla de Roles (o se
+evalúa un proceso aparte).
 
 ### Si agregas una dependencia nueva
 

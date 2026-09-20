@@ -6,6 +6,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from accounts.models import User
+from accounts.services import sync_acl
 from assignments.models import Assignment
 from patients.models import Patient
 
@@ -14,6 +15,7 @@ PAGE_SIZE = settings.REST_FRAMEWORK["PAGE_SIZE"]
 
 class ListingPaginationTests(APITestCase):
     def setUp(self):
+        sync_acl()
         self.admin = User.objects.create_user(
             username="admin",
             password="pass12345",
@@ -73,6 +75,7 @@ class ListingPaginationTests(APITestCase):
 
 class PatientDirectoryTests(APITestCase):
     def setUp(self):
+        sync_acl()
         self.admin = User.objects.create_user(
             username="admin",
             password="pass12345",
@@ -187,3 +190,63 @@ class PatientDirectoryTests(APITestCase):
         row = response.json()["results"][0]
         self.assertEqual(row["assigned_to"], "Ana López")
         self.assertNotIn("address", row)
+
+
+class RecepcionPatientPermissionTests(APITestCase):
+    def setUp(self):
+        sync_acl()
+        self.recepcion = User.objects.create_user(
+            username="recepcion",
+            password="pass12345",
+            role=User.Role.RECEPCION,
+        )
+        self.admin = User.objects.create_user(
+            username="admin",
+            password="pass12345",
+            role=User.Role.ADMIN,
+        )
+        self.student = User.objects.create_user(
+            username="estudiante",
+            password="pass12345",
+            role=User.Role.ESTUDIANTE,
+        )
+        self.unassigned = Patient.objects.create(
+            first_name="Ana",
+            last_name="Libre",
+            document_id="LIB-001",
+        )
+        self.assigned = Patient.objects.create(
+            first_name="Luis",
+            last_name="Asignado",
+            document_id="ASG-002",
+        )
+        Assignment.objects.create(patient=self.assigned, student=self.student)
+        self.client.force_authenticate(user=self.recepcion)
+
+    def test_recepcion_can_edit_unassigned_patient(self):
+        response = self.client.patch(
+            f"/api/patients/{self.unassigned.id}/",
+            {"phone_number": "7777-7777"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.unassigned.refresh_from_db()
+        self.assertEqual(self.unassigned.phone_number, "7777-7777")
+
+    def test_recepcion_cannot_edit_assigned_patient(self):
+        response = self.client.patch(
+            f"/api/patients/{self.assigned.id}/",
+            {"phone_number": "7777-7777"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertIn("asignados", str(response.data).lower())
+
+    def test_admin_can_edit_assigned_patient(self):
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.patch(
+            f"/api/patients/{self.assigned.id}/",
+            {"phone_number": "7000-0000"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)

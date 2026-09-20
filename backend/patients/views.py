@@ -1,19 +1,23 @@
 from rest_framework import filters, viewsets
 from rest_framework.permissions import IsAuthenticated
 
+from accounts.permissions import HasRequiredAcl, RecepcionCannotEditAssignedPatient
+
 from .models import Patient
 from .serializers import PatientListSerializer, PatientSerializer
 
 
 class PatientViewSet(viewsets.ModelViewSet):
-    """
-    CRUD de pacientes. Todavía sin reglas de permisos por rol
-    (ej. que un estudiante solo vea sus pacientes asignados);
-    eso se implementará junto con la lógica de negocio de assignments.
-    """
-
     queryset = Patient.objects.all()
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasRequiredAcl, RecepcionCannotEditAssignedPatient]
+    acl_permissions = {
+        "list": "patients.view",
+        "retrieve": "patients.view",
+        "create": "patients.create",
+        "update": "patients.edit",
+        "partial_update": "patients.edit",
+        "destroy": "patients.delete",
+    }
     filter_backends = [filters.SearchFilter]
     search_fields = ["first_name", "last_name", "document_id"]
 

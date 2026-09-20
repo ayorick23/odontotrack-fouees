@@ -8,9 +8,13 @@ type UserResponse = {
   first_name: string;
   last_name: string;
   role: AuthUser["role"];
+  permissions?: string[];
 };
 
 export async function getCurrentUser(): Promise<AuthUser> {
   const { data } = await api.get<UserResponse>("/accounts/users/me/");
-  return data;
+  return {
+    ...data,
+    permissions: data.permissions ?? [],
+  };
 }
