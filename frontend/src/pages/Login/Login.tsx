@@ -18,7 +18,7 @@ const loginSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 export function Login() {
-  const { isAuthenticated, login } = useAuth();
+  const { isAuthenticated, isReady, login } = useAuth();
   const navigate = useNavigate();
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -36,10 +36,10 @@ export function Login() {
   });
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isReady && isAuthenticated) {
       navigate("/dashboard", { replace: true });
     }
-  }, [isAuthenticated, navigate]);
+  }, [isReady, isAuthenticated, navigate]);
 
   async function onSubmit(values: LoginFormValues) {
     setSubmitError(null);
@@ -49,6 +49,16 @@ export function Login() {
     } catch (error) {
       setSubmitError(getLoginErrorMessage(error));
     }
+  }
+
+  if (!isReady) {
+    return (
+      <div className="flex min-h-svh items-center justify-center bg-[#eef3f8] dark:bg-slate-950">
+        <p className="text-sm text-slate-500 dark:text-slate-400">
+          Cargando sesión...
+        </p>
+      </div>
+    );
   }
 
   return (

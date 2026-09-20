@@ -82,3 +82,25 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
 export function isAllowed(roles: readonly UserRole[], role: UserRole): boolean {
   return roles.includes(role);
 }
+
+function navLeaves(): readonly NavLeaf[] {
+  return NAV_ENTRIES.flatMap((entry) =>
+    "children" in entry ? entry.children : [entry],
+  );
+}
+
+export function canAccessPath(pathname: string, role: UserRole): boolean {
+  const normalized = pathname.replace(/\/$/, "") || "/";
+  const leaves = navLeaves();
+  const exact = leaves.find((leaf) => leaf.to === normalized);
+  if (exact) {
+    return isAllowed(exact.roles, role);
+  }
+
+  if (normalized.startsWith("/patients/")) {
+    const directory = leaves.find((leaf) => leaf.to === "/patients");
+    return directory ? isAllowed(directory.roles, role) : false;
+  }
+
+  return false;
+}

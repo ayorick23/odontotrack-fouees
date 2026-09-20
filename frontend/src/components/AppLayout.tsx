@@ -1,40 +1,31 @@
-import { useEffect } from "react";
-import { Navigate, Outlet, useNavigate } from "react-router-dom";
+import { Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
 
 import { useAuth } from "../hooks/useAuth";
-import { getCurrentUser } from "../services/accounts";
+import { canAccessPath } from "./navigation";
 import { Navbar } from "./Navbar";
 import { Sidebar } from "./Sidebar";
 
 export function AppLayout() {
-  const { user, isAuthenticated, setUser, logout } = useAuth();
+  const { user, isAuthenticated, isReady, logout } = useAuth();
+  const location = useLocation();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    if (!isAuthenticated || user) {
-      return;
-    }
-
-    let cancelled = false;
-    getCurrentUser()
-      .then((current) => {
-        if (!cancelled) {
-          setUser(current);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          logout();
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isAuthenticated, user, setUser, logout]);
+  if (!isReady || (isAuthenticated && user === null)) {
+    return (
+      <div className="flex min-h-svh items-center justify-center bg-[#eef3f8] dark:bg-slate-950">
+        <p className="text-sm text-slate-500 dark:text-slate-400">
+          Cargando sesión...
+        </p>
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
+  }
+
+  if (user !== null && !canAccessPath(location.pathname, user.role)) {
+    return <Navigate to="/dashboard" replace />;
   }
 
   function handleLogout() {

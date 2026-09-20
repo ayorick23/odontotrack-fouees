@@ -4,7 +4,9 @@ from rest_framework.test import APITestCase
 from accounts.models import User
 
 TOKEN_URL = "/api/auth/token/"
+TOKEN_REFRESH_URL = "/api/auth/token/refresh/"
 USERS_URL = "/api/accounts/users/"
+ME_URL = "/api/accounts/users/me/"
 VALID_PASSWORD = "OdontoTrack2026!"
 
 
@@ -67,6 +69,22 @@ class LoginTests(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("username", response.data)
+
+    def test_refresh_returns_rotated_tokens(self):
+        tokens = self.client.post(
+            TOKEN_URL,
+            {"username": "mgomez", "password": VALID_PASSWORD},
+            format="json",
+        ).data
+        response = self.client.post(
+            TOKEN_REFRESH_URL,
+            {"refresh": tokens["refresh"]},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("access", response.data)
+        self.assertIn("refresh", response.data)
+        self.assertNotEqual(response.data["access"], tokens["access"])
 
 
 class UserCreateTests(APITestCase):
@@ -141,3 +159,33 @@ class UserCreateTests(APITestCase):
         response = self.client.post(USERS_URL, payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("email", response.data)
+
+
+class CurrentUserTests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="mgomez",
+            email="maria.gomez@fouees.edu.sv",
+            password=VALID_PASSWORD,
+            first_name="María",
+            last_name="Gómez",
+            role=User.Role.ESTUDIANTE,
+        )
+
+    def test_me_returns_authenticated_user(self):
+        tokens = self.client.post(
+            TOKEN_URL,
+            {"username": "mgomez", "password": VALID_PASSWORD},
+            format="json",
+        ).data
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {tokens['access']}")
+        response = self.client.get(ME_URL)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["id"], self.user.id)
+        self.assertEqual(response.data["username"], "mgomez")
+        self.assertEqual(response.data["role"], User.Role.ESTUDIANTE)
+        self.assertNotIn("password", response.data)
+
+    def test_me_requires_authentication(self):
+        response = self.client.get(ME_URL)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
