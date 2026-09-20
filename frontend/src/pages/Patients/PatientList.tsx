@@ -1,5 +1,3 @@
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
 import {
   CircleCheckBig,
   Clock3,
@@ -7,8 +5,11 @@ import {
   UserCheck,
   UserPlus,
   Users,
+  X,
   type LucideIcon,
 } from "lucide-react";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -17,6 +18,13 @@ import { can } from "../../acl/can";
 import { ConfirmDeleteDialog } from "../../components/ConfirmDeleteDialog";
 import { Table } from "../../components/Table";
 import { TableRowActions } from "../../components/TableRowActions";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../components/ui/select";
 import { useAuth } from "../../hooks/useAuth";
 import { primaryActionClass } from "../../lib/actions";
 import {
@@ -26,12 +34,17 @@ import {
 } from "../../services/dashboard";
 import {
   CASE_STATUS_LABELS,
+  CLINICAL_AREA_LABELS,
+  CLINICAL_AREAS,
   deletePatient,
+  listAssignees,
   listPatients,
   patientFullName,
   patientInitials,
   type CaseStatus,
+  type ClinicalArea,
   type DirectoryPeriod,
+  type PatientAssignee,
   type PatientListItem,
 } from "../../services/patients";
 
@@ -42,12 +55,24 @@ const PERIOD_FILTERS: Array<{ value: DirectoryPeriod | "todos"; label: string }>
   { value: "6m", label: "6M" },
   { value: "1a", label: "1A" },
 ];
-const STATUS_FILTERS: Array<{ value: CaseStatus | "todos"; label: string }> = [
-  { value: "todos", label: "Todos" },
+const STATUS_OPTIONS: Array<{ value: CaseStatus | "todos"; label: string }> = [
+  { value: "todos", label: "Todos los estados" },
   { value: "pendiente", label: CASE_STATUS_LABELS.pendiente },
   { value: "en_proceso", label: CASE_STATUS_LABELS.en_proceso },
   { value: "finalizado", label: CASE_STATUS_LABELS.finalizado },
 ];
+const AREA_OPTIONS: Array<{ value: ClinicalArea | "todos"; label: string }> = [
+  { value: "todos", label: "Todas las áreas" },
+  ...CLINICAL_AREAS.map((area) => ({
+    value: area,
+    label: CLINICAL_AREA_LABELS[area],
+  })),
+];
+const SELECT_PARAM_KEYS = [
+  "case_status",
+  "clinical_area",
+  "assigned_to",
+] as const;
 const STATUS_ICONS: Record<CaseStatus, LucideIcon> = {
   pendiente: Clock3,
   en_proceso: UserCheck,
@@ -76,6 +101,14 @@ function isCaseStatus(value: string | null): value is CaseStatus {
   return value === "pendiente" || value === "en_proceso" || value === "finalizado";
 }
 
+function isClinicalArea(value: string | null): value is ClinicalArea {
+  return value !== null && value in CLINICAL_AREA_LABELS;
+}
+
+function isAssigneeFilter(value: string | null): value is string {
+  return value === "unassigned" || (value !== null && /^\d+$/.test(value));
+}
+
 export function PatientList() {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -85,9 +118,16 @@ export function PatientList() {
   const period = isDirectoryPeriod(periodFromUrl) ? periodFromUrl : undefined;
   const statusFromUrl = searchParams.get("case_status");
   const caseStatus = isCaseStatus(statusFromUrl) ? statusFromUrl : undefined;
+  const areaFromUrl = searchParams.get("clinical_area");
+  const clinicalArea = isClinicalArea(areaFromUrl) ? areaFromUrl : undefined;
+  const assignedFromUrl = searchParams.get("assigned_to");
+  const assignedTo = isAssigneeFilter(assignedFromUrl)
+    ? assignedFromUrl
+    : undefined;
 
   const [searchInput, setSearchInput] = useState(searchFromUrl);
   const [reloadToken, setReloadToken] = useState(0);
+  const [assignees, setAssignees] = useState<PatientAssignee[]>([]);
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const [kpiState, setKpiState] = useState<KpiState>({ status: "loading" });
   const [pendingDelete, setPendingDelete] = useState<PatientListItem | null>(
@@ -149,6 +189,26 @@ export function PatientList() {
 
   useEffect(() => {
     let cancelled = false;
+
+    listAssignees()
+      .then((rows) => {
+        if (!cancelled) {
+          setAssignees(rows);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setAssignees([]);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [reloadToken]);
+
+  useEffect(() => {
+    let cancelled = false;
     setState({ status: "loading" });
 
     listPatients({
@@ -156,6 +216,8 @@ export function PatientList() {
       search: searchFromUrl || undefined,
       period,
       caseStatus,
+      clinicalArea,
+      assignedTo,
     })
       .then((payload) => {
         if (!cancelled) {
@@ -178,7 +240,21 @@ export function PatientList() {
     return () => {
       cancelled = true;
     };
-  }, [page, searchFromUrl, period, caseStatus, reloadToken]);
+  }, [page, searchFromUrl, period, caseStatus, clinicalArea, assignedTo, reloadToken]);
+
+  function setSelectParam(
+    key: (typeof SELECT_PARAM_KEYS)[number],
+    value: string,
+  ) {
+    const next = new URLSearchParams(searchParams);
+    if (value === "todos") {
+      next.delete(key);
+    } else {
+      next.set(key, value);
+    }
+    next.delete("page");
+    setSearchParams(next);
+  }
 
   function setPeriodFilter(nextPeriod: DirectoryPeriod | "todos") {
     const next = new URLSearchParams(searchParams);
@@ -192,11 +268,13 @@ export function PatientList() {
   }
 
   function setStatusFilter(nextStatus: CaseStatus | "todos") {
+    setSelectParam("case_status", nextStatus);
+  }
+
+  function clearSelectFilters() {
     const next = new URLSearchParams(searchParams);
-    if (nextStatus === "todos") {
-      next.delete("case_status");
-    } else {
-      next.set("case_status", nextStatus);
+    for (const key of SELECT_PARAM_KEYS) {
+      next.delete(key);
     }
     next.delete("page");
     setSearchParams(next);
@@ -213,6 +291,20 @@ export function PatientList() {
   }
 
   const pageCount = state.status === "ready" ? Math.max(Math.ceil(state.count / PAGE_SIZE), 1) : 1;
+  const hasSelectFilters = Boolean(
+    caseStatus || clinicalArea || assignedTo,
+  );
+  const assigneeOptions = useMemo(
+    () => [
+      { value: "todos", label: "Todos" },
+      { value: "unassigned", label: "Sin asignar" },
+      ...assignees.map((student) => ({
+        value: String(student.id),
+        label: student.name,
+      })),
+    ],
+    [assignees],
+  );
   const range = useMemo(() => {
     if (state.status !== "ready" || state.count === 0) {
       return { from: 0, to: 0 };
@@ -228,7 +320,7 @@ export function PatientList() {
         header: "ID",
         render: (patient: PatientListItem) => (
           <span className="font-medium text-slate-500 dark:text-slate-400">
-            #{patient.id}
+            {patient.id}
           </span>
         ),
       },
@@ -239,20 +331,24 @@ export function PatientList() {
             <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-teal-50 text-xs font-semibold text-teal-700 dark:bg-teal-950/60 dark:text-teal-300">
               {patientInitials(patient)}
             </span>
-            <div>
-              <p className="font-medium text-slate-800 dark:text-slate-100">
-                {patientFullName(patient)}
-              </p>
-              {patient.phone_number ? (
-                <p className="text-xs text-slate-400">{patient.phone_number}</p>
-              ) : null}
-            </div>
+            <p className="font-medium text-slate-800 dark:text-slate-100">
+              {patientFullName(patient)}
+            </p>
           </div>
         ),
       },
       {
         header: "Documento",
         render: (patient: PatientListItem) => patient.document_id,
+      },
+      {
+        header: "Área",
+        render: (patient: PatientListItem) =>
+          patient.clinical_area ? (
+            CLINICAL_AREA_LABELS[patient.clinical_area]
+          ) : (
+            <span className="text-slate-400">Sin área</span>
+          ),
       },
       {
         header: "Asignado a",
@@ -268,7 +364,7 @@ export function PatientList() {
         ),
       },
       {
-        header: "Registrado",
+        header: "Creado desde",
         render: (patient: PatientListItem) =>
           format(new Date(patient.created_at), "d MMM yyyy", { locale: es }),
       },
@@ -366,36 +462,54 @@ export function PatientList() {
       />
 
       <section className="rounded-2xl bg-white p-4 shadow-[0_10px_30px_rgba(15,40,80,0.06)] dark:bg-slate-900 dark:shadow-none dark:ring-1 dark:ring-white/10 sm:p-5">
-        <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div
-            className="flex flex-wrap gap-2"
-            role="group"
-            aria-label="Filtrar por estado"
-          >
-            {STATUS_FILTERS.map((filter) => {
-              const selected =
-                filter.value === "todos"
-                  ? caseStatus === undefined
-                  : caseStatus === filter.value;
-              const Icon =
-                filter.value === "todos" ? Users : STATUS_ICONS[filter.value];
-              return (
-                <button
-                  key={filter.value}
-                  type="button"
-                  aria-pressed={selected}
-                  onClick={() => setStatusFilter(filter.value)}
-                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition ${
-                    selected
-                      ? "bg-[#2ad4c5] text-white"
-                      : "bg-slate-50 text-slate-500 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
-                  }`}
-                >
-                  <Icon className="size-3.5" aria-hidden="true" />
-                  {filter.label}
-                </button>
-              );
-            })}
+        <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex flex-wrap items-center gap-2">
+            <DirectoryFilter
+              id="directory-status"
+              label="Estado"
+              value={caseStatus ?? "todos"}
+              options={STATUS_OPTIONS}
+              onChange={(value) =>
+                setSelectParam(
+                  "case_status",
+                  isCaseStatus(value) ? value : "todos",
+                )
+              }
+            />
+            <DirectoryFilter
+              id="directory-area"
+              label="Área"
+              value={clinicalArea ?? "todos"}
+              options={AREA_OPTIONS}
+              onChange={(value) =>
+                setSelectParam(
+                  "clinical_area",
+                  isClinicalArea(value) ? value : "todos",
+                )
+              }
+            />
+            <DirectoryFilter
+              id="directory-assignee"
+              label="Asignado"
+              value={assignedTo ?? "todos"}
+              options={assigneeOptions}
+              onChange={(value) =>
+                setSelectParam(
+                  "assigned_to",
+                  isAssigneeFilter(value) ? value : "todos",
+                )
+              }
+            />
+            {hasSelectFilters ? (
+              <button
+                type="button"
+                onClick={clearSelectFilters}
+                className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium text-slate-500 transition hover:bg-slate-50 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+              >
+                <X className="size-3.5" aria-hidden="true" />
+                Limpiar filtros
+              </button>
+            ) : null}
           </div>
           <label className="flex items-center gap-2 rounded-full bg-slate-50 px-3 py-2 text-sm text-slate-500 dark:bg-slate-800 dark:text-slate-300">
             <Search className="size-4 shrink-0" />
@@ -434,7 +548,15 @@ export function PatientList() {
               columns={columns}
               rows={state.patients}
               getRowKey={(patient) => patient.id}
-              emptyMessage={emptyDirectoryMessage(searchFromUrl, period, caseStatus)}
+              emptyMessage={emptyDirectoryMessage(
+                Boolean(
+                  searchFromUrl ||
+                    period ||
+                    caseStatus ||
+                    clinicalArea ||
+                    assignedTo,
+                ),
+              )}
             />
             {state.count > 0 ? (
               <Pagination
@@ -578,12 +700,8 @@ function DirectoryKpi({
   );
 }
 
-function emptyDirectoryMessage(
-  search: string,
-  period: DirectoryPeriod | undefined,
-  caseStatus: CaseStatus | undefined,
-): string {
-  if (search || period || caseStatus) {
+function emptyDirectoryMessage(hasFilters: boolean): string {
+  if (hasFilters) {
     return "No se encontraron pacientes con ese criterio.";
   }
   return "Aún no hay pacientes registrados.";
@@ -605,6 +723,69 @@ function StatusBadge({ status }: { status: CaseStatus }) {
       <Icon className="size-3.5" aria-hidden="true" />
       {CASE_STATUS_LABELS[status]}
     </span>
+  );
+}
+
+function DirectoryFilter({
+  id,
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  options: Array<{ value: string; label: string }>;
+  onChange: (value: string) => void;
+}) {
+  const labelId = `${id}-label`;
+  const isFiltered = value !== "todos";
+
+  return (
+    <div className="flex items-center gap-1 rounded-full bg-slate-50 py-1.5 pr-1.5 pl-3 text-sm dark:bg-slate-800">
+      <span
+        id={labelId}
+        className="text-xs font-semibold uppercase tracking-wide text-slate-400"
+      >
+        {label}
+      </span>
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger
+          id={id}
+          size="sm"
+          aria-labelledby={labelId}
+          className="h-auto max-w-44 border-0 bg-transparent px-1 py-0.5 font-medium text-slate-700 shadow-none dark:bg-transparent dark:hover:bg-transparent dark:text-slate-100"
+        >
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent
+          position="popper"
+          align="start"
+          className="rounded-xl border-slate-200 bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+        >
+          {options.map((option) => (
+            <SelectItem
+              key={option.value}
+              value={option.value}
+              className="rounded-lg focus:bg-slate-100 focus:text-slate-800 dark:focus:bg-slate-700 dark:focus:text-white"
+            >
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      {isFiltered ? (
+        <button
+          type="button"
+          onClick={() => onChange("todos")}
+          aria-label={`Quitar filtro de ${label.toLowerCase()}`}
+          className="flex size-6 shrink-0 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-200 hover:text-slate-700 dark:hover:bg-slate-700 dark:hover:text-slate-100"
+        >
+          <X className="size-3.5" aria-hidden="true" />
+        </button>
+      ) : null}
+    </div>
   );
 }
 

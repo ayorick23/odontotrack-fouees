@@ -5,8 +5,14 @@ from .models import Patient
 
 @admin.register(Patient)
 class PatientAdmin(admin.ModelAdmin):
-    list_display = ("full_name", "document_id", "case_status", "created_at")
-    list_filter = ("case_status",)
+    list_display = (
+        "full_name",
+        "document_id",
+        "clinical_area",
+        "case_status",
+        "created_at",
+    )
+    list_filter = ("case_status", "clinical_area")
     search_fields = ("first_name", "last_name", "document_id")
 
     @admin.display(description="Nombre completo")

@@ -109,6 +109,118 @@ class PatientDirectoryTests(APITestCase):
             ["99999999-9"],
         )
 
+    def test_filter_by_clinical_area(self):
+        Patient.objects.create(
+            first_name="Ana",
+            last_name="Endodoncia",
+            document_id="END-001",
+            clinical_area=Patient.ClinicalArea.ENDODONCIA,
+        )
+        Patient.objects.create(
+            first_name="Luis",
+            last_name="Operatoria",
+            document_id="OPE-001",
+            clinical_area=Patient.ClinicalArea.OPERATORIA,
+        )
+
+        response = self.client.get(
+            "/api/patients/",
+            {"clinical_area": Patient.ClinicalArea.ENDODONCIA},
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        body = response.json()
+        self.assertEqual(body["count"], 1)
+        self.assertEqual(body["results"][0]["document_id"], "END-001")
+        self.assertEqual(
+            body["results"][0]["clinical_area"],
+            Patient.ClinicalArea.ENDODONCIA,
+        )
+
+    def test_filter_by_assigned_to_unassigned_and_student(self):
+        student = User.objects.create_user(
+            username="estudiante-filtro",
+            password="pass12345",
+            role=User.Role.ESTUDIANTE,
+            first_name="Diego",
+            last_name="Ramírez",
+        )
+        other = User.objects.create_user(
+            username="estudiante-otro",
+            password="pass12345",
+            role=User.Role.ESTUDIANTE,
+            first_name="Laura",
+            last_name="Rivas",
+        )
+        free = Patient.objects.create(
+            first_name="Ana",
+            last_name="Libre",
+            document_id="ASG-FREE",
+        )
+        diego_patient = Patient.objects.create(
+            first_name="Luis",
+            last_name="DeDiego",
+            document_id="ASG-DIEGO",
+        )
+        Patient.objects.create(
+            first_name="Marta",
+            last_name="DeLaura",
+            document_id="ASG-LAURA",
+        )
+        Assignment.objects.create(patient=diego_patient, student=student)
+        Assignment.objects.create(
+            patient=Patient.objects.get(document_id="ASG-LAURA"),
+            student=other,
+        )
+
+        unassigned = self.client.get(
+            "/api/patients/",
+            {"assigned_to": "unassigned"},
+        )
+        self.assertEqual(unassigned.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            [row["document_id"] for row in unassigned.json()["results"]],
+            [free.document_id],
+        )
+
+        by_student = self.client.get(
+            "/api/patients/",
+            {"assigned_to": student.id},
+        )
+        self.assertEqual(by_student.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            [row["document_id"] for row in by_student.json()["results"]],
+            [diego_patient.document_id],
+        )
+
+    def test_assignees_lists_students_with_active_assignment(self):
+        assigned = User.objects.create_user(
+            username="estudiante-activo",
+            password="pass12345",
+            role=User.Role.ESTUDIANTE,
+            first_name="Diego",
+            last_name="Ramírez",
+        )
+        User.objects.create_user(
+            username="estudiante-libre",
+            password="pass12345",
+            role=User.Role.ESTUDIANTE,
+            first_name="Laura",
+            last_name="Rivas",
+        )
+        patient = Patient.objects.create(
+            first_name="Luis",
+            last_name="Caso",
+            document_id="ASG-LIST",
+        )
+        Assignment.objects.create(patient=patient, student=assigned)
+
+        response = self.client.get("/api/patients/assignees/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            response.json(),
+            [{"id": assigned.id, "name": "Diego Ramírez"}],
+        )
+
     def test_filter_by_case_status(self):
         Patient.objects.create(
             first_name="Ana",
@@ -189,6 +301,7 @@ class PatientDirectoryTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         row = response.json()["results"][0]
         self.assertEqual(row["assigned_to"], "Ana López")
+        self.assertEqual(row["clinical_area"], "")
         self.assertNotIn("address", row)
 
 
