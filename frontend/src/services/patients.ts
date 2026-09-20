@@ -59,3 +59,7 @@ export function patientInitials(patient: PatientListItem): string {
   const last = patient.last_name.trim().charAt(0);
   return `${first}${last}`.toUpperCase() || "?";
 }
+
+export async function deletePatient(id: number): Promise<void> {
+  await api.delete(`/patients/${id}/`);
+}

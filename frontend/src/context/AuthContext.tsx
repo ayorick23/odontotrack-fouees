@@ -30,6 +30,7 @@ export interface AuthUser {
   last_name: string;
   email: string;
   role: UserRole;
+  permissions: string[];
 }
 
 export const ROLE_LABELS: Record<UserRole, string> = {
@@ -55,6 +56,7 @@ interface AuthContextValue {
     remember: boolean,
   ) => Promise<void>;
   logout: () => void;
+  refreshUser: () => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextValue | undefined>(
@@ -72,6 +74,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearTokens();
     setUser(null);
     setAuthenticated(false);
+  }, []);
+
+  const refreshUser = useCallback(async () => {
+    const current = await getCurrentUser();
+    setUser(current);
+    setAuthenticated(true);
   }, []);
 
   const login = useCallback(
@@ -136,8 +144,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isReady,
       login,
       logout,
+      refreshUser,
     }),
-    [user, isAuthenticated, isReady, login, logout],
+    [user, isAuthenticated, isReady, login, logout, refreshUser],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

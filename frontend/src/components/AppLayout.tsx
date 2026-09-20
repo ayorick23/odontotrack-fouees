@@ -1,7 +1,7 @@
 import { Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
 
 import { useAuth } from "../hooks/useAuth";
-import { canAccessPath } from "./navigation";
+import { canAccessPath, firstAllowedPath } from "./navigation";
 import { Navbar } from "./Navbar";
 import { Sidebar } from "./Sidebar";
 
@@ -24,8 +24,19 @@ export function AppLayout() {
     return <Navigate to="/login" replace />;
   }
 
-  if (user !== null && !canAccessPath(location.pathname, user.role)) {
-    return <Navigate to="/dashboard" replace />;
+  if (user !== null && !canAccessPath(location.pathname, user)) {
+    const fallback = firstAllowedPath(user);
+    if (fallback && fallback !== location.pathname) {
+      return <Navigate to={fallback} replace />;
+    }
+    return (
+      <div className="flex min-h-svh items-center justify-center bg-[#eef3f8] dark:bg-slate-950">
+        <p className="text-sm text-slate-500 dark:text-slate-400">
+          Tu rol no tiene pantallas habilitadas. Pide a administración que revise
+          la matriz de permisos.
+        </p>
+      </div>
+    );
   }
 
   function handleLogout() {

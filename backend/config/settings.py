@@ -42,7 +42,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "drf_spectacular",
     # Apps propias del proyecto
-    "accounts",
+    "accounts.apps.AccountsConfig",
     "patients",
     "assignments",
     "clinical_records",

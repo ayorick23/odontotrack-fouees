@@ -5,6 +5,7 @@ import {
   GraduationCap,
   Headset,
   LayoutDashboard,
+  Shield,
   UserPlus,
   Users,
 } from "lucide-react";
@@ -12,13 +13,14 @@ import { useState, type ReactNode } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 
 import logoUees from "../assets/logo-uees.png";
+import { can } from "../acl/can";
 import {
   displayName,
   ROLE_LABELS,
   type AuthUser,
 } from "../context/AuthContext";
 import {
-  isAllowed,
+  isNavVisible,
   NAV_ENTRIES,
   type NavEntry,
   type NavGroup,
@@ -33,7 +35,7 @@ export function Sidebar({ user }: { user: AuthUser | null }) {
     );
   }
 
-  const visible = NAV_ENTRIES.filter((entry) => isAllowed(entry.roles, user.role));
+  const visible = NAV_ENTRIES.filter((entry) => isNavVisible(entry, user));
 
   return (
     <aside className="flex w-64 shrink-0 flex-col rounded-2xl bg-white p-4 shadow-sm dark:bg-slate-900 dark:shadow-none dark:ring-1 dark:ring-white/10">
@@ -66,7 +68,7 @@ export function Sidebar({ user }: { user: AuthUser | null }) {
       <nav className="flex flex-1 flex-col gap-1">
         {visible.map((entry) =>
           "children" in entry ? (
-            <PatientsGroup key={entry.label} entry={entry} role={user.role} />
+            <PatientsGroup key={entry.label} entry={entry} user={user} />
           ) : (
             <SidebarLink
               key={entry.to}
@@ -83,13 +85,13 @@ export function Sidebar({ user }: { user: AuthUser | null }) {
 
 function PatientsGroup({
   entry,
-  role,
+  user,
 }: {
   entry: NavGroup & { icon: "patients" };
-  role: AuthUser["role"];
+  user: AuthUser;
 }) {
   const location = useLocation();
-  const children = entry.children.filter((child) => isAllowed(child.roles, role));
+  const children = entry.children.filter((child) => can(user, child.permission));
   const childActive = children.some(
     (child) =>
       location.pathname === child.to ||
@@ -170,6 +172,8 @@ function navIcon(icon: Exclude<NavEntry["icon"], "patients">): ReactNode {
       return <ClipboardCheck className={className} />;
     case "students":
       return <GraduationCap className={className} />;
+    case "roles":
+      return <Shield className={className} />;
     case "support":
       return <Headset className={className} />;
   }

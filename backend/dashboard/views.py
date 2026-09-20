@@ -1,6 +1,8 @@
 from django.db.models import Count
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework.permissions import IsAuthenticated
+
+from accounts.permissions import HasRequiredAcl
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -22,7 +24,8 @@ class DashboardSummaryView(APIView):
     vistas más específicas.
     """
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasRequiredAcl]
+    acl_permission = "dashboard.view"
 
     @extend_schema(
         tags=["dashboard"],

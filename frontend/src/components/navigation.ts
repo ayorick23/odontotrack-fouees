@@ -1,61 +1,52 @@
-import type { UserRole } from "../context/AuthContext";
+import type { AuthUser } from "../context/AuthContext";
+import { can } from "../acl/can";
 
 export type NavLeaf = {
   to: string;
   label: string;
-  roles: readonly UserRole[];
+  permission: string;
 };
 
 export type NavGroup = {
   label: string;
-  roles: readonly UserRole[];
   children: readonly NavLeaf[];
 };
 
 export type NavEntry =
-  | (NavLeaf & { icon: "dashboard" | "calendar" | "supervision" | "students" | "support" })
+  | (NavLeaf & { icon: "dashboard" | "calendar" | "supervision" | "students" | "support" | "roles" })
   | (NavGroup & { icon: "patients" });
-
-const ALL_ROLES: readonly UserRole[] = [
-  "admin",
-  "docente",
-  "estudiante",
-  "recepcion",
-  "soporte",
-];
 
 export const NAV_ENTRIES: readonly NavEntry[] = [
   {
     to: "/dashboard",
     label: "Dashboard",
     icon: "dashboard",
-    roles: ALL_ROLES,
+    permission: "dashboard.view",
   },
   {
     to: "/calendar",
     label: "Calendario de citas",
     icon: "calendar",
-    roles: ["admin", "docente", "estudiante", "recepcion"],
+    permission: "calendar.view",
   },
   {
     label: "Pacientes",
     icon: "patients",
-    roles: ["admin", "docente", "estudiante", "recepcion"],
     children: [
       {
         to: "/patients/new",
         label: "Registro de paciente",
-        roles: ["admin", "recepcion"],
+        permission: "patients.create",
       },
       {
         to: "/patients",
         label: "Directorio",
-        roles: ["admin", "docente", "estudiante", "recepcion"],
+        permission: "patients.view",
       },
       {
         to: "/assignments",
         label: "Asignación de paciente",
-        roles: ["admin", "docente", "recepcion"],
+        permission: "assignments.view",
       },
     ],
   },
@@ -63,24 +54,47 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
     to: "/supervision",
     label: "Supervisión",
     icon: "supervision",
-    roles: ["admin", "docente"],
+    permission: "supervision.view",
   },
   {
     to: "/students",
     label: "Base de estudiantes",
     icon: "students",
-    roles: ["admin", "docente"],
+    permission: "students.view",
+  },
+  {
+    to: "/roles",
+    label: "Roles y permisos",
+    icon: "roles",
+    permission: "roles.view",
   },
   {
     to: "/support",
     label: "Soporte técnico",
     icon: "support",
-    roles: ["admin", "soporte"],
+    permission: "support.view",
   },
 ];
 
-export function isAllowed(roles: readonly UserRole[], role: UserRole): boolean {
-  return roles.includes(role);
+export function isNavVisible(entry: NavEntry, user: AuthUser): boolean {
+  if ("children" in entry) {
+    return entry.children.some((child) => can(user, child.permission));
+  }
+  return can(user, entry.permission);
+}
+
+export function firstAllowedPath(user: AuthUser): string | null {
+  for (const entry of NAV_ENTRIES) {
+    if ("children" in entry) {
+      const child = entry.children.find((item) => can(user, item.permission));
+      if (child) {
+        return child.to;
+      }
+    } else if (can(user, entry.permission)) {
+      return entry.to;
+    }
+  }
+  return null;
 }
 
 function navLeaves(): readonly NavLeaf[] {
@@ -89,17 +103,28 @@ function navLeaves(): readonly NavLeaf[] {
   );
 }
 
-export function canAccessPath(pathname: string, role: UserRole): boolean {
+export function canAccessPath(pathname: string, user: AuthUser): boolean {
   const normalized = pathname.replace(/\/$/, "") || "/";
   const leaves = navLeaves();
   const exact = leaves.find((leaf) => leaf.to === normalized);
   if (exact) {
-    return isAllowed(exact.roles, role);
+    return can(user, exact.permission);
+  }
+
+  if (/^\/patients\/\d+\/edit$/.test(normalized)) {
+    return can(user, "patients.edit");
   }
 
   if (normalized.startsWith("/patients/")) {
-    const directory = leaves.find((leaf) => leaf.to === "/patients");
-    return directory ? isAllowed(directory.roles, role) : false;
+    return can(user, "patients.view");
+  }
+
+  if (/^\/roles\/\d+\/edit$/.test(normalized)) {
+    return can(user, "roles.edit");
+  }
+
+  if (/^\/roles\/\d+$/.test(normalized)) {
+    return can(user, "roles.view");
   }
 
   return false;

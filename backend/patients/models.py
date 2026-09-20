@@ -3,6 +3,8 @@ from datetime import timedelta
 from django.db import models
 from django.utils import timezone
 
+from assignments.models import Assignment
+
 PERIOD_DAYS = {
     "1m": 30,
     "6m": 182,
@@ -16,6 +18,9 @@ class PatientQuerySet(models.QuerySet):
         if days is None:
             return self
         return self.filter(created_at__gte=timezone.now() - timedelta(days=days))
+
+    def unassigned(self):
+        return self.exclude(assignments__status=Assignment.AssignmentStatus.ACTIVA)
 
 
 class Patient(models.Model):
@@ -58,3 +63,8 @@ class Patient(models.Model):
 
     def __str__(self):
         return f"{self.first_name} {self.last_name} ({self.document_id})"
+
+    def has_active_assignment(self) -> bool:
+        return self.assignments.filter(
+            status=Assignment.AssignmentStatus.ACTIVA,
+        ).exists()

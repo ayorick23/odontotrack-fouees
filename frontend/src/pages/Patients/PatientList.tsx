@@ -12,8 +12,12 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
-import { isAllowed } from "../../components/navigation";
+import { can } from "../../acl/can";
 import { Table } from "../../components/Table";
+import {
+  ConfirmDeleteBar,
+  TableRowActions,
+} from "../../components/TableRowActions";
 import { useAuth } from "../../hooks/useAuth";
 import {
   countByStatus,
@@ -22,6 +26,7 @@ import {
 } from "../../services/dashboard";
 import {
   CASE_STATUS_LABELS,
+  deletePatient,
   listPatients,
   patientFullName,
   patientInitials,
@@ -85,8 +90,16 @@ export function PatientList() {
   const [reloadToken, setReloadToken] = useState(0);
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const [kpiState, setKpiState] = useState<KpiState>({ status: "loading" });
+  const [pendingDelete, setPendingDelete] = useState<PatientListItem | null>(
+    null,
+  );
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  const canRegister = user !== null && isAllowed(["admin", "recepcion"], user.role);
+  const canRegister = can(user, "patients.create");
+  const canView = can(user, "patients.view");
+  const canEdit = can(user, "patients.edit");
+  const canRemove = can(user, "patients.delete");
 
   useEffect(() => {
     setSearchInput(searchFromUrl);
@@ -263,17 +276,42 @@ export function PatientList() {
         header: "Acciones",
         align: "right" as const,
         render: (patient: PatientListItem) => (
-          <Link
-            to={`/patients/${patient.id}`}
-            className="text-sm font-medium text-teal-600 hover:text-teal-700 dark:text-teal-400"
-          >
-            Ver
-          </Link>
+          <TableRowActions
+            viewTo={canView ? `/patients/${patient.id}` : undefined}
+            editTo={canEdit ? `/patients/${patient.id}/edit` : undefined}
+            onDelete={
+              canRemove
+                ? () => {
+                    setDeleteError(null);
+                    setPendingDelete(patient);
+                  }
+                : undefined
+            }
+          />
         ),
       },
     ],
-    [],
+    [canEdit, canRemove, canView],
   );
+
+  async function confirmDelete() {
+    if (pendingDelete === null) {
+      return;
+    }
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await deletePatient(pendingDelete.id);
+      setPendingDelete(null);
+      setReloadToken((token) => token + 1);
+    } catch {
+      setDeleteError(
+        "No se pudo borrar el paciente. Puede estar asignado o no tienes permiso.",
+      );
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -326,6 +364,18 @@ export function PatientList() {
       />
 
       <section className="rounded-2xl bg-white p-4 shadow-[0_10px_30px_rgba(15,40,80,0.06)] dark:bg-slate-900 dark:shadow-none dark:ring-1 dark:ring-white/10 sm:p-5">
+        {pendingDelete ? (
+          <ConfirmDeleteBar
+            message={`¿Borrar a ${patientFullName(pendingDelete)}? Esta acción no se puede deshacer.`}
+            error={deleteError}
+            busy={deleting}
+            onCancel={() => {
+              setPendingDelete(null);
+              setDeleteError(null);
+            }}
+            onConfirm={() => void confirmDelete()}
+          />
+        ) : null}
         <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div
             className="flex flex-wrap gap-2"
