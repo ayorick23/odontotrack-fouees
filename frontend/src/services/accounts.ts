@@ -1,6 +1,5 @@
 import type { AuthUser } from "../context/AuthContext";
 import { api } from "./api";
-import { getUserIdFromAccessToken } from "./tokens";
 
 type UserResponse = {
   id: number;
@@ -12,11 +11,6 @@ type UserResponse = {
 };
 
 export async function getCurrentUser(): Promise<AuthUser> {
-  const userId = getUserIdFromAccessToken();
-  if (userId === null) {
-    throw new Error("No hay sesión activa.");
-  }
-
-  const { data } = await api.get<UserResponse>(`/accounts/users/${userId}/`);
+  const { data } = await api.get<UserResponse>("/accounts/users/me/");
   return data;
 }

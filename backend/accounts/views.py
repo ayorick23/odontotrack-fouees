@@ -1,7 +1,9 @@
 from django.contrib.auth import get_user_model
 from drf_spectacular.utils import extend_schema
 from rest_framework import viewsets
+from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 from rest_framework_simplejwt.views import TokenObtainPairView
 
 from .permissions import IsAdminOrSoporte
@@ -39,3 +41,8 @@ class UserViewSet(viewsets.ModelViewSet):
         if self.action in ("create", "update", "partial_update", "destroy"):
             return [IsAdminOrSoporte()]
         return [IsAuthenticated()]
+
+    @action(detail=False, methods=["get"])
+    def me(self, request):
+        serializer = UserSerializer(request.user)
+        return Response(serializer.data)

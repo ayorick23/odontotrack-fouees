@@ -1,4 +1,17 @@
-import type { TokenPair } from "./auth";
+export type TokenPair = {
+  access: string;
+  refresh: string;
+};
+
+function activeTokenStorage(): Storage {
+  if (
+    localStorage.getItem("accessToken") !== null ||
+    localStorage.getItem("refreshToken") !== null
+  ) {
+    return localStorage;
+  }
+  return sessionStorage;
+}
 
 export function getStoredAccessToken(): string | null {
   return (
@@ -6,26 +19,11 @@ export function getStoredAccessToken(): string | null {
   );
 }
 
-export function getUserIdFromAccessToken(): number | null {
-  const token = getStoredAccessToken();
-  if (!token) {
-    return null;
-  }
-
-  const payload = token.split(".")[1];
-  if (!payload) {
-    return null;
-  }
-
-  try {
-    const padded = payload.replace(/-/g, "+").replace(/_/g, "/");
-    const normalized = padded + "=".repeat((4 - (padded.length % 4)) % 4);
-    const parsed = JSON.parse(atob(normalized)) as { user_id?: string | number };
-    const userId = Number(parsed.user_id);
-    return Number.isFinite(userId) ? userId : null;
-  } catch {
-    return null;
-  }
+export function getStoredRefreshToken(): string | null {
+  return (
+    localStorage.getItem("refreshToken") ??
+    sessionStorage.getItem("refreshToken")
+  );
 }
 
 export function persistTokens(tokens: TokenPair, remember: boolean): void {
@@ -36,6 +34,17 @@ export function persistTokens(tokens: TokenPair, remember: boolean): void {
   other.removeItem("refreshToken");
   storage.setItem("accessToken", tokens.access);
   storage.setItem("refreshToken", tokens.refresh);
+}
+
+export function persistRotatedTokens(tokens: {
+  access: string;
+  refresh?: string;
+}): void {
+  const storage = activeTokenStorage();
+  storage.setItem("accessToken", tokens.access);
+  if (tokens.refresh) {
+    storage.setItem("refreshToken", tokens.refresh);
+  }
 }
 
 export function clearTokens(): void {

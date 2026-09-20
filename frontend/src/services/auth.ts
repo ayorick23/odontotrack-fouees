@@ -1,11 +1,7 @@
 import axios from "axios";
 
 import { api } from "./api";
-
-export type TokenPair = {
-  access: string;
-  refresh: string;
-};
+import type { TokenPair } from "./tokens";
 
 export function loginWithCredentials(
   identifier: string,
