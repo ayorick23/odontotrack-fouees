@@ -11,7 +11,7 @@ type TableRowActionsProps = {
 };
 
 const baseClass =
-  "inline-flex size-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-50 dark:hover:bg-slate-800";
+  "inline-flex size-8 items-center justify-center rounded-lg transition";
 
 export function TableRowActions({
   viewTo,
@@ -47,8 +47,8 @@ export function TableRowActions({
           onClick={onDelete}
           className={`${baseClass} ${
             deleteDisabled
-              ? "cursor-not-allowed opacity-40"
-              : "hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-400"
+              ? "cursor-not-allowed text-slate-300 opacity-40 dark:text-slate-600"
+              : "text-red-500 hover:bg-red-50 hover:text-red-600 dark:text-red-400 dark:hover:bg-red-950/40 dark:hover:text-red-300"
           }`}
         >
           <Trash2 className="size-4" />
@@ -72,7 +72,7 @@ function ActionLink({
       to={to}
       title={label}
       aria-label={label}
-      className={`${baseClass} hover:text-teal-600 dark:hover:text-teal-400`}
+      className={`${baseClass} text-slate-500 hover:bg-teal-50 hover:text-teal-700 dark:text-slate-400 dark:hover:bg-teal-950/40 dark:hover:text-teal-300`}
     >
       {children}
     </Link>

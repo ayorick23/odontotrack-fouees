@@ -1,6 +1,7 @@
 import { Navigate, Route, BrowserRouter, Routes } from "react-router-dom";
 
 import { AppLayout } from "./components/AppLayout";
+import { Toaster } from "./components/ui/sonner";
 import { AuthProvider } from "./context/AuthContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import { Assignments } from "./pages/Assignments/Assignments";
@@ -19,6 +20,7 @@ import { Support } from "./pages/Support/Support";
 function App() {
   return (
     <ThemeProvider>
+      <Toaster />
       <AuthProvider>
         <BrowserRouter>
           <Routes>

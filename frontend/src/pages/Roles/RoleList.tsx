@@ -1,6 +1,7 @@
 import { Plus, Search, Shield } from "lucide-react";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 
 import { can } from "../../acl/can";
 import { ConfirmDeleteDialog } from "../../components/ConfirmDeleteDialog";
@@ -8,6 +9,7 @@ import { Modal } from "../../components/Modal";
 import { Table } from "../../components/Table";
 import { TableRowActions } from "../../components/TableRowActions";
 import { useAuth } from "../../hooks/useAuth";
+import { primaryActionClass, secondaryActionClass } from "../../lib/actions";
 import {
   createRole,
   deleteRole,
@@ -142,10 +144,12 @@ export function RoleList() {
         roles: state.roles.filter((role) => role.id !== pendingDelete.id),
       });
       setPendingDelete(null);
+      toast.warning(`Se eliminó el rol “${pendingDelete.name}”.`);
     } catch {
-      setDeleteError(
-        "No se pudo borrar el rol. Puede tener usuarios asignados.",
-      );
+      const message =
+        "No se pudo borrar el rol. Puede tener usuarios asignados.";
+      setDeleteError(message);
+      toast.error(message);
     } finally {
       setDeleting(false);
     }
@@ -173,7 +177,7 @@ export function RoleList() {
             <button
               type="button"
               onClick={() => setCreateOpen(true)}
-              className="inline-flex items-center justify-center gap-2 rounded-full border border-[#2ad4c5] px-4 py-2 text-sm font-semibold text-[#2ad4c5] hover:bg-teal-50 dark:hover:bg-teal-950/40"
+              className={primaryActionClass}
             >
               <Plus className="size-4" />
               Nuevo rol
@@ -231,9 +235,11 @@ export function RoleList() {
         onCreated={(role) => {
           setCreateOpen(false);
           if (canEdit) {
-            navigate(`/roles/${role.id}/edit`, { state: { justCreated: true } });
+            toast.success("Rol creado. Asigna los permisos y guarda la matriz.");
+            navigate(`/roles/${role.id}/edit`);
             return;
           }
+          toast.success(`Rol “${role.name}” creado.`);
           if (state.status === "ready") {
             setState({ status: "ready", roles: [...state.roles, role] });
           }
@@ -286,7 +292,7 @@ function CreateRoleModal({
       });
       onCreated(role);
     } catch {
-      setError("No se pudo crear el rol. Revisa el nombre e inténtalo de nuevo.");
+      toast.error("No se pudo crear el rol. Revisa el nombre e inténtalo de nuevo.");
     } finally {
       setSaving(false);
     }
@@ -294,7 +300,11 @@ function CreateRoleModal({
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Nuevo rol">
-      <form onSubmit={(event) => void handleSubmit(event)} className="space-y-4">
+      <form
+        onSubmit={(event) => void handleSubmit(event)}
+        noValidate
+        className="space-y-4"
+      >
         <p className="text-sm text-slate-500 dark:text-slate-400">
           {canEditAfterCreate
             ? "Primero guarda el rol. Después le asignas la matriz de permisos."
@@ -304,10 +314,19 @@ function CreateRoleModal({
           Nombre
           <input
             value={name}
-            onChange={(event) => setName(event.target.value)}
+            onChange={(event) => {
+              setName(event.target.value);
+              if (error) {
+                setError(null);
+              }
+            }}
             autoFocus
-            required
-            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-[#2ad4c5] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+            aria-invalid={error ? true : undefined}
+            className={`mt-1 w-full rounded-xl border bg-white px-3 py-2 text-sm text-slate-800 outline-none dark:bg-slate-800 dark:text-slate-100 ${
+              error
+                ? "border-red-400 focus:border-red-500 dark:border-red-500"
+                : "border-slate-200 focus:border-[#2ad4c5] dark:border-slate-700"
+            }`}
           />
         </label>
         <label className="block text-sm font-medium text-slate-600 dark:text-slate-300">
@@ -328,14 +347,14 @@ function CreateRoleModal({
             type="button"
             onClick={onClose}
             disabled={saving}
-            className="rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 dark:border-slate-700 dark:text-slate-300"
+            className={secondaryActionClass}
           >
             Cancelar
           </button>
           <button
             type="submit"
             disabled={saving}
-            className="rounded-full bg-[#2ad4c5] px-4 py-2 text-sm font-semibold text-white hover:bg-teal-400 disabled:opacity-60"
+            className={primaryActionClass}
           >
             {saving ? "Creando..." : "Crear rol"}
           </button>

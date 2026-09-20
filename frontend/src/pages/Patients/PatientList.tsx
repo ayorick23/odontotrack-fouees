@@ -11,12 +11,14 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { toast } from "sonner";
 
 import { can } from "../../acl/can";
 import { ConfirmDeleteDialog } from "../../components/ConfirmDeleteDialog";
 import { Table } from "../../components/Table";
 import { TableRowActions } from "../../components/TableRowActions";
 import { useAuth } from "../../hooks/useAuth";
+import { primaryActionClass } from "../../lib/actions";
 import {
   countByStatus,
   getDashboardSummary,
@@ -300,12 +302,14 @@ export function PatientList() {
     setDeleteError(null);
     try {
       await deletePatient(pendingDelete.id);
+      toast.warning(`Se eliminó a ${patientFullName(pendingDelete)}.`);
       setPendingDelete(null);
       setReloadToken((token) => token + 1);
     } catch {
-      setDeleteError(
-        "No se pudo borrar el paciente. Puede estar asignado o no tienes permiso.",
-      );
+      const message =
+        "No se pudo borrar el paciente. Puede estar asignado o no tienes permiso.";
+      setDeleteError(message);
+      toast.error(message);
     } finally {
       setDeleting(false);
     }
@@ -345,7 +349,7 @@ export function PatientList() {
         {canRegister ? (
           <Link
             to="/patients/new"
-            className="inline-flex items-center justify-center gap-2 rounded-full border border-[#2ad4c5] px-4 py-2 text-sm font-semibold text-[#2ad4c5] hover:bg-teal-50 dark:hover:bg-teal-950/40"
+            className={primaryActionClass}
           >
             <UserPlus className="size-4" />
             Registrar Nuevo Paciente
