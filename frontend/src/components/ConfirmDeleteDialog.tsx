@@ -8,6 +8,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { dangerActionClass, secondaryActionClass } from "@/lib/actions";
 
 type ConfirmDeleteDialogProps = {
   open: boolean;
@@ -54,16 +55,13 @@ export function ConfirmDeleteDialog({
           </p>
         ) : null}
         <AlertDialogFooter className="gap-3 sm:justify-end">
-          <AlertDialogCancel
-            disabled={busy}
-            className="h-10 rounded-xl border-slate-300 px-5 font-medium dark:border-slate-600"
-          >
+          <AlertDialogCancel disabled={busy} className={secondaryActionClass}>
             Cancelar
           </AlertDialogCancel>
           <AlertDialogAction
             variant="destructive"
             disabled={busy}
-            className="h-10 rounded-xl bg-red-500 px-5 font-medium text-white hover:bg-red-600 dark:bg-red-500 dark:hover:bg-red-600"
+            className={dangerActionClass}
             onClick={(event) => {
               event.preventDefault();
               onConfirm();

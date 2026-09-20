@@ -1,4 +1,5 @@
 import { Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 
 import { useAuth } from "../hooks/useAuth";
 import { canAccessPath, firstAllowedPath } from "./navigation";
@@ -41,6 +42,7 @@ export function AppLayout() {
 
   function handleLogout() {
     logout();
+    toast.info("Sesión cerrada.");
     navigate("/login", { replace: true });
   }
 

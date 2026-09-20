@@ -1,7 +1,8 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { z } from "zod";
 
 import logoUees from "../../assets/logo-uees.png";
@@ -20,7 +21,6 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 export function Login() {
   const { isAuthenticated, isReady, login } = useAuth();
   const navigate = useNavigate();
-  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const {
     register,
@@ -42,12 +42,11 @@ export function Login() {
   }, [isReady, isAuthenticated, navigate]);
 
   async function onSubmit(values: LoginFormValues) {
-    setSubmitError(null);
     try {
       await login(values.identifier, values.password, values.remember);
       navigate("/dashboard", { replace: true });
     } catch (error) {
-      setSubmitError(getLoginErrorMessage(error));
+      toast.error(getLoginErrorMessage(error));
     }
   }
 
@@ -127,15 +126,6 @@ export function Login() {
               ¿Olvidaste tu contraseña?
             </span>
           </div>
-
-          {submitError ? (
-            <p
-              className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300"
-              role="alert"
-            >
-              {submitError}
-            </p>
-          ) : null}
 
           <button
             type="submit"

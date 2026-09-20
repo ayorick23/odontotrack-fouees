@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { toast } from "sonner";
 
 import { can } from "../../acl/can";
 import { ConfirmDeleteDialog } from "../../components/ConfirmDeleteDialog";
 import { useAuth } from "../../hooks/useAuth";
+import { dangerActionClass, primaryActionClass } from "../../lib/actions";
 import {
   deleteRole,
   getPermissionCatalog,
@@ -30,9 +32,6 @@ export function RoleForm() {
   const roleId = Number(id);
   const { user, refreshUser } = useAuth();
   const isEditing = location.pathname.endsWith("/edit");
-  const justCreated = Boolean(
-    (location.state as { justCreated?: boolean } | null)?.justCreated,
-  );
   const canWrite = can(user, "roles.edit") && isEditing;
 
   const [state, setState] = useState<LoadState>({ status: "loading" });
@@ -41,8 +40,6 @@ export function RoleForm() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState("");
   const [saving, setSaving] = useState(false);
-  const [feedback, setFeedback] = useState<string | null>(null);
-  const [saveError, setSaveError] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -124,12 +121,10 @@ export function RoleForm() {
     }
     const trimmedName = name.trim();
     if (!trimmedName) {
-      setSaveError("El nombre es obligatorio.");
+      toast.error("El nombre es obligatorio.");
       return;
     }
     setSaving(true);
-    setFeedback(null);
-    setSaveError(null);
     try {
       const updated = await updateRole(state.role.id, {
         name: trimmedName,
@@ -138,12 +133,12 @@ export function RoleForm() {
       });
       setState({ ...state, role: updated });
       setSelected(new Set(updated.permissions));
-      setFeedback("Matriz guardada.");
+      toast.success("Matriz de permisos guardada.");
       if (user?.role === updated.slug) {
         await refreshUser();
       }
     } catch {
-      setSaveError(
+      toast.error(
         "No se pudo guardar. Revisa que los permisos existan en el catálogo.",
       );
     } finally {
@@ -159,11 +154,13 @@ export function RoleForm() {
     setDeleteError(null);
     try {
       await deleteRole(state.role.id);
+      toast.warning(`Se eliminó el rol “${state.role.name}”.`);
       navigate("/roles");
     } catch {
-      setDeleteError(
-        "No se pudo borrar el rol. Puede tener usuarios asignados.",
-      );
+      const message =
+        "No se pudo borrar el rol. Puede tener usuarios asignados.";
+      setDeleteError(message);
+      toast.error(message);
     } finally {
       setDeleting(false);
     }
@@ -200,7 +197,7 @@ export function RoleForm() {
                 setPendingDelete(true);
                 setDeleteError(null);
               }}
-              className="rounded-full border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-950/40"
+              className={dangerActionClass}
             >
               Eliminar rol
             </button>
@@ -210,14 +207,14 @@ export function RoleForm() {
               type="button"
               onClick={() => void handleSave()}
               disabled={saving}
-              className="rounded-full bg-[#2ad4c5] px-5 py-2 text-sm font-semibold text-white hover:bg-teal-400 disabled:opacity-60"
+              className={primaryActionClass}
             >
               {saving ? "Guardando..." : "Guardar matriz"}
             </button>
           ) : can(user, "roles.edit") ? (
             <Link
               to={`/roles/${state.role.id}/edit`}
-              className="rounded-full bg-[#2ad4c5] px-5 py-2 text-sm font-semibold text-white hover:bg-teal-400"
+              className={primaryActionClass}
             >
               Editar
             </Link>
@@ -238,20 +235,6 @@ export function RoleForm() {
         }}
         onConfirm={() => void confirmDelete()}
       />
-
-      {justCreated && !feedback ? (
-        <p className="text-sm text-teal-700 dark:text-teal-300">
-          Rol creado. Ahora asigna los permisos y guarda la matriz.
-        </p>
-      ) : null}
-      {feedback ? (
-        <p className="text-sm text-teal-700 dark:text-teal-300">{feedback}</p>
-      ) : null}
-      {saveError ? (
-        <p className="text-sm text-red-600 dark:text-red-400" role="alert">
-          {saveError}
-        </p>
-      ) : null}
 
       <section className="rounded-2xl bg-white p-5 shadow-sm dark:bg-slate-900 dark:ring-1 dark:ring-white/10">
         <div className="grid gap-4 md:grid-cols-2">
