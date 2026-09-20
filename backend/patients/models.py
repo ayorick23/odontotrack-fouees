@@ -22,6 +22,30 @@ class PatientQuerySet(models.QuerySet):
     def unassigned(self):
         return self.exclude(assignments__status=Assignment.AssignmentStatus.ACTIVA)
 
+    def by_case_status(self, case_status: str | None):
+        if case_status in Patient.CaseStatus.values:
+            return self.filter(case_status=case_status)
+        return self
+
+    def by_clinical_area(self, clinical_area: str | None):
+        if clinical_area in Patient.ClinicalArea.values:
+            return self.filter(clinical_area=clinical_area)
+        return self
+
+    def by_assignee(self, assigned_to: str | None):
+        if assigned_to == "unassigned":
+            return self.unassigned()
+        try:
+            student_id = int(assigned_to or "")
+        except ValueError:
+            return self
+        if student_id < 1:
+            return self
+        return self.filter(
+            assignments__status=Assignment.AssignmentStatus.ACTIVA,
+            assignments__student_id=student_id,
+        ).distinct()
+
 
 class Patient(models.Model):
     """
@@ -35,6 +59,15 @@ class Patient(models.Model):
         EN_PROCESO = "en_proceso", "En proceso"
         FINALIZADO = "finalizado", "Finalizado"
 
+    class ClinicalArea(models.TextChoices):
+        OPERATORIA = "operatoria", "Operatoria"
+        ENDODONCIA = "endodoncia", "Endodoncia"
+        PERIODONCIA = "periodoncia", "Periodoncia"
+        CIRUGIA = "cirugia", "Cirugía"
+        PROTESIS = "protesis", "Prótesis"
+        ODONTOPEDIATRIA = "odontopediatria", "Odontopediatría"
+        ORTODONCIA = "ortodoncia", "Ortodoncia"
+
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
     document_id = models.CharField(
@@ -47,6 +80,11 @@ class Patient(models.Model):
     email = models.EmailField(blank=True)
     address = models.CharField(max_length=255, blank=True)
 
+    clinical_area = models.CharField(
+        max_length=20,
+        choices=ClinicalArea.choices,
+        blank=True,
+    )
     case_status = models.CharField(
         max_length=20,
         choices=CaseStatus.choices,
