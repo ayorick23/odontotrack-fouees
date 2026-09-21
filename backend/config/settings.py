@@ -40,8 +40,9 @@ INSTALLED_APPS = [
     # Librerías de terceros
     "rest_framework",
     "corsheaders",
+    "drf_spectacular",
     # Apps propias del proyecto
-    "accounts",
+    "accounts.apps.AccountsConfig",
     "patients",
     "assignments",
     "clinical_records",
@@ -142,6 +143,12 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 
+# Fotos de paciente. El serving HTTP y el upload se agregan aparte.
+# MEDIA_ROOT relativo a BASE_DIR si no es una ruta absoluta.
+MEDIA_URL = config("MEDIA_URL", default="/media/")
+_media_root = config("MEDIA_ROOT", default="media")
+MEDIA_ROOT = Path(_media_root) if Path(_media_root).is_absolute() else BASE_DIR / _media_root
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 
@@ -156,11 +163,41 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.IsAuthenticated",
     ),
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "PAGE_SIZE": 20,
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+}
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "OdontoTrack FOUEES API",
+    "DESCRIPTION": (
+        "Banco digital de pacientes de la Facultad de Odontología "
+        "de la Universidad Evangélica de El Salvador (FOUEES). "
+        "Para probar endpoints autenticados: POST /api/auth/token/, "
+        "luego Authorize con el access token (Bearer)."
+    ),
+    "VERSION": "0.1.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    "SCHEMA_PATH_PREFIX": r"/api/",
+    "COMPONENT_SPLIT_REQUEST": True,
+    "TAGS": [
+        {"name": "health", "description": "Chequeo de que la API está viva."},
+        {"name": "auth", "description": "Login JWT y refresh del access token."},
+        {"name": "accounts", "description": "Usuarios del sistema."},
+        {"name": "patients", "description": "Directorio de pacientes."},
+        {"name": "assignments", "description": "Asignación paciente-estudiante."},
+        {"name": "clinical-records", "description": "Expediente clínico."},
+        {"name": "dashboard", "description": "KPIs e indicadores."},
+    ],
 }
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
+    "ACCESS_TOKEN_LIFETIME": timedelta(
+        minutes=config("JWT_ACCESS_MINUTES", default=60, cast=int),
+    ),
+    "REFRESH_TOKEN_LIFETIME": timedelta(
+        days=config("JWT_REFRESH_DAYS", default=1, cast=int),
+    ),
     "ROTATE_REFRESH_TOKENS": True,
 }
 

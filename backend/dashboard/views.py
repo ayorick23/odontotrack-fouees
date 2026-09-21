@@ -1,11 +1,16 @@
 from django.db.models import Count
+from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework.permissions import IsAuthenticated
+
+from accounts.permissions import HasRequiredAcl
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from assignments.models import Assignment
 from clinical_records.models import ClinicalRecord
 from patients.models import Patient
+
+from .serializers import DashboardSummarySerializer
 
 
 class DashboardSummaryView(APIView):
@@ -19,15 +24,30 @@ class DashboardSummaryView(APIView):
     vistas más específicas.
     """
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasRequiredAcl]
+    acl_permission = "dashboard.view"
 
+    @extend_schema(
+        tags=["dashboard"],
+        parameters=[
+            OpenApiParameter(
+                name="period",
+                description="Filtra pacientes creados en el último mes (1m), 6 meses (6m) o año (1a).",
+                required=False,
+                type=str,
+                enum=["1m", "6m", "1a"],
+            ),
+        ],
+        responses=DashboardSummarySerializer,
+    )
     def get(self, request):
+        patients = Patient.objects.in_period(request.query_params.get("period"))
         data = {
-            "total_patients": Patient.objects.count(),
+            "total_patients": patients.count(),
             "total_assignments": Assignment.objects.count(),
             "total_clinical_records": ClinicalRecord.objects.count(),
             "patients_by_status": dict(
-                Patient.objects.values_list("case_status").annotate(count=Count("id"))
+                patients.values_list("case_status").annotate(count=Count("id"))
             ),
         }
         return Response(data)
