@@ -339,7 +339,7 @@ export function PatientList() {
       },
       {
         header: "Documento",
-        render: (patient: PatientListItem) => patient.document_id,
+        render: (patient: PatientListItem) => patient.dui,
       },
       {
         header: "Área",

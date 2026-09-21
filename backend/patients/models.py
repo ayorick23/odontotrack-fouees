@@ -68,17 +68,47 @@ class Patient(models.Model):
         ODONTOPEDIATRIA = "odontopediatria", "Odontopediatría"
         ORTODONCIA = "ortodoncia", "Ortodoncia"
 
+    class EmergencyContactRelationship(models.TextChoices):
+        MADRE = "madre", "Madre"
+        PADRE = "padre", "Padre"
+        HERMANO_A = "hermano_a", "Hermano/a"
+        CONYUGE = "conyuge", "Cónyuge"
+        HIJO_A = "hijo_a", "Hijo/a"
+        OTRO = "otro", "Otro"
+
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
-    document_id = models.CharField(
+    dui = models.CharField(
         max_length=30,
         unique=True,
-        help_text="Número de documento único de identificación (DUI, pasaporte, etc.)",
+        help_text="Documento Único de Identidad del paciente.",
+    )
+    carnet = models.CharField(
+        max_length=30,
+        blank=True,
+        default="",
+        help_text="Número de expediente/carnet interno de la clínica, si aplica.",
     )
     date_of_birth = models.DateField(null=True, blank=True)
     phone_number = models.CharField(max_length=20, blank=True)
+    whatsapp_number = models.CharField(
+        max_length=20,
+        blank=True,
+        default="",
+        help_text="Número de WhatsApp, si es distinto al teléfono principal.",
+    )
     email = models.EmailField(blank=True)
     address = models.CharField(max_length=255, blank=True)
+    photo = models.ImageField(upload_to="patients/photos/", null=True, blank=True)
+
+    emergency_contact_name = models.CharField(max_length=150, blank=True, default="")
+    emergency_contact_phone = models.CharField(max_length=20, blank=True, default="")
+    emergency_contact_relationship = models.CharField(
+        max_length=20,
+        choices=EmergencyContactRelationship.choices,
+        blank=True,
+        default="",
+    )
 
     clinical_area = models.CharField(
         max_length=20,
@@ -100,7 +130,7 @@ class Patient(models.Model):
         ordering = ["last_name", "first_name"]
 
     def __str__(self):
-        return f"{self.first_name} {self.last_name} ({self.document_id})"
+        return f"{self.first_name} {self.last_name} ({self.dui})"
 
     def has_active_assignment(self) -> bool:
         return self.assignments.filter(

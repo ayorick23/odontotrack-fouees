@@ -34,7 +34,7 @@ export type PatientListItem = {
   id: number;
   first_name: string;
   last_name: string;
-  document_id: string;
+  dui: string;
   phone_number: string;
   clinical_area: ClinicalArea | "";
   case_status: CaseStatus;

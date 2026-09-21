@@ -23,19 +23,19 @@ class DashboardSummaryTests(APITestCase):
         Patient.objects.create(
             first_name="Ana",
             last_name="Pendiente",
-            document_id="PEND-001",
+            dui="PEND-001",
             case_status=Patient.CaseStatus.PENDIENTE,
         )
         Patient.objects.create(
             first_name="Luis",
             last_name="Asignado",
-            document_id="PROC-001",
+            dui="PROC-001",
             case_status=Patient.CaseStatus.EN_PROCESO,
         )
         Patient.objects.create(
             first_name="María",
             last_name="Cerrada",
-            document_id="FIN-001",
+            dui="FIN-001",
             case_status=Patient.CaseStatus.FINALIZADO,
         )
 
@@ -51,12 +51,12 @@ class DashboardSummaryTests(APITestCase):
         recent = Patient.objects.create(
             first_name="Reciente",
             last_name="Hoy",
-            document_id="REC-001",
+            dui="REC-001",
         )
         old = Patient.objects.create(
             first_name="Antigua",
             last_name="Año",
-            document_id="OLD-001",
+            dui="OLD-001",
         )
         Patient.objects.filter(pk=old.pk).update(
             created_at=timezone.now() - timedelta(days=40),
@@ -66,4 +66,4 @@ class DashboardSummaryTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         body = response.json()
         self.assertEqual(body["total_patients"], 1)
-        self.assertEqual(recent.document_id, "REC-001")
+        self.assertEqual(recent.dui, "REC-001")
