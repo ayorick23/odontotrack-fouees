@@ -143,7 +143,7 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 
-# Fotos de paciente. El serving HTTP y el upload se agregan aparte.
+# Fotos de paciente. En DEBUG se sirven en config/urls.py.
 # MEDIA_ROOT relativo a BASE_DIR si no es una ruta absoluta.
 MEDIA_URL = config("MEDIA_URL", default="/media/")
 _media_root = config("MEDIA_ROOT", default="media")

@@ -38,6 +38,7 @@ services:
       - "8000:8000"
     volumes:
       - ./backend:/app
+      - patient_media:/app/media
     depends_on:
       db:
         condition: service_healthy
@@ -57,3 +58,4 @@ services:
 
 volumes:
   postgres_data:
+  patient_media:
