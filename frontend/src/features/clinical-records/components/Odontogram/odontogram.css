@@ -1,0 +1,97 @@
+.odontogram-fouees {
+  --odon-accent: #0f8f82;
+  --odon-accent2: #2ad4c5;
+  overflow: visible;
+}
+
+.odontogram-fouees .odontogram-root {
+  font-family: inherit;
+  background: transparent;
+  box-shadow: none;
+  border: none;
+}
+
+.odontogram-fouees .chart {
+  background: transparent;
+  border: 1px solid rgb(241 245 249);
+  border-radius: 1rem;
+  overflow: hidden;
+}
+
+.odontogram-fouees .chart-header {
+  padding: 0.85rem 1rem;
+  background: rgb(248 250 252 / 0.9);
+}
+
+.odontogram-fouees .chart-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: rgb(30 41 59);
+}
+
+.odontogram-fouees .chart-hint {
+  color: rgb(100 116 139);
+}
+
+.odontogram-fouees #chartModeToggle,
+.odontogram-fouees .chart-actions {
+  display: none !important;
+}
+
+.odontogram-fouees .proposed-legend {
+  margin: 0 1rem 0.75rem;
+  font-size: 0.75rem;
+  color: rgb(100 116 139);
+}
+
+.odontogram-fouees .chart-mode-btn.is-active,
+.odontogram-fouees .chart-mode-toggle [aria-pressed="true"] {
+  background: var(--odon-accent);
+  color: #fff;
+}
+
+.odontogram-fouees .tooth-grid {
+  padding: 0.75rem 0.5rem 1rem;
+}
+
+.odontogram-fouees .tooth-svg,
+.odontogram-fouees .tooth-svg svg {
+  color-scheme: light;
+}
+
+:is(.dark) .odontogram-fouees .chart {
+  border-color: rgb(255 255 255 / 0.1);
+}
+
+:is(.dark) .odontogram-fouees .chart-header {
+  background: rgb(2 6 23 / 0.4);
+}
+
+:is(.dark) .odontogram-fouees .chart-title {
+  color: rgb(241 245 249);
+}
+
+:is(.dark) .odontogram-fouees .chart-hint {
+  color: rgb(148 163 184);
+}
+
+:is(.dark) .odontogram-fouees .tooth-tile {
+  background: rgb(51 65 85 / 0.45);
+}
+
+:is(.dark) .odontogram-fouees .tooth-tile:hover {
+  background: rgb(15 143 130 / 0.18);
+}
+
+:is(.dark) .odontogram-fouees .tooth-tile.active {
+  border-color: rgb(45 212 197 / 0.7);
+  background: rgb(15 143 130 / 0.2);
+}
+
+:is(.dark) .odontogram-fouees .tooth-tile.active .tooth-svg svg {
+  filter: drop-shadow(0 0 4px rgb(45 212 197 / 0.35));
+}
+
+:is(.dark) .odontogram-fouees .tooth-label-cell {
+  color: rgb(226 232 240);
+}

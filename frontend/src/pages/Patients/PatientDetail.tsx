@@ -7,11 +7,12 @@ import {
   UserCheck,
   type LucideIcon,
 } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { can } from "../../acl/can";
 import { useAuth } from "../../hooks/useAuth";
+import { useTheme } from "../../hooks/useTheme";
 import { primaryActionClass } from "../../lib/actions";
 import {
   areaLabel,
@@ -28,6 +29,12 @@ import {
   type CaseStatus,
   type Patient,
 } from "../../services/patients";
+
+const PatientOdontogramSection = lazy(() =>
+  import("./PatientOdontogramSection").then((mod) => ({
+    default: mod.PatientOdontogramSection,
+  })),
+);
 
 const cardClass =
   "rounded-2xl bg-white p-5 shadow-[0_10px_30px_rgba(15,40,80,0.06)] dark:bg-slate-900 dark:shadow-none dark:ring-1 dark:ring-white/10 sm:p-6";
@@ -46,6 +53,7 @@ type LoadState =
 export function PatientDetail() {
   const { id } = useParams();
   const { user } = useAuth();
+  const { theme } = useTheme();
   const patientId = Number(id);
   const [state, setState] = useState<LoadState>({ status: "loading" });
 
@@ -250,6 +258,23 @@ export function PatientDetail() {
           </dl>
         </section>
       </div>
+
+      {can(user, "odontogram.view") ? (
+        <Suspense
+          fallback={
+            <p className="text-sm text-slate-400 dark:text-slate-500">
+              Cargando odontograma...
+            </p>
+          }
+        >
+          <PatientOdontogramSection
+            patientId={patient.id}
+            patientName={patientFullName(patient)}
+            readOnly={!can(user, "odontogram.update")}
+            darkMode={theme === "dark"}
+          />
+        </Suspense>
+      ) : null}
     </div>
   );
 }
