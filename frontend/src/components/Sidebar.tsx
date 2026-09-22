@@ -1,4 +1,5 @@
 import {
+  BookOpen,
   CalendarDays,
   ClipboardCheck,
   FolderOpen,
@@ -174,6 +175,8 @@ function navIcon(icon: Exclude<NavEntry["icon"], "patients">): ReactNode {
       return <GraduationCap className={className} />;
     case "roles":
       return <Shield className={className} />;
+    case "catalogs":
+      return <BookOpen className={className} />;
     case "support":
       return <Headset className={className} />;
   }

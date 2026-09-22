@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     "drf_spectacular",
     # Apps propias del proyecto
     "accounts.apps.AccountsConfig",
+    "catalogs.apps.CatalogsConfig",
     "patients",
     "assignments",
     "clinical_records",

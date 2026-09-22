@@ -23,6 +23,7 @@ const PAGE_META: Record<string, { title: string; crumb: string }> = {
   "/supervision": { title: "Supervisión", crumb: "Dashboard › Supervisión" },
   "/students": { title: "Base de estudiantes", crumb: "Dashboard › Estudiantes" },
   "/roles": { title: "Roles y permisos", crumb: "Sistema › Roles" },
+  "/catalogs": { title: "Catálogos clínicos", crumb: "Sistema › Catálogos" },
   "/support": { title: "Soporte técnico", crumb: "Dashboard › Soporte" },
 };
 
