@@ -7,13 +7,14 @@ from .models import Patient
 class PatientAdmin(admin.ModelAdmin):
     list_display = (
         "full_name",
-        "document_id",
+        "dui",
+        "carnet",
         "clinical_area",
         "case_status",
         "created_at",
     )
     list_filter = ("case_status", "clinical_area")
-    search_fields = ("first_name", "last_name", "document_id")
+    search_fields = ("first_name", "last_name", "dui", "carnet")
 
     @admin.display(description="Nombre completo")
     def full_name(self, obj):

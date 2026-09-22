@@ -1,7 +1,10 @@
 from datetime import timedelta
+from io import BytesIO
 
 from django.conf import settings
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.utils import timezone
+from PIL import Image
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -44,7 +47,7 @@ class ListingPaginationTests(APITestCase):
             Patient.objects.create(
                 first_name="Ana",
                 last_name=f"Paciente{index:02d}",
-                document_id=f"DUI{index:03d}",
+                dui=f"DUI{index:03d}",
             )
         self._assert_paginated_list("/api/patients/", expected_count=PAGE_SIZE + 1)
 
@@ -67,7 +70,7 @@ class ListingPaginationTests(APITestCase):
             patient = Patient.objects.create(
                 first_name="Luis",
                 last_name=f"Caso{index:02d}",
-                document_id=f"ASG{index:03d}",
+                dui=f"ASG{index:03d}",
             )
             Assignment.objects.create(patient=patient, student=student)
         self._assert_paginated_list("/api/assignments/", expected_count=PAGE_SIZE + 1)
@@ -87,12 +90,12 @@ class PatientDirectoryTests(APITestCase):
         Patient.objects.create(
             first_name="María",
             last_name="Gómez",
-            document_id="01234567-8",
+            dui="01234567-8",
         )
         Patient.objects.create(
             first_name="Luis",
             last_name="Pérez",
-            document_id="99999999-9",
+            dui="99999999-9",
         )
 
         by_name = self.client.get("/api/patients/", {"search": "Gómez"})
@@ -105,21 +108,42 @@ class PatientDirectoryTests(APITestCase):
         by_document = self.client.get("/api/patients/", {"search": "99999999-9"})
         self.assertEqual(by_document.status_code, status.HTTP_200_OK)
         self.assertEqual(
-            [row["document_id"] for row in by_document.json()["results"]],
+            [row["dui"] for row in by_document.json()["results"]],
             ["99999999-9"],
+        )
+
+    def test_search_matches_carnet(self):
+        Patient.objects.create(
+            first_name="Ana",
+            last_name="Carnet",
+            dui="CAR-DUI",
+            carnet="CARNET-22",
+        )
+        Patient.objects.create(
+            first_name="Luis",
+            last_name="Otro",
+            dui="CAR-OTRO",
+            carnet="CARNET-99",
+        )
+
+        response = self.client.get("/api/patients/", {"search": "CARNET-22"})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            [row["dui"] for row in response.json()["results"]],
+            ["CAR-DUI"],
         )
 
     def test_filter_by_clinical_area(self):
         Patient.objects.create(
             first_name="Ana",
             last_name="Endodoncia",
-            document_id="END-001",
+            dui="END-001",
             clinical_area=Patient.ClinicalArea.ENDODONCIA,
         )
         Patient.objects.create(
             first_name="Luis",
             last_name="Operatoria",
-            document_id="OPE-001",
+            dui="OPE-001",
             clinical_area=Patient.ClinicalArea.OPERATORIA,
         )
 
@@ -130,7 +154,7 @@ class PatientDirectoryTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         body = response.json()
         self.assertEqual(body["count"], 1)
-        self.assertEqual(body["results"][0]["document_id"], "END-001")
+        self.assertEqual(body["results"][0]["dui"], "END-001")
         self.assertEqual(
             body["results"][0]["clinical_area"],
             Patient.ClinicalArea.ENDODONCIA,
@@ -154,21 +178,21 @@ class PatientDirectoryTests(APITestCase):
         free = Patient.objects.create(
             first_name="Ana",
             last_name="Libre",
-            document_id="ASG-FREE",
+            dui="ASG-FREE",
         )
         diego_patient = Patient.objects.create(
             first_name="Luis",
             last_name="DeDiego",
-            document_id="ASG-DIEGO",
+            dui="ASG-DIEGO",
         )
         Patient.objects.create(
             first_name="Marta",
             last_name="DeLaura",
-            document_id="ASG-LAURA",
+            dui="ASG-LAURA",
         )
         Assignment.objects.create(patient=diego_patient, student=student)
         Assignment.objects.create(
-            patient=Patient.objects.get(document_id="ASG-LAURA"),
+            patient=Patient.objects.get(dui="ASG-LAURA"),
             student=other,
         )
 
@@ -178,8 +202,8 @@ class PatientDirectoryTests(APITestCase):
         )
         self.assertEqual(unassigned.status_code, status.HTTP_200_OK)
         self.assertEqual(
-            [row["document_id"] for row in unassigned.json()["results"]],
-            [free.document_id],
+            [row["dui"] for row in unassigned.json()["results"]],
+            [free.dui],
         )
 
         by_student = self.client.get(
@@ -188,8 +212,8 @@ class PatientDirectoryTests(APITestCase):
         )
         self.assertEqual(by_student.status_code, status.HTTP_200_OK)
         self.assertEqual(
-            [row["document_id"] for row in by_student.json()["results"]],
-            [diego_patient.document_id],
+            [row["dui"] for row in by_student.json()["results"]],
+            [diego_patient.dui],
         )
 
     def test_assignees_lists_students_with_active_assignment(self):
@@ -210,7 +234,7 @@ class PatientDirectoryTests(APITestCase):
         patient = Patient.objects.create(
             first_name="Luis",
             last_name="Caso",
-            document_id="ASG-LIST",
+            dui="ASG-LIST",
         )
         Assignment.objects.create(patient=patient, student=assigned)
 
@@ -225,13 +249,13 @@ class PatientDirectoryTests(APITestCase):
         Patient.objects.create(
             first_name="Ana",
             last_name="Pendiente",
-            document_id="PEND-001",
+            dui="PEND-001",
             case_status=Patient.CaseStatus.PENDIENTE,
         )
         Patient.objects.create(
             first_name="Luis",
             last_name="Cerrado",
-            document_id="FIN-001",
+            dui="FIN-001",
             case_status=Patient.CaseStatus.FINALIZADO,
         )
 
@@ -242,18 +266,18 @@ class PatientDirectoryTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         body = response.json()
         self.assertEqual(body["count"], 1)
-        self.assertEqual(body["results"][0]["document_id"], "FIN-001")
+        self.assertEqual(body["results"][0]["dui"], "FIN-001")
 
     def test_list_is_ordered_by_id(self):
         Patient.objects.create(
             first_name="Zaira",
             last_name="Zelaya",
-            document_id="ZEL-001",
+            dui="ZEL-001",
         )
         Patient.objects.create(
             first_name="Ana",
             last_name="Ábrego",
-            document_id="ABR-001",
+            dui="ABR-001",
         )
 
         response = self.client.get("/api/patients/")
@@ -265,12 +289,12 @@ class PatientDirectoryTests(APITestCase):
         Patient.objects.create(
             first_name="Reciente",
             last_name="Hoy",
-            document_id="REC-001",
+            dui="REC-001",
         )
         old = Patient.objects.create(
             first_name="Antigua",
             last_name="Año",
-            document_id="OLD-001",
+            dui="OLD-001",
         )
         Patient.objects.filter(pk=old.pk).update(
             created_at=timezone.now() - timedelta(days=40),
@@ -280,7 +304,7 @@ class PatientDirectoryTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         body = response.json()
         self.assertEqual(body["count"], 1)
-        self.assertEqual(body["results"][0]["document_id"], "REC-001")
+        self.assertEqual(body["results"][0]["dui"], "REC-001")
 
     def test_list_includes_active_assignment_name(self):
         student = User.objects.create_user(
@@ -293,7 +317,7 @@ class PatientDirectoryTests(APITestCase):
         patient = Patient.objects.create(
             first_name="Carlos",
             last_name="Ruiz",
-            document_id="ASG-001",
+            dui="ASG-001",
         )
         Assignment.objects.create(patient=patient, student=student)
 
@@ -303,6 +327,57 @@ class PatientDirectoryTests(APITestCase):
         self.assertEqual(row["assigned_to"], "Ana López")
         self.assertEqual(row["clinical_area"], "")
         self.assertNotIn("address", row)
+
+
+class PatientCompleteFieldsTests(APITestCase):
+    def setUp(self):
+        sync_acl()
+        self.admin = User.objects.create_user(
+            username="admin",
+            password="pass12345",
+            role=User.Role.ADMIN,
+        )
+        self.client.force_authenticate(user=self.admin)
+
+    def test_create_patient_with_full_contact_data(self):
+        payload = {
+            "first_name": "Ana",
+            "last_name": "Completa",
+            "dui": "04512345-6",
+            "carnet": "FOUEES-2026-014",
+            "phone_number": "7000-1111",
+            "whatsapp_number": "7000-2222",
+            "emergency_contact_name": "Marta Completa",
+            "emergency_contact_phone": "7000-3333",
+            "emergency_contact_relationship": Patient.EmergencyContactRelationship.MADRE,
+        }
+        response = self.client.post("/api/patients/", payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        patient = Patient.objects.get(dui="04512345-6")
+        self.assertEqual(patient.carnet, "FOUEES-2026-014")
+        self.assertEqual(patient.whatsapp_number, "7000-2222")
+        self.assertEqual(patient.emergency_contact_name, "Marta Completa")
+        self.assertEqual(patient.emergency_contact_phone, "7000-3333")
+        self.assertEqual(
+            patient.emergency_contact_relationship,
+            Patient.EmergencyContactRelationship.MADRE,
+        )
+        self.assertFalse(patient.photo)
+
+    def test_new_contact_fields_are_optional(self):
+        response = self.client.post(
+            "/api/patients/",
+            {"first_name": "Luis", "last_name": "Minimo", "dui": "MIN-001"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        patient = Patient.objects.get(dui="MIN-001")
+        self.assertEqual(patient.carnet, "")
+        self.assertEqual(patient.whatsapp_number, "")
+        self.assertEqual(patient.emergency_contact_name, "")
+        self.assertEqual(patient.emergency_contact_phone, "")
+        self.assertEqual(patient.emergency_contact_relationship, "")
 
 
 class RecepcionPatientPermissionTests(APITestCase):
@@ -326,12 +401,12 @@ class RecepcionPatientPermissionTests(APITestCase):
         self.unassigned = Patient.objects.create(
             first_name="Ana",
             last_name="Libre",
-            document_id="LIB-001",
+            dui="LIB-001",
         )
         self.assigned = Patient.objects.create(
             first_name="Luis",
             last_name="Asignado",
-            document_id="ASG-002",
+            dui="ASG-002",
         )
         Assignment.objects.create(patient=self.assigned, student=self.student)
         self.client.force_authenticate(user=self.recepcion)
@@ -363,3 +438,228 @@ class RecepcionPatientPermissionTests(APITestCase):
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+
+class PatientWriteTests(APITestCase):
+    def setUp(self):
+        sync_acl()
+        self.recepcion = User.objects.create_user(
+            username="recepcion-alta",
+            password="pass12345",
+            role=User.Role.RECEPCION,
+        )
+        self.admin = User.objects.create_user(
+            username="admin-alta",
+            password="pass12345",
+            role=User.Role.ADMIN,
+        )
+        self.client.force_authenticate(user=self.recepcion)
+
+    def test_create_starts_as_pendiente_and_ignores_case_status(self):
+        response = self.client.post(
+            "/api/patients/",
+            {
+                "first_name": "  Ana  ",
+                "last_name": "López",
+                "dui": "01234567-8",
+                "phone_number": "7777-7777",
+                "clinical_area": Patient.ClinicalArea.OPERATORIA,
+                "case_status": Patient.CaseStatus.FINALIZADO,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        body = response.json()
+        self.assertEqual(body["first_name"], "Ana")
+        self.assertEqual(body["case_status"], Patient.CaseStatus.PENDIENTE)
+        self.assertFalse(body["has_active_assignment"])
+        self.assertEqual(body["clinical_area"], Patient.ClinicalArea.OPERATORIA)
+
+    def test_duplicate_dui_is_rejected(self):
+        Patient.objects.create(
+            first_name="Luis",
+            last_name="Pérez",
+            dui="01234567-8",
+        )
+        response = self.client.post(
+            "/api/patients/",
+            {
+                "first_name": "María",
+                "last_name": "Gómez",
+                "dui": "01234567-8",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("dui", response.data)
+
+    def test_required_fields_are_validated(self):
+        response = self.client.post(
+            "/api/patients/",
+            {"first_name": "   ", "last_name": "", "dui": ""},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("first_name", response.data)
+        self.assertIn("last_name", response.data)
+        self.assertIn("dui", response.data)
+
+    def test_update_keeps_case_status(self):
+        patient = Patient.objects.create(
+            first_name="Carlos",
+            last_name="Ruiz",
+            dui="UPD-001",
+            case_status=Patient.CaseStatus.EN_PROCESO,
+        )
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.put(
+            f"/api/patients/{patient.id}/",
+            {
+                "first_name": "Carlos",
+                "last_name": "Ruiz",
+                "dui": "UPD-001",
+                "date_of_birth": "1990-05-12",
+                "phone_number": "7000-1111",
+                "email": "carlos@example.com",
+                "address": "San Salvador",
+                "clinical_area": Patient.ClinicalArea.ENDODONCIA,
+                "case_status": Patient.CaseStatus.FINALIZADO,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        body = response.json()
+        self.assertEqual(body["phone_number"], "7000-1111")
+        self.assertEqual(body["clinical_area"], Patient.ClinicalArea.ENDODONCIA)
+        self.assertEqual(body["case_status"], Patient.CaseStatus.EN_PROCESO)
+        self.assertEqual(body["date_of_birth"], "1990-05-12")
+
+    def test_retrieve_includes_assignment_flag(self):
+        student = User.objects.create_user(
+            username="estudiante-ficha",
+            password="pass12345",
+            role=User.Role.ESTUDIANTE,
+        )
+        patient = Patient.objects.create(
+            first_name="Marta",
+            last_name="Rivas",
+            dui="FIC-001",
+        )
+        Assignment.objects.create(patient=patient, student=student)
+
+        response = self.client.get(f"/api/patients/{patient.id}/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        body = response.json()
+        self.assertTrue(body["has_active_assignment"])
+        self.assertEqual(body["dui"], "FIC-001")
+        self.assertIn("address", body)
+        self.assertIn("carnet", body)
+        self.assertIn("whatsapp_number", body)
+        self.assertIn("emergency_contact_name", body)
+        self.assertIn("emergency_contact_phone", body)
+        self.assertIn("emergency_contact_relationship", body)
+        self.assertIn("photo", body)
+
+    def test_create_saves_reception_fields(self):
+        response = self.client.post(
+            "/api/patients/",
+            {
+                "first_name": "Ana",
+                "last_name": "López",
+                "dui": "REC-001",
+                "carnet": "C-100",
+                "whatsapp_number": "7777-8888",
+                "emergency_contact_name": "Marta López",
+                "emergency_contact_phone": "7000-3333",
+                "emergency_contact_relationship": Patient.EmergencyContactRelationship.MADRE,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        body = response.json()
+        self.assertEqual(body["carnet"], "C-100")
+        self.assertEqual(body["whatsapp_number"], "7777-8888")
+        self.assertEqual(body["emergency_contact_name"], "Marta López")
+        self.assertEqual(body["emergency_contact_phone"], "7000-3333")
+        self.assertEqual(
+            body["emergency_contact_relationship"],
+            Patient.EmergencyContactRelationship.MADRE,
+        )
+
+    def test_blank_carnet_can_repeat(self):
+        Patient.objects.create(
+            first_name="Luis",
+            last_name="Pérez",
+            dui="CAR-BLANK-1",
+        )
+        response = self.client.post(
+            "/api/patients/",
+            {
+                "first_name": "María",
+                "last_name": "Gómez",
+                "dui": "CAR-BLANK-2",
+                "carnet": "",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.json()["carnet"], "")
+
+    def test_photo_upload_returns_url(self):
+        response = self.client.post(
+            "/api/patients/",
+            {
+                "first_name": "Ana",
+                "last_name": "Foto",
+                "dui": "FOTO-001",
+                "photo": _jpeg_upload(),
+            },
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        photo = response.json()["photo"]
+        self.assertIsNotNone(photo)
+        self.assertIn("/media/", photo)
+
+    def test_photo_rejects_non_image(self):
+        response = self.client.post(
+            "/api/patients/",
+            {
+                "first_name": "Ana",
+                "last_name": "Archivo",
+                "dui": "FOTO-BAD",
+                "photo": SimpleUploadedFile(
+                    "nota.txt",
+                    b"no es una imagen",
+                    content_type="text/plain",
+                ),
+            },
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("photo", response.data)
+
+    def test_photo_rejects_oversized_file(self):
+        huge = SimpleUploadedFile(
+            "grande.jpg",
+            b"x" * (2 * 1024 * 1024 + 1),
+            content_type="image/jpeg",
+        )
+        response = self.client.post(
+            "/api/patients/",
+            {
+                "first_name": "Ana",
+                "last_name": "Grande",
+                "dui": "FOTO-BIG",
+                "photo": huge,
+            },
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("photo", response.data)
+
+
+def _jpeg_upload(name="foto.jpg") -> SimpleUploadedFile:
+    buffer = BytesIO()
+    Image.new("RGB", (8, 8), color="#2ad4c5").save(buffer, format="JPEG")
+    return SimpleUploadedFile(name, buffer.getvalue(), content_type="image/jpeg")

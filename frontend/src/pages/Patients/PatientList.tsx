@@ -328,9 +328,17 @@ export function PatientList() {
         header: "Paciente",
         render: (patient: PatientListItem) => (
           <div className="flex items-center gap-3">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-teal-50 text-xs font-semibold text-teal-700 dark:bg-teal-950/60 dark:text-teal-300">
-              {patientInitials(patient)}
-            </span>
+            {patient.photo ? (
+              <img
+                src={patient.photo}
+                alt=""
+                className="size-9 shrink-0 rounded-full object-cover"
+              />
+            ) : (
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-teal-50 text-xs font-semibold text-teal-700 dark:bg-teal-950/60 dark:text-teal-300">
+                {patientInitials(patient)}
+              </span>
+            )}
             <p className="font-medium text-slate-800 dark:text-slate-100">
               {patientFullName(patient)}
             </p>
@@ -339,7 +347,7 @@ export function PatientList() {
       },
       {
         header: "Documento",
-        render: (patient: PatientListItem) => patient.document_id,
+        render: (patient: PatientListItem) => patient.dui,
       },
       {
         header: "Área",
@@ -518,7 +526,7 @@ export function PatientList() {
               type="search"
               value={searchInput}
               onChange={(event) => setSearchInput(event.target.value)}
-              placeholder="Buscar por nombre o DUI"
+              placeholder="Buscar por nombre, DUI o carnet"
               className="w-52 bg-transparent outline-none placeholder:text-slate-400"
             />
           </label>
