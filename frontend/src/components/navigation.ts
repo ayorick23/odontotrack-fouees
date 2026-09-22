@@ -13,7 +13,7 @@ export type NavGroup = {
 };
 
 export type NavEntry =
-  | (NavLeaf & { icon: "dashboard" | "calendar" | "supervision" | "students" | "support" | "roles" })
+  | (NavLeaf & { icon: "dashboard" | "calendar" | "supervision" | "students" | "support" | "roles" | "catalogs" })
   | (NavGroup & { icon: "patients" });
 
 export const NAV_ENTRIES: readonly NavEntry[] = [
@@ -67,6 +67,12 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
     label: "Roles y permisos",
     icon: "roles",
     permission: "roles.view",
+  },
+  {
+    to: "/catalogs",
+    label: "Catálogos clínicos",
+    icon: "catalogs",
+    permission: "catalogs.view",
   },
   {
     to: "/support",

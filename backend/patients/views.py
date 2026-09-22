@@ -26,12 +26,13 @@ class PatientViewSet(viewsets.ModelViewSet):
         "assignees": "patients.view",
     }
     filter_backends = [filters.SearchFilter]
-    search_fields = ["first_name", "last_name", "dui", "carnet"]
+    search_fields = ["first_name", "last_name", "dui"]
 
     def get_queryset(self):
         params = self.request.query_params
         return (
             Patient.objects.prefetch_related("assignments__student")
+            .select_related("clinical_area", "clinical_treatment")
             .in_period(params.get("period"))
             .by_case_status(params.get("case_status"))
             .by_clinical_area(params.get("clinical_area"))
