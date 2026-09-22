@@ -42,6 +42,7 @@ urlpatterns = [
     ),
     path("api/auth/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
     path("api/accounts/", include("accounts.urls")),
+    path("api/catalogs/", include("catalogs.urls")),
     path("api/patients/", include("patients.urls")),
     path("api/assignments/", include("assignments.urls")),
     path("api/clinical-records/", include("clinical_records.urls")),

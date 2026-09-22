@@ -13,6 +13,7 @@ import { PatientForm } from "./pages/Patients/PatientForm";
 import { PatientList } from "./pages/Patients/PatientList";
 import { RoleForm } from "./pages/Roles/RoleForm";
 import { RoleList } from "./pages/Roles/RoleList";
+import { CatalogList } from "./pages/Catalogs/CatalogList";
 import { Students } from "./pages/Students/Students";
 import { Supervision } from "./pages/Supervision/Supervision";
 import { Support } from "./pages/Support/Support";
@@ -37,6 +38,7 @@ function App() {
               <Route path="/supervision" element={<Supervision />} />
               <Route path="/students" element={<Students />} />
               <Route path="/roles" element={<RoleList />} />
+              <Route path="/catalogs" element={<CatalogList />} />
               <Route path="/roles/:id/edit" element={<RoleForm />} />
               <Route path="/roles/:id" element={<RoleForm />} />
               <Route path="/support" element={<Support />} />

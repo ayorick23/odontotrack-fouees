@@ -25,8 +25,6 @@ import { useAuth } from "../../hooks/useAuth";
 import { primaryActionClass, secondaryActionClass } from "../../lib/actions";
 import {
   CASE_STATUS_LABELS,
-  CLINICAL_AREA_LABELS,
-  CLINICAL_AREAS,
   EMERGENCY_RELATIONSHIP_LABELS,
   EMERGENCY_RELATIONSHIPS,
   createPatient,
@@ -40,8 +38,13 @@ import {
   type PatientFieldName,
   type PatientWritePayload,
 } from "../../services/patients";
+import {
+  listClinicalAreas,
+  type ClinicalAreaRecord,
+} from "../../services/catalogs";
 
 const AREA_NONE = "sin-area";
+const SUBCATEGORY_NONE = "sin-tratamiento";
 const RELATIONSHIP_NONE = "sin-parentesco";
 const DUI_PATTERN = /^\d{8}-\d$/;
 const PASSPORT_PATTERN = /^[A-Za-z][A-Za-z0-9-]{4,29}$/;
@@ -54,7 +57,7 @@ const inputClass =
 const selectClass =
   "mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 shadow-none outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 disabled:cursor-not-allowed disabled:opacity-70 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-800";
 const selectMenuClass =
-  "rounded-xl border-slate-200 bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100";
+  "max-h-72 rounded-xl border-slate-200 bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100";
 const STATUS_ICONS: Record<CaseStatus, LucideIcon> = {
   pendiente: Clock3,
   en_proceso: UserCheck,
@@ -88,7 +91,6 @@ const patientFormSchema = z.object({
       today.setHours(0, 0, 0, 0);
       return birth <= today;
     }, "La fecha de nacimiento no puede ser futura"),
-  carnet: z.string().trim().max(30, "El carnet no puede superar 30 caracteres"),
   phone_number: z.string().trim().max(20, "El teléfono no puede superar 20 caracteres"),
   email: z
     .string()
@@ -110,18 +112,8 @@ const patientFormSchema = z.object({
     z.literal(""),
     z.enum(["madre", "padre", "hermano_a", "conyuge", "hijo_a", "otro"]),
   ]),
-  clinical_area: z.union([
-    z.literal(""),
-    z.enum([
-      "operatoria",
-      "endodoncia",
-      "periodoncia",
-      "cirugia",
-      "protesis",
-      "odontopediatria",
-      "ortodoncia",
-    ]),
-  ]),
+  clinical_area: z.string(),
+  clinical_subcategory: z.string(),
 });
 
 type PatientFormValues = z.infer<typeof patientFormSchema>;
@@ -131,7 +123,6 @@ const EMPTY_VALUES: PatientFormValues = {
   last_name: "",
   dui: "",
   date_of_birth: "",
-  carnet: "",
   phone_number: "",
   email: "",
   address: "",
@@ -139,6 +130,7 @@ const EMPTY_VALUES: PatientFormValues = {
   emergency_contact_phone: "",
   emergency_contact_relationship: "",
   clinical_area: "",
+  clinical_subcategory: "",
 };
 
 type LoadState =
@@ -161,6 +153,7 @@ export function PatientForm() {
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [photoError, setPhotoError] = useState<string | null>(null);
+  const [areas, setAreas] = useState<ClinicalAreaRecord[]>([]);
 
   const {
     register,
@@ -168,11 +161,37 @@ export function PatientForm() {
     handleSubmit,
     reset,
     setError,
+    setValue,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<PatientFormValues>({
     resolver: zodResolver(patientFormSchema),
     defaultValues: EMPTY_VALUES,
   });
+  const selectedArea = watch("clinical_area");
+  const selectedAreaRecord = areas.find((area) => area.slug === selectedArea);
+  const subcategoryOptions = (selectedAreaRecord?.treatments ?? []).filter(
+    (treatment) =>
+      treatment.is_active || treatment.slug === watch("clinical_subcategory"),
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    listClinicalAreas()
+      .then((records) => {
+        if (!cancelled) {
+          setAreas(records);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setAreas([]);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!isEditing) {
@@ -442,26 +461,6 @@ export function PatientForm() {
                   )}
                 />
               </Field>
-              <Field label="Carnet" error={errors.carnet?.message}>
-                <input
-                  autoComplete="off"
-                  disabled={!canWrite}
-                  placeholder="Expediente interno"
-                  className={inputClass}
-                  {...register("carnet")}
-                />
-              </Field>
-              <Field
-                label="Fecha de nacimiento"
-                error={errors.date_of_birth?.message}
-              >
-                <input
-                  type="date"
-                  disabled={!canWrite}
-                  className={inputClass}
-                  {...register("date_of_birth")}
-                />
-              </Field>
               <Field
                 label="Área clínica"
                 error={errors.clinical_area?.message}
@@ -472,9 +471,10 @@ export function PatientForm() {
                   render={({ field }) => (
                     <Select
                       value={field.value === "" ? AREA_NONE : field.value}
-                      onValueChange={(value) =>
-                        field.onChange(value === AREA_NONE ? "" : value)
-                      }
+                      onValueChange={(value) => {
+                        field.onChange(value === AREA_NONE ? "" : value);
+                        setValue("clinical_subcategory", "");
+                      }}
                       disabled={!canWrite}
                     >
                       <SelectTrigger className={selectClass}>
@@ -486,14 +486,78 @@ export function PatientForm() {
                         className={selectMenuClass}
                       >
                         <SelectItem value={AREA_NONE}>Sin área</SelectItem>
-                        {CLINICAL_AREAS.map((area) => (
-                          <SelectItem key={area} value={area}>
-                            {CLINICAL_AREA_LABELS[area]}
+                        {areas
+                          .filter(
+                            (area) =>
+                              area.is_active || area.slug === selectedArea,
+                          )
+                          .map((area) => (
+                            <SelectItem key={area.slug} value={area.slug}>
+                              {area.name}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              </Field>
+              <Field
+                label="Tratamiento"
+                error={errors.clinical_subcategory?.message}
+              >
+                <Controller
+                  name="clinical_subcategory"
+                  control={control}
+                  render={({ field }) => (
+                    <Select
+                      value={
+                        field.value === "" ? SUBCATEGORY_NONE : field.value
+                      }
+                      onValueChange={(value) =>
+                        field.onChange(
+                          value === SUBCATEGORY_NONE ? "" : value,
+                        )
+                      }
+                      disabled={!canWrite || subcategoryOptions.length === 0}
+                    >
+                      <SelectTrigger className={selectClass}>
+                        <SelectValue
+                          placeholder={
+                            selectedArea
+                              ? subcategoryOptions.length === 0
+                                ? "Sin tratamientos en el catálogo"
+                                : "Sin tratamiento"
+                              : "Selecciona un área primero"
+                          }
+                        />
+                      </SelectTrigger>
+                      <SelectContent
+                        position="popper"
+                        align="start"
+                        className={selectMenuClass}
+                      >
+                        <SelectItem value={SUBCATEGORY_NONE}>
+                          Sin tratamiento
+                        </SelectItem>
+                        {subcategoryOptions.map((treatment) => (
+                          <SelectItem key={treatment.slug} value={treatment.slug}>
+                            {treatment.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   )}
+                />
+              </Field>
+              <Field
+                label="Fecha de nacimiento"
+                error={errors.date_of_birth?.message}
+              >
+                <input
+                  type="date"
+                  disabled={!canWrite}
+                  className={inputClass}
+                  {...register("date_of_birth")}
                 />
               </Field>
             </div>
@@ -732,7 +796,6 @@ function toFormValues(patient: Patient): PatientFormValues {
     last_name: patient.last_name,
     dui: formatDocumentId(patient.dui),
     date_of_birth: patient.date_of_birth ?? "",
-    carnet: patient.carnet ?? "",
     phone_number: patient.phone_number,
     email: patient.email,
     address: patient.address,
@@ -740,6 +803,7 @@ function toFormValues(patient: Patient): PatientFormValues {
     emergency_contact_phone: patient.emergency_contact_phone,
     emergency_contact_relationship: patient.emergency_contact_relationship,
     clinical_area: patient.clinical_area,
+    clinical_subcategory: patient.clinical_subcategory,
   };
 }
 
@@ -749,7 +813,6 @@ function toPayload(values: PatientFormValues): PatientWritePayload {
     last_name: values.last_name,
     dui: values.dui,
     date_of_birth: values.date_of_birth || null,
-    carnet: values.carnet,
     phone_number: values.phone_number,
     email: values.email,
     address: values.address,
@@ -757,6 +820,7 @@ function toPayload(values: PatientFormValues): PatientWritePayload {
     emergency_contact_phone: values.emergency_contact_phone,
     emergency_contact_relationship: values.emergency_contact_relationship,
     clinical_area: values.clinical_area,
+    clinical_subcategory: values.clinical_subcategory,
   };
 }
 

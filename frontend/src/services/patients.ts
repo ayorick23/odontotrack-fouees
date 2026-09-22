@@ -3,34 +3,12 @@ import axios from "axios";
 import { api, type PaginatedResponse } from "./api";
 
 export type CaseStatus = "pendiente" | "en_proceso" | "finalizado";
-export type ClinicalArea =
-  | "operatoria"
-  | "endodoncia"
-  | "periodoncia"
-  | "cirugia"
-  | "protesis"
-  | "odontopediatria"
-  | "ortodoncia";
 
 export const CASE_STATUS_LABELS: Record<CaseStatus, string> = {
   pendiente: "Pendiente",
   en_proceso: "Asignado",
   finalizado: "Finalizado",
 };
-
-export const CLINICAL_AREA_LABELS: Record<ClinicalArea, string> = {
-  operatoria: "Operatoria",
-  endodoncia: "Endodoncia",
-  periodoncia: "Periodoncia",
-  cirugia: "Cirugía",
-  protesis: "Prótesis",
-  odontopediatria: "Odontopediatría",
-  ortodoncia: "Ortodoncia",
-};
-
-export const CLINICAL_AREAS = Object.keys(
-  CLINICAL_AREA_LABELS,
-) as ClinicalArea[];
 
 export type PatientListItem = {
   id: number;
@@ -39,7 +17,8 @@ export type PatientListItem = {
   dui: string;
   phone_number: string;
   photo: string | null;
-  clinical_area: ClinicalArea | "";
+  clinical_area: string;
+  clinical_subcategory: string;
   case_status: CaseStatus;
   created_at: string;
   assigned_to: string | null;
@@ -75,7 +54,6 @@ export type Patient = {
   last_name: string;
   dui: string;
   date_of_birth: string | null;
-  carnet: string;
   phone_number: string;
   whatsapp_number: string;
   email: string;
@@ -84,7 +62,8 @@ export type Patient = {
   emergency_contact_name: string;
   emergency_contact_phone: string;
   emergency_contact_relationship: EmergencyContactRelationship | "";
-  clinical_area: ClinicalArea | "";
+  clinical_area: string;
+  clinical_subcategory: string;
   case_status: CaseStatus;
   has_active_assignment: boolean;
   created_at: string;
@@ -96,14 +75,14 @@ export type PatientWritePayload = {
   last_name: string;
   dui: string;
   date_of_birth: string | null;
-  carnet: string;
   phone_number: string;
   email: string;
   address: string;
   emergency_contact_name: string;
   emergency_contact_phone: string;
   emergency_contact_relationship: EmergencyContactRelationship | "";
-  clinical_area: ClinicalArea | "";
+  clinical_area: string;
+  clinical_subcategory: string;
 };
 
 export type PatientFieldName = keyof PatientWritePayload | "photo";
@@ -119,7 +98,7 @@ export type ListPatientsParams = {
   page?: number;
   search?: string;
   caseStatus?: CaseStatus;
-  clinicalArea?: ClinicalArea;
+  clinicalArea?: string;
   assignedTo?: "unassigned" | string;
   period?: DirectoryPeriod;
 };
@@ -229,7 +208,6 @@ const PATIENT_FIELDS = new Set<PatientFieldName>([
   "last_name",
   "dui",
   "date_of_birth",
-  "carnet",
   "phone_number",
   "email",
   "address",
@@ -238,6 +216,7 @@ const PATIENT_FIELDS = new Set<PatientFieldName>([
   "emergency_contact_phone",
   "emergency_contact_relationship",
   "clinical_area",
+  "clinical_subcategory",
 ]);
 
 export function getPatientMutationError(error: unknown): PatientMutationError {

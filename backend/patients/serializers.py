@@ -2,6 +2,7 @@ from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
 from assignments.models import Assignment
+from catalogs.models import ClinicalArea, ClinicalTreatment
 
 from .models import Patient
 
@@ -16,6 +17,26 @@ class StrippedCharField(serializers.CharField):
         if isinstance(data, str):
             data = data.strip()
         return super().to_internal_value(data)
+
+
+class OptionalSlugRelatedField(serializers.SlugRelatedField):
+    def to_internal_value(self, data):
+        if data in ("", None):
+            return None
+        return super().to_internal_value(data)
+
+    def to_representation(self, obj):
+        if obj is None:
+            return ""
+        return super().to_representation(obj)
+
+
+def empty_catalog_slugs(data: dict) -> dict:
+    if data.get("clinical_area") is None:
+        data["clinical_area"] = ""
+    if data.get("clinical_subcategory") is None:
+        data["clinical_subcategory"] = ""
+    return data
 
 
 class PatientPhotoField(serializers.ImageField):
@@ -48,7 +69,6 @@ class PatientSerializer(serializers.ModelSerializer):
             )
         ],
     )
-    carnet = StrippedCharField(max_length=30, required=False, allow_blank=True)
     whatsapp_number = StrippedCharField(
         max_length=20,
         required=False,
@@ -66,6 +86,19 @@ class PatientSerializer(serializers.ModelSerializer):
     )
     photo = PatientPhotoField(required=False, allow_null=True)
     has_active_assignment = serializers.SerializerMethodField()
+    clinical_area = OptionalSlugRelatedField(
+        slug_field="slug",
+        queryset=ClinicalArea.objects.all(),
+        allow_null=True,
+        required=False,
+    )
+    clinical_subcategory = OptionalSlugRelatedField(
+        slug_field="slug",
+        queryset=ClinicalTreatment.objects.all(),
+        source="clinical_treatment",
+        allow_null=True,
+        required=False,
+    )
 
     class Meta:
         model = Patient
@@ -74,7 +107,6 @@ class PatientSerializer(serializers.ModelSerializer):
             "first_name",
             "last_name",
             "dui",
-            "carnet",
             "date_of_birth",
             "phone_number",
             "whatsapp_number",
@@ -85,6 +117,7 @@ class PatientSerializer(serializers.ModelSerializer):
             "emergency_contact_phone",
             "emergency_contact_relationship",
             "clinical_area",
+            "clinical_subcategory",
             "case_status",
             "has_active_assignment",
             "created_at",
@@ -104,9 +137,57 @@ class PatientSerializer(serializers.ModelSerializer):
             for assignment in patient.assignments.all()
         )
 
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        area = (
+            attrs["clinical_area"]
+            if "clinical_area" in attrs
+            else (self.instance.clinical_area if self.instance else None)
+        )
+        treatment_provided = "clinical_treatment" in attrs
+        treatment = (
+            attrs["clinical_treatment"]
+            if treatment_provided
+            else (self.instance.clinical_treatment if self.instance else None)
+        )
+        if not treatment:
+            return attrs
+        if not area:
+            raise serializers.ValidationError(
+                {
+                    "clinical_subcategory": (
+                        "Selecciona un área clínica antes del tratamiento."
+                    )
+                }
+            )
+        if treatment.area_id == area.id:
+            return attrs
+        if treatment_provided:
+            raise serializers.ValidationError(
+                {
+                    "clinical_subcategory": (
+                        "El tratamiento no corresponde al área clínica seleccionada."
+                    )
+                }
+            )
+        attrs["clinical_treatment"] = None
+        return attrs
+
+    def to_representation(self, instance):
+        return empty_catalog_slugs(super().to_representation(instance))
+
 
 class PatientListSerializer(serializers.ModelSerializer):
     assigned_to = serializers.SerializerMethodField()
+    clinical_area = OptionalSlugRelatedField(
+        slug_field="slug",
+        read_only=True,
+    )
+    clinical_subcategory = OptionalSlugRelatedField(
+        slug_field="slug",
+        source="clinical_treatment",
+        read_only=True,
+    )
 
     class Meta:
         model = Patient
@@ -118,6 +199,7 @@ class PatientListSerializer(serializers.ModelSerializer):
             "phone_number",
             "photo",
             "clinical_area",
+            "clinical_subcategory",
             "case_status",
             "created_at",
             "assigned_to",
@@ -133,3 +215,6 @@ class PatientListSerializer(serializers.ModelSerializer):
             return None
         student = active[0].student
         return student.get_full_name() or student.username
+
+    def to_representation(self, instance):
+        return empty_catalog_slugs(super().to_representation(instance))

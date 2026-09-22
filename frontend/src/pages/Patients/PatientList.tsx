@@ -34,19 +34,22 @@ import {
 } from "../../services/dashboard";
 import {
   CASE_STATUS_LABELS,
-  CLINICAL_AREA_LABELS,
-  CLINICAL_AREAS,
   deletePatient,
   listAssignees,
   listPatients,
   patientFullName,
   patientInitials,
   type CaseStatus,
-  type ClinicalArea,
   type DirectoryPeriod,
   type PatientAssignee,
   type PatientListItem,
 } from "../../services/patients";
+import {
+  areaLabel,
+  listClinicalAreas,
+  treatmentLabel,
+  type ClinicalAreaRecord,
+} from "../../services/catalogs";
 
 const PAGE_SIZE = 20;
 const PERIOD_FILTERS: Array<{ value: DirectoryPeriod | "todos"; label: string }> = [
@@ -61,13 +64,7 @@ const STATUS_OPTIONS: Array<{ value: CaseStatus | "todos"; label: string }> = [
   { value: "en_proceso", label: CASE_STATUS_LABELS.en_proceso },
   { value: "finalizado", label: CASE_STATUS_LABELS.finalizado },
 ];
-const AREA_OPTIONS: Array<{ value: ClinicalArea | "todos"; label: string }> = [
-  { value: "todos", label: "Todas las áreas" },
-  ...CLINICAL_AREAS.map((area) => ({
-    value: area,
-    label: CLINICAL_AREA_LABELS[area],
-  })),
-];
+const AREA_ALL = "todos";
 const SELECT_PARAM_KEYS = [
   "case_status",
   "clinical_area",
@@ -101,10 +98,6 @@ function isCaseStatus(value: string | null): value is CaseStatus {
   return value === "pendiente" || value === "en_proceso" || value === "finalizado";
 }
 
-function isClinicalArea(value: string | null): value is ClinicalArea {
-  return value !== null && value in CLINICAL_AREA_LABELS;
-}
-
 function isAssigneeFilter(value: string | null): value is string {
   return value === "unassigned" || (value !== null && /^\d+$/.test(value));
 }
@@ -119,7 +112,7 @@ export function PatientList() {
   const statusFromUrl = searchParams.get("case_status");
   const caseStatus = isCaseStatus(statusFromUrl) ? statusFromUrl : undefined;
   const areaFromUrl = searchParams.get("clinical_area");
-  const clinicalArea = isClinicalArea(areaFromUrl) ? areaFromUrl : undefined;
+  const clinicalArea = areaFromUrl || undefined;
   const assignedFromUrl = searchParams.get("assigned_to");
   const assignedTo = isAssigneeFilter(assignedFromUrl)
     ? assignedFromUrl
@@ -135,6 +128,7 @@ export function PatientList() {
   );
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [areas, setAreas] = useState<ClinicalAreaRecord[]>([]);
 
   const canRegister = can(user, "patients.create");
   const canView = can(user, "patients.view");
@@ -144,6 +138,24 @@ export function PatientList() {
   useEffect(() => {
     setSearchInput(searchFromUrl);
   }, [searchFromUrl]);
+
+  useEffect(() => {
+    let cancelled = false;
+    listClinicalAreas()
+      .then((records) => {
+        if (!cancelled) {
+          setAreas(records);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setAreas([]);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -305,6 +317,16 @@ export function PatientList() {
     ],
     [assignees],
   );
+  const areaOptions = useMemo(
+    () => [
+      { value: AREA_ALL, label: "Todas las áreas" },
+      ...areas.map((area) => ({
+        value: area.slug,
+        label: area.name,
+      })),
+    ],
+    [areas],
+  );
   const range = useMemo(() => {
     if (state.status !== "ready" || state.count === 0) {
       return { from: 0, to: 0 };
@@ -353,7 +375,14 @@ export function PatientList() {
         header: "Área",
         render: (patient: PatientListItem) =>
           patient.clinical_area ? (
-            CLINICAL_AREA_LABELS[patient.clinical_area]
+            <div>
+              <p>{areaLabel(areas, patient.clinical_area)}</p>
+              {patient.clinical_subcategory ? (
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  {treatmentLabel(areas, patient.clinical_subcategory)}
+                </p>
+              ) : null}
+            </div>
           ) : (
             <span className="text-slate-400">Sin área</span>
           ),
@@ -395,7 +424,7 @@ export function PatientList() {
         ),
       },
     ],
-    [canEdit, canRemove, canView],
+    [areas, canEdit, canRemove, canView],
   );
 
   async function confirmDelete() {
@@ -487,12 +516,12 @@ export function PatientList() {
             <DirectoryFilter
               id="directory-area"
               label="Área"
-              value={clinicalArea ?? "todos"}
-              options={AREA_OPTIONS}
+              value={clinicalArea ?? AREA_ALL}
+              options={areaOptions}
               onChange={(value) =>
                 setSelectParam(
                   "clinical_area",
-                  isClinicalArea(value) ? value : "todos",
+                  value === AREA_ALL ? AREA_ALL : value,
                 )
               }
             />
@@ -526,7 +555,7 @@ export function PatientList() {
               type="search"
               value={searchInput}
               onChange={(event) => setSearchInput(event.target.value)}
-              placeholder="Buscar por nombre, DUI o carnet"
+              placeholder="Buscar por nombre o DUI"
               className="w-52 bg-transparent outline-none placeholder:text-slate-400"
             />
           </label>

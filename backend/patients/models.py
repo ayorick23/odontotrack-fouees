@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
 
@@ -28,9 +29,9 @@ class PatientQuerySet(models.QuerySet):
         return self
 
     def by_clinical_area(self, clinical_area: str | None):
-        if clinical_area in Patient.ClinicalArea.values:
-            return self.filter(clinical_area=clinical_area)
-        return self
+        if not clinical_area:
+            return self
+        return self.filter(clinical_area__slug=clinical_area)
 
     def by_assignee(self, assigned_to: str | None):
         if assigned_to == "unassigned":
@@ -59,15 +60,6 @@ class Patient(models.Model):
         EN_PROCESO = "en_proceso", "En proceso"
         FINALIZADO = "finalizado", "Finalizado"
 
-    class ClinicalArea(models.TextChoices):
-        OPERATORIA = "operatoria", "Operatoria"
-        ENDODONCIA = "endodoncia", "Endodoncia"
-        PERIODONCIA = "periodoncia", "Periodoncia"
-        CIRUGIA = "cirugia", "Cirugía"
-        PROTESIS = "protesis", "Prótesis"
-        ODONTOPEDIATRIA = "odontopediatria", "Odontopediatría"
-        ORTODONCIA = "ortodoncia", "Ortodoncia"
-
     class EmergencyContactRelationship(models.TextChoices):
         MADRE = "madre", "Madre"
         PADRE = "padre", "Padre"
@@ -82,12 +74,6 @@ class Patient(models.Model):
         max_length=30,
         unique=True,
         help_text="Documento Único de Identidad del paciente.",
-    )
-    carnet = models.CharField(
-        max_length=30,
-        blank=True,
-        default="",
-        help_text="Número de expediente/carnet interno de la clínica, si aplica.",
     )
     date_of_birth = models.DateField(null=True, blank=True)
     phone_number = models.CharField(max_length=20, blank=True)
@@ -110,10 +96,20 @@ class Patient(models.Model):
         default="",
     )
 
-    clinical_area = models.CharField(
-        max_length=20,
-        choices=ClinicalArea.choices,
+    clinical_area = models.ForeignKey(
+        "catalogs.ClinicalArea",
+        on_delete=models.PROTECT,
+        null=True,
         blank=True,
+        related_name="patients",
+    )
+    clinical_treatment = models.ForeignKey(
+        "catalogs.ClinicalTreatment",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="patients",
+        help_text="Tratamiento del catálogo FOUEES según el área clínica.",
     )
     case_status = models.CharField(
         max_length=20,
@@ -131,6 +127,27 @@ class Patient(models.Model):
 
     def __str__(self):
         return f"{self.first_name} {self.last_name} ({self.dui})"
+
+    def clean(self):
+        super().clean()
+        if not self.clinical_treatment_id:
+            return
+        if not self.clinical_area_id:
+            raise ValidationError(
+                {
+                    "clinical_subcategory": (
+                        "Selecciona un área clínica antes del tratamiento."
+                    )
+                }
+            )
+        if self.clinical_treatment.area_id != self.clinical_area_id:
+            raise ValidationError(
+                {
+                    "clinical_subcategory": (
+                        "El tratamiento no corresponde al área clínica seleccionada."
+                    )
+                }
+            )
 
     def has_active_assignment(self) -> bool:
         return self.assignments.filter(

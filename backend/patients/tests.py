@@ -2,7 +2,9 @@ from datetime import timedelta
 from io import BytesIO
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import TestCase
 from django.utils import timezone
 from PIL import Image
 from rest_framework import status
@@ -11,9 +13,18 @@ from rest_framework.test import APITestCase
 from accounts.models import User
 from accounts.services import sync_acl
 from assignments.models import Assignment
+from catalogs.models import ClinicalArea, ClinicalTreatment
 from patients.models import Patient
 
 PAGE_SIZE = settings.REST_FRAMEWORK["PAGE_SIZE"]
+
+
+def clinical_area(slug: str) -> ClinicalArea:
+    return ClinicalArea.objects.get(slug=slug)
+
+
+def clinical_treatment(slug: str) -> ClinicalTreatment:
+    return ClinicalTreatment.objects.get(slug=slug)
 
 
 class ListingPaginationTests(APITestCase):
@@ -112,44 +123,23 @@ class PatientDirectoryTests(APITestCase):
             ["99999999-9"],
         )
 
-    def test_search_matches_carnet(self):
-        Patient.objects.create(
-            first_name="Ana",
-            last_name="Carnet",
-            dui="CAR-DUI",
-            carnet="CARNET-22",
-        )
-        Patient.objects.create(
-            first_name="Luis",
-            last_name="Otro",
-            dui="CAR-OTRO",
-            carnet="CARNET-99",
-        )
-
-        response = self.client.get("/api/patients/", {"search": "CARNET-22"})
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(
-            [row["dui"] for row in response.json()["results"]],
-            ["CAR-DUI"],
-        )
-
     def test_filter_by_clinical_area(self):
         Patient.objects.create(
             first_name="Ana",
             last_name="Endodoncia",
             dui="END-001",
-            clinical_area=Patient.ClinicalArea.ENDODONCIA,
+            clinical_area=clinical_area("endodoncia"),
         )
         Patient.objects.create(
             first_name="Luis",
             last_name="Operatoria",
             dui="OPE-001",
-            clinical_area=Patient.ClinicalArea.OPERATORIA,
+            clinical_area=clinical_area("operatoria"),
         )
 
         response = self.client.get(
             "/api/patients/",
-            {"clinical_area": Patient.ClinicalArea.ENDODONCIA},
+            {"clinical_area": "endodoncia"},
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         body = response.json()
@@ -157,7 +147,7 @@ class PatientDirectoryTests(APITestCase):
         self.assertEqual(body["results"][0]["dui"], "END-001")
         self.assertEqual(
             body["results"][0]["clinical_area"],
-            Patient.ClinicalArea.ENDODONCIA,
+            "endodoncia",
         )
 
     def test_filter_by_assigned_to_unassigned_and_student(self):
@@ -344,7 +334,6 @@ class PatientCompleteFieldsTests(APITestCase):
             "first_name": "Ana",
             "last_name": "Completa",
             "dui": "04512345-6",
-            "carnet": "FOUEES-2026-014",
             "phone_number": "7000-1111",
             "whatsapp_number": "7000-2222",
             "emergency_contact_name": "Marta Completa",
@@ -355,7 +344,6 @@ class PatientCompleteFieldsTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
         patient = Patient.objects.get(dui="04512345-6")
-        self.assertEqual(patient.carnet, "FOUEES-2026-014")
         self.assertEqual(patient.whatsapp_number, "7000-2222")
         self.assertEqual(patient.emergency_contact_name, "Marta Completa")
         self.assertEqual(patient.emergency_contact_phone, "7000-3333")
@@ -373,7 +361,6 @@ class PatientCompleteFieldsTests(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         patient = Patient.objects.get(dui="MIN-001")
-        self.assertEqual(patient.carnet, "")
         self.assertEqual(patient.whatsapp_number, "")
         self.assertEqual(patient.emergency_contact_name, "")
         self.assertEqual(patient.emergency_contact_phone, "")
@@ -463,7 +450,7 @@ class PatientWriteTests(APITestCase):
                 "last_name": "López",
                 "dui": "01234567-8",
                 "phone_number": "7777-7777",
-                "clinical_area": Patient.ClinicalArea.OPERATORIA,
+                "clinical_area": "operatoria",
                 "case_status": Patient.CaseStatus.FINALIZADO,
             },
             format="json",
@@ -473,7 +460,7 @@ class PatientWriteTests(APITestCase):
         self.assertEqual(body["first_name"], "Ana")
         self.assertEqual(body["case_status"], Patient.CaseStatus.PENDIENTE)
         self.assertFalse(body["has_active_assignment"])
-        self.assertEqual(body["clinical_area"], Patient.ClinicalArea.OPERATORIA)
+        self.assertEqual(body["clinical_area"], "operatoria")
 
     def test_duplicate_dui_is_rejected(self):
         Patient.objects.create(
@@ -522,7 +509,7 @@ class PatientWriteTests(APITestCase):
                 "phone_number": "7000-1111",
                 "email": "carlos@example.com",
                 "address": "San Salvador",
-                "clinical_area": Patient.ClinicalArea.ENDODONCIA,
+                "clinical_area": "endodoncia",
                 "case_status": Patient.CaseStatus.FINALIZADO,
             },
             format="json",
@@ -530,7 +517,7 @@ class PatientWriteTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         body = response.json()
         self.assertEqual(body["phone_number"], "7000-1111")
-        self.assertEqual(body["clinical_area"], Patient.ClinicalArea.ENDODONCIA)
+        self.assertEqual(body["clinical_area"], "endodoncia")
         self.assertEqual(body["case_status"], Patient.CaseStatus.EN_PROCESO)
         self.assertEqual(body["date_of_birth"], "1990-05-12")
 
@@ -553,7 +540,6 @@ class PatientWriteTests(APITestCase):
         self.assertTrue(body["has_active_assignment"])
         self.assertEqual(body["dui"], "FIC-001")
         self.assertIn("address", body)
-        self.assertIn("carnet", body)
         self.assertIn("whatsapp_number", body)
         self.assertIn("emergency_contact_name", body)
         self.assertIn("emergency_contact_phone", body)
@@ -567,7 +553,6 @@ class PatientWriteTests(APITestCase):
                 "first_name": "Ana",
                 "last_name": "López",
                 "dui": "REC-001",
-                "carnet": "C-100",
                 "whatsapp_number": "7777-8888",
                 "emergency_contact_name": "Marta López",
                 "emergency_contact_phone": "7000-3333",
@@ -577,7 +562,6 @@ class PatientWriteTests(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         body = response.json()
-        self.assertEqual(body["carnet"], "C-100")
         self.assertEqual(body["whatsapp_number"], "7777-8888")
         self.assertEqual(body["emergency_contact_name"], "Marta López")
         self.assertEqual(body["emergency_contact_phone"], "7000-3333")
@@ -585,25 +569,6 @@ class PatientWriteTests(APITestCase):
             body["emergency_contact_relationship"],
             Patient.EmergencyContactRelationship.MADRE,
         )
-
-    def test_blank_carnet_can_repeat(self):
-        Patient.objects.create(
-            first_name="Luis",
-            last_name="Pérez",
-            dui="CAR-BLANK-1",
-        )
-        response = self.client.post(
-            "/api/patients/",
-            {
-                "first_name": "María",
-                "last_name": "Gómez",
-                "dui": "CAR-BLANK-2",
-                "carnet": "",
-            },
-            format="json",
-        )
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(response.json()["carnet"], "")
 
     def test_photo_upload_returns_url(self):
         response = self.client.post(
@@ -657,6 +622,88 @@ class PatientWriteTests(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("photo", response.data)
+
+    def test_create_accepts_diagnostico_area(self):
+        response = self.client.post(
+            "/api/patients/",
+            {
+                "first_name": "Ana",
+                "last_name": "Dx",
+                "dui": "DX-001",
+                "clinical_area": "diagnostico",
+                "clinical_subcategory": "diagnostico_con_rx_panoramica",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        body = response.json()
+        self.assertEqual(body["clinical_area"], "diagnostico")
+        self.assertEqual(
+            body["clinical_subcategory"],
+            "diagnostico_con_rx_panoramica",
+        )
+
+    def test_subcategory_must_match_clinical_area(self):
+        response = self.client.post(
+            "/api/patients/",
+            {
+                "first_name": "Ana",
+                "last_name": "Cruz",
+                "dui": "SUB-BAD",
+                "clinical_area": "operatoria",
+                "clinical_subcategory": "endodoncia_monorradicular",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("clinical_subcategory", response.data)
+
+    def test_subcategory_requires_clinical_area(self):
+        response = self.client.post(
+            "/api/patients/",
+            {
+                "first_name": "Ana",
+                "last_name": "Cruz",
+                "dui": "SUB-NOAREA",
+                "clinical_subcategory": "ameloplastia_adulto",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("clinical_subcategory", response.data)
+
+    def test_patch_area_clears_incompatible_subcategory(self):
+        patient = Patient.objects.create(
+            first_name="Carlos",
+            last_name="Ruiz",
+            dui="SUB-PATCH",
+            clinical_area=clinical_area("operatoria"),
+            clinical_treatment=clinical_treatment("ameloplastia_adulto"),
+        )
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.patch(
+            f"/api/patients/{patient.id}/",
+            {"clinical_area": "endodoncia"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        body = response.json()
+        self.assertEqual(body["clinical_area"], "endodoncia")
+        self.assertEqual(body["clinical_subcategory"], "")
+
+
+class ClinicalCatalogTests(TestCase):
+    def test_mismatched_subcategory_fails_model_clean(self):
+        patient = Patient(
+            first_name="Ana",
+            last_name="López",
+            dui="CLEAN-001",
+            clinical_area=clinical_area("operatoria"),
+            clinical_treatment=clinical_treatment("endodoncia_monorradicular"),
+        )
+        with self.assertRaises(ValidationError) as caught:
+            patient.clean()
+        self.assertIn("clinical_subcategory", caught.exception.message_dict)
 
 
 def _jpeg_upload(name="foto.jpg") -> SimpleUploadedFile:

@@ -159,6 +159,12 @@ PERMISSION_CATALOG: Final[tuple[SectionSpec, ...]] = (
                 actions=(VIEW, CREATE, EDIT, DELETE),
             ),
             ModuleSpec(
+                key="catalogs",
+                label="Catálogos clínicos",
+                description="Áreas clínicas y tratamientos del tarifario FOUEES.",
+                actions=(VIEW, CREATE, EDIT, DELETE),
+            ),
+            ModuleSpec(
                 key="support",
                 label="Soporte técnico",
                 description="Panel de mantenimiento. Sin escritura clínica.",
@@ -304,6 +310,10 @@ SYSTEM_ROLES: Final[tuple[SystemRoleSpec, ...]] = (
             "users.edit",
             "users.delete",
             "roles.view",
+            "catalogs.view",
+            "catalogs.create",
+            "catalogs.edit",
+            "catalogs.delete",
             "support.view",
         ),
     ),
