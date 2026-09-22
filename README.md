@@ -14,6 +14,7 @@ Roles del sistema: **administrador**, **docente supervisor**,
 - **Backend:** Django + Django REST Framework (API REST pura, sin templates)
 - **Base de datos:** PostgreSQL
 - **Frontend:** React + Vite + TypeScript
+- **Odontograma:** `react-advanced-odontogram` (SVG FDI), envuelto en `frontend/src/features/clinical-records/components/Odontogram/`
 - **Autenticación:** JWT (`djangorestframework-simplejwt`), backend y frontend desacoplados
 - **Entorno local:** Docker Compose
 

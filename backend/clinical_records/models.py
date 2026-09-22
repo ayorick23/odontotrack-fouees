@@ -49,3 +49,37 @@ class ClinicalRecord(models.Model):
 
     def __str__(self):
         return f"Registro de {self.patient} ({self.created_at:%Y-%m-%d})"
+
+
+class Odontogram(models.Model):
+    """
+    Odontograma FDI del paciente: un estado actual por caso, no un
+    historial de visitas. Los 32 dientes y el snapshot visual viven en
+    JSON para no perder superficies al recargar el gráfico SVG.
+    """
+
+    patient = models.OneToOneField(
+        "patients.Patient",
+        on_delete=models.CASCADE,
+        related_name="odontogram",
+    )
+    placa = models.BooleanField(default=False)
+    sangrado = models.BooleanField(default=False)
+    sarro = models.BooleanField(default=False)
+    teeth = models.JSONField(default=list)
+    visual_snapshot = models.JSONField(null=True, blank=True)
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="updated_odontograms",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-updated_at"]
+
+    def __str__(self):
+        return f"Odontograma de {self.patient}"
