@@ -538,6 +538,7 @@ class PatientWriteTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         body = response.json()
         self.assertTrue(body["has_active_assignment"])
+        self.assertEqual(body["assigned_to"], "estudiante-ficha")
         self.assertEqual(body["dui"], "FIC-001")
         self.assertIn("address", body)
         self.assertIn("whatsapp_number", body)

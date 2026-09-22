@@ -436,7 +436,7 @@ export function PatientForm() {
                 />
               </Field>
               <Field
-                label="DUI o pasaporte"
+                label="DUI"
                 error={errors.dui?.message}
                 required
               >

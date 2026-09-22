@@ -39,6 +39,18 @@ def empty_catalog_slugs(data: dict) -> dict:
     return data
 
 
+def assigned_student_name(patient: Patient) -> str | None:
+    active = [
+        assignment
+        for assignment in patient.assignments.all()
+        if assignment.status == Assignment.AssignmentStatus.ACTIVA
+    ]
+    if not active:
+        return None
+    student = active[0].student
+    return student.get_full_name() or student.username
+
+
 class PatientPhotoField(serializers.ImageField):
     def to_internal_value(self, data):
         size = getattr(data, "size", 0) or 0
@@ -86,6 +98,7 @@ class PatientSerializer(serializers.ModelSerializer):
     )
     photo = PatientPhotoField(required=False, allow_null=True)
     has_active_assignment = serializers.SerializerMethodField()
+    assigned_to = serializers.SerializerMethodField()
     clinical_area = OptionalSlugRelatedField(
         slug_field="slug",
         queryset=ClinicalArea.objects.all(),
@@ -120,6 +133,7 @@ class PatientSerializer(serializers.ModelSerializer):
             "clinical_subcategory",
             "case_status",
             "has_active_assignment",
+            "assigned_to",
             "created_at",
             "updated_at",
         )
@@ -127,6 +141,7 @@ class PatientSerializer(serializers.ModelSerializer):
             "id",
             "case_status",
             "has_active_assignment",
+            "assigned_to",
             "created_at",
             "updated_at",
         )
@@ -136,6 +151,9 @@ class PatientSerializer(serializers.ModelSerializer):
             assignment.status == Assignment.AssignmentStatus.ACTIVA
             for assignment in patient.assignments.all()
         )
+
+    def get_assigned_to(self, patient: Patient) -> str | None:
+        return assigned_student_name(patient)
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
@@ -206,15 +224,7 @@ class PatientListSerializer(serializers.ModelSerializer):
         )
 
     def get_assigned_to(self, patient: Patient) -> str | None:
-        active = [
-            assignment
-            for assignment in patient.assignments.all()
-            if assignment.status == Assignment.AssignmentStatus.ACTIVA
-        ]
-        if not active:
-            return None
-        student = active[0].student
-        return student.get_full_name() or student.username
+        return assigned_student_name(patient)
 
     def to_representation(self, instance):
         return empty_catalog_slugs(super().to_representation(instance))
