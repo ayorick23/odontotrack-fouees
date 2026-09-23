@@ -119,9 +119,9 @@ class EvolucionClinica(models.Model):
 
 class Odontogram(models.Model):
     """
-    Odontograma FDI del paciente: un estado actual por caso, no un
-    historial de visitas. Los 32 dientes y el snapshot visual viven en
-    JSON para no perder superficies al recargar el gráfico SVG.
+    Odontograma FDI del paciente (permanente o mixto). El estado actual
+    vive aquí; cada guardado con contenido clínico deja un revision en
+    OdontogramRevision.
     """
 
     patient = models.OneToOneField(
@@ -149,3 +149,32 @@ class Odontogram(models.Model):
 
     def __str__(self):
         return f"Odontograma de {self.patient}"
+
+
+class OdontogramRevision(models.Model):
+    """Snapshot consultable de un odontograma en un momento dado."""
+
+    odontogram = models.ForeignKey(
+        Odontogram,
+        on_delete=models.CASCADE,
+        related_name="revisions",
+    )
+    teeth = models.JSONField(default=list)
+    placa = models.BooleanField(default=False)
+    sangrado = models.BooleanField(default=False)
+    sarro = models.BooleanField(default=False)
+    visual_snapshot = models.JSONField(null=True, blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="odontogram_revisions",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Revisión de {self.odontogram} ({self.created_at:%Y-%m-%d %H:%M})"

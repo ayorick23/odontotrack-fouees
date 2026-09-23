@@ -11,6 +11,7 @@ from .models import Diagnostico, EvolucionClinica, Tratamiento
 from .serializers import (
     DiagnosticoSerializer,
     EvolucionClinicaSerializer,
+    OdontogramRevisionSerializer,
     OdontogramSerializer,
     TratamientoSerializer,
 )
@@ -87,7 +88,22 @@ class PatientOdontogramView(APIView):
         patient = get_object_or_404(Patient, pk=patient_id)
         OdontogramService.assert_can_update(request.user, patient)
         odontogram = OdontogramService.get_or_create(patient)
+        OdontogramService.record_revision(odontogram, request.user)
         serializer = OdontogramSerializer(odontogram, data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save(updated_by=request.user)
         return Response(serializer.data)
+
+
+class PatientOdontogramHistoryView(APIView):
+    permission_classes = [IsAuthenticated, HasRequiredAcl]
+    acl_permissions = {
+        "get": "odontogram.view",
+    }
+
+    def get(self, request, patient_id: int):
+        patient = get_object_or_404(Patient, pk=patient_id)
+        OdontogramService.assert_can_view(request.user, patient)
+        odontogram = OdontogramService.get_or_create(patient)
+        revisions = odontogram.revisions.select_related("created_by")
+        return Response(OdontogramRevisionSerializer(revisions, many=True).data)

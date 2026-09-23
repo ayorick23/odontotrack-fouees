@@ -15,10 +15,10 @@ const triggerClass =
   "h-10 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-800 shadow-none outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 disabled:cursor-not-allowed disabled:opacity-70 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-800";
 
 const menuClass =
-  "z-[80] max-h-72 rounded-xl border-slate-200 bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100";
+  "z-[80] max-h-72 rounded-xl border-slate-200 bg-white text-slate-800 shadow-lg dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100";
 
 const itemClass =
-  "rounded-lg text-sm focus:bg-teal-50 focus:text-teal-900 dark:focus:bg-teal-950 dark:focus:text-teal-100";
+  "rounded-lg py-2 text-sm text-slate-700 focus:bg-teal-50 focus:text-teal-900 dark:text-slate-100 dark:focus:bg-teal-950 dark:focus:text-teal-100";
 
 type OdontogramFieldSelectProps = {
   label: string;
@@ -73,7 +73,11 @@ export function OdontogramFieldSelect({
             .filter((group) => group.options.length > 0)
             .map((group) => (
             <SelectGroup key={group.label}>
-              {group.label ? <SelectLabel>{group.label}</SelectLabel> : null}
+              {group.label ? (
+                <SelectLabel className="text-slate-500 dark:text-slate-400">
+                  {group.label}
+                </SelectLabel>
+              ) : null}
               {group.options.map((option) => (
                 <SelectItem
                   key={option.value || `${group.label}-empty`}

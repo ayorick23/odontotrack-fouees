@@ -1,6 +1,5 @@
 import {
   clearSelection,
-  exportFhir,
   exportImage,
   exportPdf,
   addDiagnosisToSelection,
@@ -27,6 +26,7 @@ import {
   setOrthoDriftForSelection,
   setOrthoRotationForSelection,
   setOrthoVerticalForSelection,
+  setOcclusalVisible,
   setPdfSettings,
   setPlanChart,
   setPulpEndoForSelection,
@@ -37,7 +37,18 @@ import {
 } from "react-advanced-odontogram";
 import { toast } from "sonner";
 
-import type { ToothStatus, ToothSurface } from "../../types";
+import type { ToothLayer, ToothStatus, ToothSurface } from "../../types";
+
+let activeToothLayer: ToothLayer = "hallazgo";
+
+export function readActiveToothLayer(): ToothLayer {
+  return activeToothLayer;
+}
+
+export function applyToothLayer(layer: ToothLayer): void {
+  activeToothLayer = layer;
+  setChartMode(layer === "plan" ? "plan" : "status");
+}
 
 export type EngineChartMode = "status" | "plan";
 
@@ -80,10 +91,24 @@ export function writeEngineChart(payload: unknown): void {
   } else {
     setPlanChart(getStatusChart());
   }
+  activeToothLayer = "hallazgo";
   setChartMode("status");
   setWisdomVisible(true);
   setShowBase(true);
+  setOcclusalVisible(true);
   setHealthyPulpVisible(true);
+}
+
+export function applyOcclusalVisible(on: boolean): void {
+  setOcclusalVisible(on);
+}
+
+export function applyBoneVisible(on: boolean): void {
+  setShowBase(on);
+}
+
+export function applyPulpVisible(on: boolean): void {
+  setHealthyPulpVisible(on);
 }
 
 export function readChartMode(): EngineChartMode {
@@ -128,23 +153,6 @@ export async function exportChartPdf(): Promise<void> {
   });
 }
 
-export function exportChartFhir(patientId?: number): void {
-  const bundle = exportFhir(
-    patientId ? { subject: `Patient/${patientId}` } : undefined,
-  );
-  const blob = new Blob([JSON.stringify(bundle, null, 2)], {
-    type: "application/fhir+json",
-  });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = patientId
-    ? `odontograma-paciente-${patientId}.fhir.json`
-    : "odontograma.fhir.json";
-  anchor.click();
-  URL.revokeObjectURL(url);
-}
-
 export function clearChartSelection(): void {
   clearSelection();
 }
@@ -155,6 +163,19 @@ export function hasChartSelection(): boolean {
     return true;
   }
   return document.querySelectorAll(".odontogram-fouees .tooth-tile.active").length > 0;
+}
+
+export function readSelectedFdi(): number | null {
+  const tile = document.querySelector(".odontogram-fouees .tooth-tile.active");
+  if (!(tile instanceof HTMLElement)) {
+    return null;
+  }
+  const raw = tile.getAttribute("data-tooth");
+  if (raw == null) {
+    return null;
+  }
+  const fdi = Number(raw);
+  return Number.isInteger(fdi) ? fdi : null;
 }
 
 function requireSelection(): boolean {
@@ -173,7 +194,12 @@ export function applyStatusToSelection(status: ToothStatus): void {
     resetTooth();
     return;
   }
-  if (status === "extraido") {
+  if (
+    status === "extraido" ||
+    status === "ausente_congenito" ||
+    status === "no_erupcionado" ||
+    status === "raiz_retenida"
+  ) {
     setToothSelectionForSelection("none");
     return;
   }
@@ -181,12 +207,22 @@ export function applyStatusToSelection(status: ToothStatus): void {
     setToothSelectionForSelection("implant");
     return;
   }
+  if (status === "puente") {
+    setRestorationForSelection("bridge");
+    return;
+  }
   if (status === "corona") {
     setRestorationForSelection("crown|zircon");
     return;
   }
-  if (status === "caries") {
+  if (status === "caries" || status === "fractura") {
     setCariesSurfaceForSelection("caries-occlusal", true);
+    return;
+  }
+  if (
+    status === "endodoncia" ||
+    status === "pulpotomia"
+  ) {
     return;
   }
   setFillingMaterialForSelection("composite");

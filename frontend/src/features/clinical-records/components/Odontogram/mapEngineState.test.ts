@@ -9,16 +9,16 @@ describe("engineToothToFinding", () => {
       engineToothToFinding(16, { toothSelection: "none" }),
     ).toEqual({
       fdi: 16,
-      status: "extraido",
-      statuses: ["extraido"],
-      surfaces: [],
+      marks: [{ layer: "hecho", status: "extraido", surfaces: [] }],
+      oralMarks: { placa: false, sangrado: false, sarro: false },
+      practice: { indicated: false, clinicalArea: null },
     });
   });
 
-  it("combina corona, caries y obturado en el mismo diente", () => {
+  it("separa caries y obturado con sus propias superficies", () => {
     expect(
-      engineToothToFinding(21, { toothSelection: "implant" }).status,
-    ).toBe("implante");
+      engineToothToFinding(21, { toothSelection: "implant" }).marks,
+    ).toEqual([{ layer: "hecho", status: "implante", surfaces: [] }]);
     expect(
       engineToothToFinding(11, {
         toothSelection: "tooth-base",
@@ -27,9 +27,12 @@ describe("engineToothToFinding", () => {
       }),
     ).toEqual({
       fdi: 11,
-      status: "corona",
-      statuses: ["corona", "caries"],
-      surfaces: ["oclusal"],
+      marks: [
+        { layer: "hecho", status: "corona", surfaces: [] },
+        { layer: "hallazgo", status: "caries", surfaces: ["oclusal"] },
+      ],
+      oralMarks: { placa: false, sangrado: false, sarro: false },
+      practice: { indicated: false, clinicalArea: null },
     });
     expect(
       engineToothToFinding(36, {
@@ -39,31 +42,12 @@ describe("engineToothToFinding", () => {
       }),
     ).toEqual({
       fdi: 36,
-      status: "caries",
-      statuses: ["caries", "obturado"],
-      surfaces: ["oclusal", "vestibular"],
-    });
-    expect(
-      engineToothToFinding(24, {
-        toothSelection: "tooth-base",
-        caries: ["occlusal"],
-      }),
-    ).toEqual({
-      fdi: 24,
-      status: "caries",
-      statuses: ["caries"],
-      surfaces: ["oclusal"],
-    });
-    expect(
-      engineToothToFinding(46, {
-        toothSelection: "tooth-base",
-        fillingSurfaces: ["mesial", "distal"],
-      }),
-    ).toEqual({
-      fdi: 46,
-      status: "obturado",
-      statuses: ["obturado"],
-      surfaces: ["mesial", "distal"],
+      marks: [
+        { layer: "hallazgo", status: "caries", surfaces: ["oclusal", "vestibular"] },
+        { layer: "hecho", status: "obturado", surfaces: ["oclusal"] },
+      ],
+      oralMarks: { placa: false, sangrado: false, sarro: false },
+      practice: { indicated: false, clinicalArea: null },
     });
   });
 });
@@ -87,11 +71,11 @@ describe("chartToDomain", () => {
     expect(value.teeth).toHaveLength(32);
     expect(value.teeth.find((tooth) => tooth.fdi === 16)).toEqual({
       fdi: 16,
-      status: "caries",
-      statuses: ["caries"],
-      surfaces: ["oclusal"],
+      marks: [{ layer: "hallazgo", status: "caries", surfaces: ["oclusal"] }],
+      oralMarks: { placa: true, sangrado: true, sarro: true },
+      practice: { indicated: false, clinicalArea: null },
     });
-    expect(value.teeth.find((tooth) => tooth.fdi === 11)?.status).toBe("sano");
+    expect(value.teeth.find((tooth) => tooth.fdi === 11)?.marks).toEqual([]);
     expect(value.oralMarks).toEqual({
       placa: true,
       sangrado: true,
@@ -100,14 +84,41 @@ describe("chartToDomain", () => {
     expect(value.visualSnapshot?.teeth?.["16"]).toBeTruthy();
   });
 
-  it("conserva el plan de tratamiento en el snapshot", () => {
-    const plan = { version: 2.2, teeth: { "11": { toothSelection: "none" } } };
-    const value = chartToDomain({
-      version: 2.2,
-      teeth: {},
-      plan,
-    });
-    expect(value.visualSnapshot?.plan).toEqual(plan);
+  it("guarda el plan como capa distinta y conserva el hallazgo", () => {
+    const previous = emptyOdontogram();
+    const sixteen = previous.teeth.find((tooth) => tooth.fdi === 16);
+    if (sixteen) {
+      sixteen.marks = [
+        { layer: "hallazgo", status: "caries", surfaces: ["mesial", "oclusal"] },
+      ];
+    }
+
+    const value = chartToDomain(
+      {
+        version: 2.2,
+        teeth: {
+          "16": {
+            toothSelection: "tooth-base",
+            caries: ["caries-mesial", "caries-occlusal"],
+          },
+        },
+        plan: {
+          version: 2.2,
+          teeth: {
+            "16": {
+              toothSelection: "tooth-base",
+              fillingSurfaces: ["mesial", "occlusal"],
+            },
+          },
+        },
+      },
+      { previous, activeLayer: "plan" },
+    );
+
+    expect(value.teeth.find((tooth) => tooth.fdi === 16)?.marks).toEqual([
+      { layer: "hallazgo", status: "caries", surfaces: ["mesial", "oclusal"] },
+      { layer: "plan", status: "obturado", surfaces: ["mesial", "oclusal"] },
+    ]);
   });
 });
 
@@ -116,8 +127,9 @@ describe("domainToChart", () => {
     const value = emptyOdontogram();
     const sixteen = value.teeth.find((tooth) => tooth.fdi === 16);
     if (sixteen) {
-      sixteen.status = "caries";
-      sixteen.surfaces = ["oclusal"];
+      sixteen.marks = [
+        { layer: "hallazgo", status: "caries", surfaces: ["oclusal"] },
+      ];
     }
     value.oralMarks.sarro = true;
 

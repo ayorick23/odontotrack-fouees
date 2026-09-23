@@ -1,13 +1,17 @@
 import {
+  defaultLayerForStatus,
+  deriveOralMarks,
   emptyOdontogram,
   emptyOralMarks,
-  findingStatuses,
+  emptyPractice,
   isFdiToothNumber,
-  primaryToothStatus,
+  WHOLE_TOOTH_STATUSES,
   type FdiToothNumber,
   type OdontogramSnapshot,
   type OdontogramValue,
   type ToothFinding,
+  type ToothLayer,
+  type ToothMark,
   type ToothStatus,
   type ToothSurface,
 } from "../../types";
@@ -89,65 +93,79 @@ function uniqueSurfaces(tokens: string[]): ToothSurface[] {
   return [...seen];
 }
 
+function markKey(mark: ToothMark): string {
+  return `${mark.status}:${mark.surfaces.join(",")}`;
+}
+
+function withLayer(status: ToothStatus, surfaces: ToothSurface[], layer: ToothLayer): ToothMark {
+  return {
+    layer,
+    status,
+    surfaces: WHOLE_TOOTH_STATUSES.includes(status) ? [] : surfaces,
+  };
+}
+
 /**
- * Extraído e implante sustituyen al diente. Caries, obturado y corona
- * pueden convivir en el mismo diente (superficies distintas o etapas).
+ * Extraído e implante sustituyen al diente. Caries y obturado
+ * conviven: cada uno guarda sus propias superficies.
  */
 export function engineToothToFinding(
   fdi: FdiToothNumber,
   tooth: EngineTooth,
+  layer?: ToothLayer,
 ): ToothFinding {
+  return {
+    fdi,
+    marks: engineToothToMarks(tooth, layer),
+    oralMarks: emptyOralMarks(),
+    practice: emptyPractice(),
+  };
+}
+
+export function engineToothToMarks(
+  tooth: EngineTooth,
+  layer?: ToothLayer,
+): ToothMark[] {
   const selection = tooth.toothSelection ?? "tooth-base";
   const cariesSurfaces = uniqueSurfaces(tooth.caries ?? []);
   const fillingSurfaces = uniqueSurfaces(tooth.fillingSurfaces ?? []);
   const restoration = tooth.restorationType ?? "";
 
   if (selection === "none" || selection === "no-tooth-after-extraction") {
-    return { fdi, status: "extraido", statuses: ["extraido"], surfaces: [] };
+    return [withLayer("extraido", [], layer ?? defaultLayerForStatus("extraido"))];
   }
   if (selection === "implant") {
-    return { fdi, status: "implante", statuses: ["implante"], surfaces: [] };
+    return [withLayer("implante", [], layer ?? defaultLayerForStatus("implante"))];
   }
 
-  const statuses: ToothStatus[] = [];
-  if (
-    restoration === "crown" ||
-    restoration.startsWith("crown|") ||
-    restoration === "bridge"
-  ) {
-    statuses.push("corona");
+  const marks: ToothMark[] = [];
+  if (restoration === "bridge") {
+    marks.push(withLayer("puente", [], layer ?? defaultLayerForStatus("puente")));
+  } else if (restoration === "crown" || restoration.startsWith("crown|")) {
+    marks.push(withLayer("corona", [], layer ?? defaultLayerForStatus("corona")));
   }
   if (cariesSurfaces.length > 0) {
-    statuses.push("caries");
+    marks.push(
+      withLayer("caries", cariesSurfaces, layer ?? defaultLayerForStatus("caries")),
+    );
   }
   if (fillingSurfaces.length > 0) {
-    statuses.push("obturado");
+    marks.push(
+      withLayer(
+        "obturado",
+        fillingSurfaces,
+        layer ?? defaultLayerForStatus("obturado"),
+      ),
+    );
   }
-
-  const surfaces = uniqueSurfaces([
-    ...(tooth.caries ?? []),
-    ...(tooth.fillingSurfaces ?? []),
-  ]);
-
-  if (statuses.length === 0) {
-    return { fdi, status: "sano", statuses: [], surfaces: [] };
-  }
-  return {
-    fdi,
-    status: primaryToothStatus(statuses),
-    statuses,
-    surfaces,
-  };
+  return marks;
 }
 
 function findingToEngineTooth(finding: ToothFinding): Record<string, unknown> {
-  const statuses = findingStatuses(finding);
-  const engineSurfaces = finding.surfaces.map(
-    (surface) => DOMAIN_SURFACE_TO_ENGINE[surface],
-  );
-  const fallback = engineSurfaces.length > 0 ? engineSurfaces : ["occlusal"];
+  const marks = finding.marks.filter((mark) => mark.layer !== "plan");
+  const statuses = marks.map((mark) => mark.status);
 
-  if (statuses.includes("extraido")) {
+  if (statuses.includes("extraido") || statuses.includes("ausente_congenito") || statuses.includes("no_erupcionado") || statuses.includes("raiz_retenida")) {
     return { toothSelection: "none" };
   }
   if (statuses.includes("implante")) {
@@ -157,17 +175,51 @@ function findingToEngineTooth(finding: ToothFinding): Record<string, unknown> {
   const engineTooth: Record<string, unknown> = {
     toothSelection: "tooth-base",
   };
-  if (statuses.includes("corona")) {
+  if (statuses.includes("puente")) {
+    engineTooth.restorationType = "bridge";
+  } else if (statuses.includes("corona")) {
     engineTooth.restorationType = "crown";
   }
-  if (statuses.includes("obturado")) {
+
+  const filling = marks.find(
+    (mark) =>
+      mark.status === "obturado" ||
+      mark.status === "sellante" ||
+      mark.status === "restauracion_temporal",
+  );
+  if (filling) {
+    const surfaces = filling.surfaces.map(
+      (surface) => DOMAIN_SURFACE_TO_ENGINE[surface],
+    );
     engineTooth.fillingMaterial = "composite";
-    engineTooth.fillingSurfaces = fallback;
+    engineTooth.fillingSurfaces =
+      surfaces.length > 0 ? surfaces : ["occlusal"];
   }
-  if (statuses.includes("caries")) {
+
+  const caries = marks.find((mark) => mark.status === "caries" || mark.status === "fractura");
+  if (caries) {
+    const surfaces = caries.surfaces.map(
+      (surface) => DOMAIN_SURFACE_TO_ENGINE[surface],
+    );
+    const fallback = surfaces.length > 0 ? surfaces : ["occlusal"];
     engineTooth.caries = fallback.map((surface) => `caries-${surface}`);
   }
   return engineTooth;
+}
+
+function planMarksToChart(teeth: ToothFinding[]): Record<string, unknown> {
+  const planTeeth: Record<string, unknown> = {};
+  for (const finding of teeth) {
+    const planOnly: ToothFinding = {
+      fdi: finding.fdi,
+      marks: finding.marks.filter((mark) => mark.layer === "plan"),
+    };
+    if (planOnly.marks.length === 0) {
+      continue;
+    }
+    planTeeth[String(finding.fdi)] = findingToEngineTooth(planOnly);
+  }
+  return planTeeth;
 }
 
 export function snapshotFromUnknown(value: unknown): OdontogramSnapshot | undefined {
@@ -190,14 +242,88 @@ export function snapshotFromUnknown(value: unknown): OdontogramSnapshot | undefi
   return snapshot.teeth ? snapshot : { ...snapshot, teeth: {} };
 }
 
-export function chartToDomain(chart: unknown): OdontogramValue {
+function marksFromChartTeeth(
+  rawTeeth: Record<string, unknown>,
+  layer?: ToothLayer,
+): Map<FdiToothNumber, ToothMark[]> {
+  const findings = new Map<FdiToothNumber, ToothMark[]>();
+  for (const [key, rawTooth] of Object.entries(rawTeeth)) {
+    const number = Number(key);
+    if (!isFdiToothNumber(number)) {
+      continue;
+    }
+    findings.set(number, engineToothToMarks(parseEngineTooth(rawTooth), layer));
+  }
+  return findings;
+}
+
+function previousMarkLayer(
+  previous: ToothFinding | undefined,
+  mark: ToothMark,
+): ToothLayer | undefined {
+  if (!previous) {
+    return undefined;
+  }
+  const key = markKey(mark);
+  return previous.marks.find((item) => markKey(item) === key)?.layer;
+}
+
+function mergeToothMarks(
+  inferred: ToothMark[],
+  planMarks: ToothMark[],
+  previous: ToothFinding | undefined,
+  activeLayer: ToothLayer,
+): ToothMark[] {
+  const statusMarks = inferred.map((mark) => {
+    const kept = previousMarkLayer(previous, mark);
+    if (kept && kept !== "plan") {
+      return { ...mark, layer: kept };
+    }
+    if (previous && activeLayer !== "plan") {
+      return { ...mark, layer: activeLayer };
+    }
+    return mark;
+  });
+  const keptPlan =
+    planMarks.length > 0
+      ? planMarks
+      : (previous?.marks.filter((mark) => mark.layer === "plan") ?? []);
+  const merged = [...statusMarks, ...keptPlan];
+  const seen = new Set<string>();
+  return merged.filter((mark) => {
+    const key = `${mark.layer}:${markKey(mark)}`;
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+}
+
+type ChartToDomainOptions = {
+  previous?: OdontogramValue;
+  activeLayer?: ToothLayer;
+};
+
+export function chartToDomain(
+  chart: unknown,
+  options: ChartToDomainOptions = {},
+): OdontogramValue {
   const result = emptyOdontogram();
   const snapshot = snapshotFromUnknown(chart);
   result.visualSnapshot = snapshot;
 
   const rawTeeth = snapshot?.teeth ?? {};
-  const findings = new Map<FdiToothNumber, ToothFinding>();
-  const oralMarks = emptyOralMarks();
+  const statusMarks = marksFromChartTeeth(rawTeeth);
+  const planSource = isRecord(snapshot?.plan) && isRecord(snapshot.plan.teeth)
+    ? snapshot.plan.teeth
+    : {};
+  const planMarks = marksFromChartTeeth(planSource, "plan");
+  const engineOral = new Map<FdiToothNumber, ReturnType<typeof emptyOralMarks>>();
+  const previousByFdi = new Map(
+    (options.previous?.teeth ?? []).map((tooth) => [tooth.fdi, tooth]),
+  );
+  const activeLayer = options.activeLayer ?? "hallazgo";
 
   for (const [key, rawTooth] of Object.entries(rawTeeth)) {
     const number = Number(key);
@@ -205,22 +331,39 @@ export function chartToDomain(chart: unknown): OdontogramValue {
       continue;
     }
     const tooth = parseEngineTooth(rawTooth);
-    findings.set(number, engineToothToFinding(number, tooth));
-    if (tooth.calculus) {
-      oralMarks.sarro = true;
-    }
-    if ((tooth.plaque?.length ?? 0) > 0) {
-      oralMarks.placa = true;
-    }
-    if ((tooth.perio?.bop?.length ?? 0) > 0) {
-      oralMarks.sangrado = true;
-    }
+    engineOral.set(number, {
+      placa: (tooth.plaque?.length ?? 0) > 0,
+      sangrado: (tooth.perio?.bop?.length ?? 0) > 0,
+      sarro: tooth.calculus === true,
+    });
   }
 
-  result.teeth = result.teeth.map(
-    (tooth) => findings.get(tooth.fdi) ?? tooth,
-  );
-  result.oralMarks = oralMarks;
+  const baseTeeth =
+    options.previous && options.previous.teeth.length > result.teeth.length
+      ? options.previous.teeth
+      : result.teeth;
+
+  result.teeth = baseTeeth.map((tooth) => {
+    const previous = previousByFdi.get(tooth.fdi);
+    const fromEngine = engineOral.get(tooth.fdi);
+    const baseMarks = previous?.oralMarks ?? tooth.oralMarks ?? emptyOralMarks();
+    return {
+      fdi: tooth.fdi,
+      marks: mergeToothMarks(
+        statusMarks.get(tooth.fdi) ?? [],
+        planMarks.get(tooth.fdi) ?? [],
+        previous,
+        activeLayer,
+      ),
+      oralMarks: {
+        placa: baseMarks.placa || Boolean(fromEngine?.placa),
+        sangrado: baseMarks.sangrado || Boolean(fromEngine?.sangrado),
+        sarro: baseMarks.sarro || Boolean(fromEngine?.sarro),
+      },
+      practice: previous?.practice ?? tooth.practice ?? emptyPractice(),
+    };
+  });
+  result.oralMarks = deriveOralMarks(result.teeth);
   return result;
 }
 
@@ -241,7 +384,12 @@ export function domainToChart(value: OdontogramValue): OdontogramSnapshot {
     teeth[String(finding.fdi)] = engineTooth;
   }
 
-  return { version: 2.2, teeth };
+  const planTeeth = planMarksToChart(value.teeth);
+  const snapshot: OdontogramSnapshot = { version: 2.2, teeth };
+  if (Object.keys(planTeeth).length > 0) {
+    snapshot.plan = { version: 2.2, teeth: planTeeth };
+  }
+  return snapshot;
 }
 
 export function domainKey(value: OdontogramValue): string {
