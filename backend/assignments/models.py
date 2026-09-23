@@ -15,6 +15,11 @@ class Assignment(models.Model):
         FINALIZADA = "finalizada", "Finalizada"
         CANCELADA = "cancelada", "Cancelada"
 
+    class Priority(models.TextChoices):
+        ALTA = "alta", "Alta"
+        MEDIA = "media", "Media"
+        BAJA = "baja", "Baja"
+
     patient = models.ForeignKey(
         "patients.Patient",
         on_delete=models.CASCADE,
@@ -32,6 +37,16 @@ class Assignment(models.Model):
         choices=AssignmentStatus.choices,
         default=AssignmentStatus.ACTIVA,
     )
+    appointment_number = models.PositiveIntegerField(
+        editable=False,
+        help_text="Número de cita del paciente, correlativo por paciente.",
+    )
+    reason = models.TextField(help_text="Motivo de la cita/ingreso.")
+    priority = models.CharField(
+        max_length=10,
+        choices=Priority.choices,
+        default=Priority.MEDIA,
+    )
     notes = models.TextField(blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -42,3 +57,17 @@ class Assignment(models.Model):
 
     def __str__(self):
         return f"{self.patient} -> {self.student} ({self.status})"
+
+    def save(self, *args, **kwargs):
+        is_new = self._state.adding
+        if is_new and not self.appointment_number:
+            self.appointment_number = (
+                Assignment.objects.filter(patient_id=self.patient_id).count() + 1
+            )
+        super().save(*args, **kwargs)
+        if is_new and self.status == self.AssignmentStatus.ACTIVA:
+            from patients.models import Patient
+
+            if self.patient.case_status == Patient.CaseStatus.PENDIENTE:
+                self.patient.case_status = Patient.CaseStatus.EN_PROCESO
+                self.patient.save(update_fields=["case_status"])
