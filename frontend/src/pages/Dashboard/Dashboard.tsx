@@ -4,9 +4,12 @@ import { Link } from "react-router-dom";
 
 import {
   countByStatus,
+  getDashboardSeries,
   getDashboardSummary,
+  type DashboardSeries,
   type DashboardSummary,
 } from "../../services/dashboard";
+import { DashboardCharts, type PeriodFilter } from "./DashboardCharts";
 
 type LoadState =
   | { status: "loading" }
@@ -14,7 +17,9 @@ type LoadState =
   | { status: "ready"; summary: DashboardSummary };
 
 export function Dashboard() {
+  const [period, setPeriod] = useState<PeriodFilter>("1a");
   const [state, setState] = useState<LoadState>({ status: "loading" });
+  const [series, setSeries] = useState<DashboardSeries | null>(null);
 
   function loadSummary() {
     setState({ status: "loading" });
@@ -23,7 +28,8 @@ export function Dashboard() {
       .catch(() =>
         setState({
           status: "error",
-          message: "No se pudieron cargar los indicadores. Inicia sesión e intenta de nuevo.",
+          message:
+            "No se pudieron cargar los indicadores. Inicia sesión e intenta de nuevo.",
         }),
       );
   }
@@ -32,9 +38,16 @@ export function Dashboard() {
     loadSummary();
   }, []);
 
+  useEffect(() => {
+    const params = period === "todos" ? {} : { period };
+    getDashboardSeries(params)
+      .then(setSeries)
+      .catch(() => setSeries(null));
+  }, [period]);
+
   return (
-    <div>
-      {state.status === "loading" ? <KpiSkeleton /> : null}
+    <div className="space-y-6" translate="no">
+      {state.status === "loading" ? <DashboardSkeleton /> : null}
 
       {state.status === "error" ? (
         <div className="rounded-2xl bg-white p-6 shadow-sm dark:bg-slate-900 dark:shadow-none dark:ring-1 dark:ring-white/10">
@@ -60,32 +73,39 @@ export function Dashboard() {
       ) : null}
 
       {state.status === "ready" ? (
-        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <KpiCard
-            label="Total de pacientes registrados"
-            value={state.summary.total_patients}
-            accent="bg-violet-500"
-            icon={<Users className="size-5" />}
+        <>
+          <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <KpiCard
+              label="Total de pacientes registrados"
+              value={state.summary.total_patients}
+              accent="bg-violet-500"
+              icon={<Users className="size-5" />}
+            />
+            <KpiCard
+              label="Pacientes pendientes de asignación"
+              value={countByStatus(state.summary, "pendiente")}
+              accent="bg-emerald-400"
+              icon={<Clock3 className="size-5" />}
+            />
+            <KpiCard
+              label="Pacientes asignados"
+              value={countByStatus(state.summary, "en_proceso")}
+              accent="bg-teal-400"
+              icon={<UserCheck className="size-5" />}
+            />
+            <KpiCard
+              label="Pacientes finalizados"
+              value={countByStatus(state.summary, "finalizado")}
+              accent="bg-amber-400"
+              icon={<CircleCheckBig className="size-5" />}
+            />
+          </section>
+          <DashboardCharts
+            series={series}
+            period={period}
+            onPeriodChange={setPeriod}
           />
-          <KpiCard
-            label="Pacientes pendientes de asignación"
-            value={countByStatus(state.summary, "pendiente")}
-            accent="bg-emerald-400"
-            icon={<Clock3 className="size-5" />}
-          />
-          <KpiCard
-            label="Pacientes asignados"
-            value={countByStatus(state.summary, "en_proceso")}
-            accent="bg-teal-400"
-            icon={<UserCheck className="size-5" />}
-          />
-          <KpiCard
-            label="Pacientes finalizados"
-            value={countByStatus(state.summary, "finalizado")}
-            accent="bg-amber-400"
-            icon={<CircleCheckBig className="size-5" />}
-          />
-        </section>
+        </>
       ) : null}
     </div>
   );
@@ -121,15 +141,21 @@ function KpiCard({
   );
 }
 
-function KpiSkeleton() {
+function DashboardSkeleton() {
   return (
-    <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      {["registrados", "pendientes", "asignados", "finalizados"].map((key) => (
-        <div
-          key={key}
-          className="h-32 animate-pulse rounded-2xl bg-white shadow-sm dark:bg-slate-900"
-        />
-      ))}
-    </section>
+    <>
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {["registrados", "pendientes", "asignados", "finalizados"].map((key) => (
+          <div
+            key={key}
+            className="h-32 animate-pulse rounded-2xl bg-white shadow-sm dark:bg-slate-900"
+          />
+        ))}
+      </section>
+      <section className="grid gap-4 xl:grid-cols-2">
+        <div className="h-80 animate-pulse rounded-2xl bg-white shadow-sm dark:bg-slate-900" />
+        <div className="h-80 animate-pulse rounded-2xl bg-white shadow-sm dark:bg-slate-900" />
+      </section>
+    </>
   );
 }

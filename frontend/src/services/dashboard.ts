@@ -11,12 +11,42 @@ export type DashboardSummary = {
 
 export type SummaryPeriod = "1m" | "6m" | "1a";
 
+export type DashboardMonthPoint = {
+  month: string;
+  label: string;
+  patients: number;
+  pendiente: number;
+  en_proceso: number;
+  finalizado: number;
+  assignments: number;
+};
+
+export type DashboardStatusSlice = {
+  status: CaseStatus;
+  label: string;
+  count: number;
+};
+
+export type DashboardSeries = {
+  months: DashboardMonthPoint[];
+  by_status: DashboardStatusSlice[];
+};
+
 export function getDashboardSummary(
   params: { period?: SummaryPeriod } = {},
 ): Promise<DashboardSummary> {
   const query = params.period ? { period: params.period } : undefined;
   return api
     .get<DashboardSummary>("/dashboard/summary/", { params: query })
+    .then((response) => response.data);
+}
+
+export function getDashboardSeries(
+  params: { period?: SummaryPeriod } = {},
+): Promise<DashboardSeries> {
+  const query = params.period ? { period: params.period } : undefined;
+  return api
+    .get<DashboardSeries>("/dashboard/series/", { params: query })
     .then((response) => response.data);
 }
 
