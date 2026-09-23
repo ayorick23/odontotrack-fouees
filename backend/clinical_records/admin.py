@@ -1,12 +1,25 @@
 from django.contrib import admin
 
-from .models import ClinicalRecord, Odontogram
+from .models import Diagnostico, EvolucionClinica, Odontogram, Tratamiento
 
 
-@admin.register(ClinicalRecord)
-class ClinicalRecordAdmin(admin.ModelAdmin):
+@admin.register(Diagnostico)
+class DiagnosticoAdmin(admin.ModelAdmin):
     list_display = ("patient", "student", "is_validated", "validated_by", "created_at")
     list_filter = ("is_validated",)
+    search_fields = ("patient__first_name", "patient__last_name", "student__username")
+
+
+@admin.register(Tratamiento)
+class TratamientoAdmin(admin.ModelAdmin):
+    list_display = ("patient", "clinical_area", "clinical_treatment", "created_at")
+    list_filter = ("clinical_area",)
+    search_fields = ("patient__first_name", "patient__last_name")
+
+
+@admin.register(EvolucionClinica)
+class EvolucionClinicaAdmin(admin.ModelAdmin):
+    list_display = ("patient", "student", "date", "created_at")
     search_fields = ("patient__first_name", "patient__last_name", "student__username")
 
 

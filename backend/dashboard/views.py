@@ -7,7 +7,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from assignments.models import Assignment
-from clinical_records.models import ClinicalRecord
+from clinical_records.models import Diagnostico, EvolucionClinica, Tratamiento
 from patients.models import Patient
 
 from .serializers import DashboardSummarySerializer
@@ -45,7 +45,11 @@ class DashboardSummaryView(APIView):
         data = {
             "total_patients": patients.count(),
             "total_assignments": Assignment.objects.count(),
-            "total_clinical_records": ClinicalRecord.objects.count(),
+            "total_clinical_records": (
+                Diagnostico.objects.count()
+                + Tratamiento.objects.count()
+                + EvolucionClinica.objects.count()
+            ),
             "patients_by_status": dict(
                 patients.values_list("case_status").annotate(count=Count("id"))
             ),

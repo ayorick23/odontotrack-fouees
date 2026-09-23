@@ -7,29 +7,66 @@ from rest_framework.viewsets import ModelViewSet
 from accounts.permissions import HasRequiredAcl
 from patients.models import Patient
 
-from .models import ClinicalRecord
-from .serializers import ClinicalRecordSerializer, OdontogramSerializer
+from .models import Diagnostico, EvolucionClinica, Tratamiento
+from .serializers import (
+    DiagnosticoSerializer,
+    EvolucionClinicaSerializer,
+    OdontogramSerializer,
+    TratamientoSerializer,
+)
 from .services import OdontogramService
 
 
-class ClinicalRecordViewSet(ModelViewSet):
+class DiagnosisViewSet(ModelViewSet):
     """
-    CRUD de registros clínicos. La validación por parte del docente
-    (campos validated_by / is_validated / validated_at) se manejará en
-    un endpoint de acción específico más adelante, no por escritura
+    CRUD de diagnósticos. La validación por parte del docente (campos
+    validated_by / is_validated / validated_at) se maneja en un
+    endpoint de acción específico agregado en ODO-31, no por escritura
     directa desde este serializer.
     """
 
-    queryset = ClinicalRecord.objects.all()
-    serializer_class = ClinicalRecordSerializer
+    queryset = Diagnostico.objects.all()
+    serializer_class = DiagnosticoSerializer
     permission_classes = [IsAuthenticated, HasRequiredAcl]
     acl_permissions = {
-        "list": "clinical_records.view",
-        "retrieve": "clinical_records.view",
-        "create": "clinical_records.create",
-        "update": "clinical_records.edit",
-        "partial_update": "clinical_records.edit",
-        "destroy": "clinical_records.edit",
+        "list": "diagnoses.view",
+        "retrieve": "diagnoses.view",
+        "create": "diagnoses.create",
+        "update": "diagnoses.edit",
+        "partial_update": "diagnoses.edit",
+        "destroy": "diagnoses.edit",
+    }
+
+
+class TreatmentViewSet(ModelViewSet):
+    """CRUD de tratamientos del caso."""
+
+    queryset = Tratamiento.objects.all()
+    serializer_class = TratamientoSerializer
+    permission_classes = [IsAuthenticated, HasRequiredAcl]
+    acl_permissions = {
+        "list": "treatments.view",
+        "retrieve": "treatments.view",
+        "create": "treatments.create",
+        "update": "treatments.edit",
+        "partial_update": "treatments.edit",
+        "destroy": "treatments.edit",
+    }
+
+
+class ClinicalEvolutionViewSet(ModelViewSet):
+    """CRUD de notas de evolución clínica del caso."""
+
+    queryset = EvolucionClinica.objects.all()
+    serializer_class = EvolucionClinicaSerializer
+    permission_classes = [IsAuthenticated, HasRequiredAcl]
+    acl_permissions = {
+        "list": "evolution.view",
+        "retrieve": "evolution.view",
+        "create": "evolution.create",
+        "update": "evolution.edit",
+        "partial_update": "evolution.edit",
+        "destroy": "evolution.edit",
     }
 
 

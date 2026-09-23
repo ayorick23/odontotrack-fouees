@@ -1,42 +1,38 @@
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
 
 
-class ClinicalRecord(models.Model):
+class Diagnostico(models.Model):
     """
-    Registro clínico de un paciente: diagnóstico, tratamiento propuesto
-    y evolución. Cada registro puede ser validado por un docente
-    supervisor antes de considerarse parte oficial del expediente.
+    Diagnóstico de un paciente. Un docente supervisor puede validarlo
+    antes de que se considere parte oficial del expediente (el
+    endpoint de validación se agrega en ODO-31, junto con la regla de
+    que el caso no finaliza sin un diagnóstico validado).
     """
 
     patient = models.ForeignKey(
         "patients.Patient",
         on_delete=models.CASCADE,
-        related_name="clinical_records",
+        related_name="diagnoses",
     )
     student = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name="authored_clinical_records",
+        related_name="authored_diagnoses",
         limit_choices_to={"role": "estudiante"},
-        help_text="Estudiante que registró el diagnóstico/tratamiento.",
+        help_text="Estudiante que registró el diagnóstico.",
     )
-
-    diagnosis = models.TextField(help_text="Diagnóstico del paciente.")
-    treatment = models.TextField(help_text="Tratamiento propuesto o aplicado.")
-    evolution_notes = models.TextField(
-        blank=True,
-        help_text="Notas de evolución clínica a lo largo del tratamiento.",
-    )
+    content = models.TextField(help_text="Diagnóstico del paciente.")
 
     validated_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name="validated_clinical_records",
+        related_name="validated_diagnoses",
         limit_choices_to={"role": "docente"},
-        help_text="Docente supervisor que validó este registro.",
+        help_text="Docente supervisor que validó este diagnóstico.",
     )
     is_validated = models.BooleanField(default=False)
     validated_at = models.DateTimeField(null=True, blank=True)
@@ -48,7 +44,77 @@ class ClinicalRecord(models.Model):
         ordering = ["-created_at"]
 
     def __str__(self):
-        return f"Registro de {self.patient} ({self.created_at:%Y-%m-%d})"
+        return f"Diagnóstico de {self.patient} ({self.created_at:%Y-%m-%d})"
+
+
+class Tratamiento(models.Model):
+    """Tratamiento aplicado o propuesto para un paciente."""
+
+    patient = models.ForeignKey(
+        "patients.Patient",
+        on_delete=models.CASCADE,
+        related_name="treatments",
+    )
+    clinical_area = models.ForeignKey(
+        "catalogs.ClinicalArea",
+        on_delete=models.PROTECT,
+        related_name="clinical_records_treatments",
+    )
+    clinical_treatment = models.ForeignKey(
+        "catalogs.ClinicalTreatment",
+        on_delete=models.PROTECT,
+        related_name="clinical_records_treatments",
+        help_text="Tipo de tratamiento del catálogo FOUEES.",
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Tratamiento de {self.patient} ({self.clinical_treatment})"
+
+    def clean(self):
+        super().clean()
+        if self.clinical_treatment_id and self.clinical_area_id:
+            if self.clinical_treatment.area_id != self.clinical_area_id:
+                raise ValidationError(
+                    {
+                        "clinical_treatment": (
+                            "El tratamiento no corresponde al área clínica seleccionada."
+                        )
+                    }
+                )
+
+
+class EvolucionClinica(models.Model):
+    """Nota de evolución clínica de un paciente a lo largo del caso."""
+
+    patient = models.ForeignKey(
+        "patients.Patient",
+        on_delete=models.CASCADE,
+        related_name="clinical_evolutions",
+    )
+    student = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="authored_clinical_evolutions",
+        limit_choices_to={"role": "estudiante"},
+        help_text="Estudiante que registró la nota de evolución.",
+    )
+    date = models.DateField()
+    note = models.TextField()
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-date", "-created_at"]
+
+    def __str__(self):
+        return f"Evolución de {self.patient} ({self.date})"
 
 
 class Odontogram(models.Model):

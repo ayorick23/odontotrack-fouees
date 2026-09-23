@@ -4,6 +4,7 @@ from rest_framework.test import APITestCase
 
 from accounts.models import AclPermission, Role, User
 from accounts.services import sync_acl
+from catalogs.models import ClinicalArea, ClinicalTreatment
 from clinical_records.catalog import (
     FDI_TOOTH_NUMBERS,
     OralGeneralMark,
@@ -13,6 +14,7 @@ from clinical_records.catalog import (
     is_fdi_permanent_tooth,
     primary_tooth_status,
 )
+from clinical_records.models import Diagnostico, EvolucionClinica, Tratamiento
 from patients.models import Patient
 
 
@@ -202,3 +204,163 @@ class OdontogramApiTests(APITestCase):
             tooth_26["statuses"],
             [ToothStatus.CARIES, ToothStatus.OBTURADO],
         )
+
+
+class DiagnosisApiTests(APITestCase):
+    def setUp(self):
+        sync_acl()
+        self.student = User.objects.create_user(
+            username="estudiante-dx",
+            password="pass12345",
+            role=User.Role.ESTUDIANTE,
+        )
+        self.docente = User.objects.create_user(
+            username="docente-dx",
+            password="pass12345",
+            role=User.Role.DOCENTE,
+        )
+        self.patient = Patient.objects.create(
+            first_name="Ana",
+            last_name="Diagnostico",
+            dui="DX-001",
+        )
+        self.url = "/api/clinical-records/diagnoses/"
+
+    def test_student_can_create_and_list_own_diagnosis(self):
+        self.client.force_authenticate(user=self.student)
+        response = self.client.post(
+            self.url,
+            {
+                "patient": self.patient.id,
+                "student": self.student.id,
+                "content": "Caries en pieza 16.",
+            },
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        body = response.json()
+        self.assertFalse(body["is_validated"])
+        self.assertIsNone(body["validated_by"])
+
+        listing = self.client.get(self.url)
+        self.assertEqual(listing.json()["count"], 1)
+
+    def test_is_validated_is_read_only(self):
+        self.client.force_authenticate(user=self.student)
+        response = self.client.post(
+            self.url,
+            {
+                "patient": self.patient.id,
+                "student": self.student.id,
+                "content": "Caries en pieza 16.",
+                "is_validated": True,
+                "validated_by": self.docente.id,
+            },
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertFalse(response.json()["is_validated"])
+
+    def test_docente_can_view_but_not_create(self):
+        self.client.force_authenticate(user=self.docente)
+        listing = self.client.get(self.url)
+        self.assertEqual(listing.status_code, status.HTTP_200_OK)
+
+        response = self.client.post(
+            self.url,
+            {
+                "patient": self.patient.id,
+                "student": self.student.id,
+                "content": "Intento de docente.",
+            },
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class TreatmentApiTests(APITestCase):
+    def setUp(self):
+        sync_acl()
+        self.student = User.objects.create_user(
+            username="estudiante-tx",
+            password="pass12345",
+            role=User.Role.ESTUDIANTE,
+        )
+        self.patient = Patient.objects.create(
+            first_name="Luis",
+            last_name="Tratamiento",
+            dui="TX-001",
+        )
+        self.area = ClinicalArea.objects.get(slug="endodoncia")
+        self.treatment = ClinicalTreatment.objects.filter(area=self.area).first()
+        self.other_area = ClinicalArea.objects.exclude(id=self.area.id).first()
+        self.url = "/api/clinical-records/treatments/"
+        self.client.force_authenticate(user=self.student)
+
+    def test_student_can_create_treatment(self):
+        response = self.client.post(
+            self.url,
+            {
+                "patient": self.patient.id,
+                "clinical_area": self.area.id,
+                "clinical_treatment": self.treatment.id,
+            },
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Tratamiento.objects.count(), 1)
+
+    def test_rejects_treatment_from_a_different_area(self):
+        response = self.client.post(
+            self.url,
+            {
+                "patient": self.patient.id,
+                "clinical_area": self.other_area.id,
+                "clinical_treatment": self.treatment.id,
+            },
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class ClinicalEvolutionApiTests(APITestCase):
+    def setUp(self):
+        sync_acl()
+        self.student = User.objects.create_user(
+            username="estudiante-evo",
+            password="pass12345",
+            role=User.Role.ESTUDIANTE,
+        )
+        self.recepcion = User.objects.create_user(
+            username="recepcion-evo",
+            password="pass12345",
+            role=User.Role.RECEPCION,
+        )
+        self.patient = Patient.objects.create(
+            first_name="Marta",
+            last_name="Evolucion",
+            dui="EVO-001",
+        )
+        self.url = "/api/clinical-records/evolution/"
+
+    def test_student_can_create_evolution_note(self):
+        self.client.force_authenticate(user=self.student)
+        response = self.client.post(
+            self.url,
+            {
+                "patient": self.patient.id,
+                "student": self.student.id,
+                "date": "2026-09-22",
+                "note": "Paciente sin dolor, continúa tratamiento.",
+            },
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(EvolucionClinica.objects.count(), 1)
+
+    def test_recepcion_has_no_clinical_write_access(self):
+        self.client.force_authenticate(user=self.recepcion)
+        response = self.client.post(
+            self.url,
+            {
+                "patient": self.patient.id,
+                "student": self.student.id,
+                "date": "2026-09-22",
+                "note": "No debería poder crear esto.",
+            },
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)

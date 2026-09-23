@@ -10,19 +10,17 @@ from .catalog import (
     is_fdi_permanent_tooth,
     primary_tooth_status,
 )
-from .models import ClinicalRecord, Odontogram
+from .models import Diagnostico, EvolucionClinica, Odontogram, Tratamiento
 
 
-class ClinicalRecordSerializer(serializers.ModelSerializer):
+class DiagnosticoSerializer(serializers.ModelSerializer):
     class Meta:
-        model = ClinicalRecord
+        model = Diagnostico
         fields = (
             "id",
             "patient",
             "student",
-            "diagnosis",
-            "treatment",
-            "evolution_notes",
+            "content",
             "validated_by",
             "is_validated",
             "validated_at",
@@ -30,6 +28,50 @@ class ClinicalRecordSerializer(serializers.ModelSerializer):
             "updated_at",
         )
         read_only_fields = ["validated_by", "is_validated", "validated_at"]
+
+
+class TratamientoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Tratamiento
+        fields = (
+            "id",
+            "patient",
+            "clinical_area",
+            "clinical_treatment",
+            "created_at",
+            "updated_at",
+        )
+
+    def validate(self, attrs):
+        clinical_area = attrs.get("clinical_area") or getattr(
+            self.instance, "clinical_area", None
+        )
+        clinical_treatment = attrs.get("clinical_treatment") or getattr(
+            self.instance, "clinical_treatment", None
+        )
+        if clinical_treatment and clinical_area and clinical_treatment.area_id != clinical_area.id:
+            raise serializers.ValidationError(
+                {
+                    "clinical_treatment": (
+                        "El tratamiento no corresponde al área clínica seleccionada."
+                    )
+                }
+            )
+        return attrs
+
+
+class EvolucionClinicaSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EvolucionClinica
+        fields = (
+            "id",
+            "patient",
+            "student",
+            "date",
+            "note",
+            "created_at",
+            "updated_at",
+        )
 
 
 class ToothFindingSerializer(serializers.Serializer):
