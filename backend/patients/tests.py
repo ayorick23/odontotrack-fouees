@@ -206,6 +206,48 @@ class PatientDirectoryTests(APITestCase):
             [diego_patient.dui],
         )
 
+    def test_estudiante_can_combine_unassigned_and_pendiente_filters(self):
+        student = User.objects.create_user(
+            username="estudiante-disponibles",
+            password="pass12345",
+            role=User.Role.ESTUDIANTE,
+        )
+        other = User.objects.create_user(
+            username="estudiante-otro-disponibles",
+            password="pass12345",
+            role=User.Role.ESTUDIANTE,
+        )
+        available = Patient.objects.create(
+            first_name="Ana",
+            last_name="Disponible",
+            dui="DISP-001",
+            case_status=Patient.CaseStatus.PENDIENTE,
+        )
+        Patient.objects.create(
+            first_name="Luis",
+            last_name="EnProceso",
+            dui="DISP-002",
+            case_status=Patient.CaseStatus.EN_PROCESO,
+        )
+        assigned_pendiente = Patient.objects.create(
+            first_name="Marta",
+            last_name="Asignada",
+            dui="DISP-003",
+            case_status=Patient.CaseStatus.PENDIENTE,
+        )
+        Assignment.objects.create(patient=assigned_pendiente, student=other)
+
+        self.client.force_authenticate(user=student)
+        response = self.client.get(
+            "/api/patients/",
+            {"assigned_to": "unassigned", "case_status": "pendiente"},
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            [row["dui"] for row in response.json()["results"]],
+            [available.dui],
+        )
+
     def test_assignees_lists_students_with_active_assignment(self):
         assigned = User.objects.create_user(
             username="estudiante-activo",
