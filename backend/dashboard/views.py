@@ -10,7 +10,8 @@ from assignments.models import Assignment
 from clinical_records.models import Diagnostico, EvolucionClinica, Tratamiento
 from patients.models import Patient
 
-from .serializers import DashboardSummarySerializer
+from .serializers import DashboardSeriesSerializer, DashboardSummarySerializer
+from .services import build_dashboard_series
 
 
 class DashboardSummaryView(APIView):
@@ -55,3 +56,24 @@ class DashboardSummaryView(APIView):
             ),
         }
         return Response(data)
+
+
+class DashboardSeriesView(APIView):
+    permission_classes = [IsAuthenticated, HasRequiredAcl]
+    acl_permission = "dashboard.view"
+
+    @extend_schema(
+        tags=["dashboard"],
+        parameters=[
+            OpenApiParameter(
+                name="period",
+                description="Filtra series del último mes (1m), 6 meses (6m) o año (1a).",
+                required=False,
+                type=str,
+                enum=["1m", "6m", "1a"],
+            ),
+        ],
+        responses=DashboardSeriesSerializer,
+    )
+    def get(self, request):
+        return Response(build_dashboard_series(request.query_params.get("period")))
