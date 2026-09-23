@@ -1,3 +1,19 @@
+/* La librería pinta `select` y `body` en global. Lo devolvemos al tema FOUEES. */
+body {
+  background-image: none;
+  background-color: #eef3f8;
+}
+
+html.dark body {
+  background-color: #020617;
+}
+
+select {
+  appearance: auto;
+  min-width: 0;
+  background-image: none;
+}
+
 .odontogram-fouees {
   --odon-accent: #0f8f82;
   --odon-accent2: #2ad4c5;
@@ -18,8 +34,31 @@
   overflow: hidden;
 }
 
+.odontogram-fouees .odontogram-chart-wrap {
+  position: relative;
+}
+
+.odontogram-fouees .odontogram-chart-views {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  z-index: 6;
+}
+
+@media (max-width: 640px) {
+  .odontogram-fouees .odontogram-chart-views {
+    position: static;
+    margin: 0 0 8px auto;
+    width: fit-content;
+  }
+
+  .odontogram-fouees .chart-header {
+    padding-right: 1rem;
+  }
+}
+
 .odontogram-fouees .chart-header {
-  padding: 0.85rem 1rem;
+  padding: 0.85rem 11rem 0.85rem 1rem;
   background: rgb(248 250 252 / 0.9);
 }
 
@@ -59,6 +98,19 @@
   color-scheme: light;
 }
 
+.odontogram-fouees .tooth-tile.active {
+  border-color: #0f8f82;
+  border-width: 2px;
+  background: rgb(15 143 130 / 0.12);
+  box-shadow: 0 0 0 3px rgb(15 143 130 / 0.28);
+}
+
+.odontogram-fouees .tooth-tile.active:after {
+  border-color: #0f8f82;
+  border-style: solid;
+  animation: none;
+}
+
 :is(.dark) .odontogram-fouees .chart {
   border-color: rgb(255 255 255 / 0.1);
 }
@@ -84,8 +136,13 @@
 }
 
 :is(.dark) .odontogram-fouees .tooth-tile.active {
-  border-color: rgb(45 212 197 / 0.7);
-  background: rgb(15 143 130 / 0.2);
+  border-color: #2ad4c5;
+  background: rgb(15 143 130 / 0.22);
+  box-shadow: 0 0 0 3px rgb(42 212 197 / 0.35);
+}
+
+:is(.dark) .odontogram-fouees .tooth-tile.active:after {
+  border-color: #2ad4c5;
 }
 
 :is(.dark) .odontogram-fouees .tooth-tile.active .tooth-svg svg {

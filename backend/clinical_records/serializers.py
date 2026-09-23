@@ -1,16 +1,23 @@
 from rest_framework import serializers
 
 from .catalog import (
-    FDI_TOOTH_NUMBERS,
-    FDI_TOOTH_NUMBER_SET,
+    FDI_ALL_TOOTH_NUMBER_SET,
+    ToothLayer,
     ToothStatus,
     ToothSurface,
-    combine_tooth_statuses,
     default_tooth_findings,
-    is_fdi_permanent_tooth,
-    primary_tooth_status,
+    derive_oral_marks,
+    is_fdi_tooth,
+    normalize_tooth,
+    pad_teeth,
 )
-from .models import Diagnostico, EvolucionClinica, Odontogram, Tratamiento
+from .models import (
+    Diagnostico,
+    EvolucionClinica,
+    Odontogram,
+    OdontogramRevision,
+    Tratamiento,
+)
 
 
 class DiagnosticoSerializer(serializers.ModelSerializer):
@@ -74,9 +81,41 @@ class EvolucionClinicaSerializer(serializers.ModelSerializer):
         )
 
 
+class ToothMarkSerializer(serializers.Serializer):
+    layer = serializers.ChoiceField(choices=ToothLayer.choices)
+    status = serializers.ChoiceField(choices=ToothStatus.choices)
+    surfaces = serializers.ListField(
+        child=serializers.ChoiceField(choices=ToothSurface.choices),
+        required=False,
+        default=list,
+    )
+
+
+class ToothOralMarksSerializer(serializers.Serializer):
+    placa = serializers.BooleanField(required=False, default=False)
+    sangrado = serializers.BooleanField(required=False, default=False)
+    sarro = serializers.BooleanField(required=False, default=False)
+
+
+class ToothPracticeSerializer(serializers.Serializer):
+    indicated = serializers.BooleanField(required=False, default=False)
+    clinicalArea = serializers.CharField(
+        required=False,
+        allow_null=True,
+        allow_blank=True,
+        max_length=80,
+    )
+
+
 class ToothFindingSerializer(serializers.Serializer):
     fdi = serializers.IntegerField()
-    status = serializers.ChoiceField(choices=ToothStatus.choices)
+    marks = ToothMarkSerializer(many=True, required=False)
+    oralMarks = ToothOralMarksSerializer(required=False)
+    practice = ToothPracticeSerializer(required=False)
+    status = serializers.ChoiceField(
+        choices=ToothStatus.choices,
+        required=False,
+    )
     statuses = serializers.ListField(
         child=serializers.ChoiceField(choices=ToothStatus.choices),
         required=False,
@@ -89,15 +128,12 @@ class ToothFindingSerializer(serializers.Serializer):
     )
 
     def validate_fdi(self, value: int) -> int:
-        if not is_fdi_permanent_tooth(value):
+        if not is_fdi_tooth(value):
             raise serializers.ValidationError("Número FDI inválido.")
         return value
 
     def validate(self, attrs: dict) -> dict:
-        statuses = combine_tooth_statuses(attrs["status"], attrs.get("statuses"))
-        attrs["statuses"] = statuses
-        attrs["status"] = primary_tooth_status(statuses)
-        return attrs
+        return normalize_tooth(attrs)
 
 
 class OdontogramSerializer(serializers.ModelSerializer):
@@ -120,32 +156,54 @@ class OdontogramSerializer(serializers.ModelSerializer):
         numbers = [finding["fdi"] for finding in value]
         if len(numbers) != len(set(numbers)):
             raise serializers.ValidationError("Hay dientes FDI repetidos.")
-        unknown = set(numbers) - FDI_TOOTH_NUMBER_SET
+        unknown = set(numbers) - FDI_ALL_TOOTH_NUMBER_SET
         if unknown:
             raise serializers.ValidationError("Número FDI inválido.")
-        by_fdi = {finding["fdi"]: finding for finding in value}
-        return [
-            by_fdi.get(
-                number,
-                {
-                    "fdi": number,
-                    "status": ToothStatus.SANO,
-                    "statuses": [],
-                    "surfaces": [],
-                },
-            )
-            for number in FDI_TOOTH_NUMBERS
-        ]
+        padded = pad_teeth(value)
+        derived = derive_oral_marks(padded)
+        self.context["derived_oral_marks"] = derived
+        return padded
+
+    def update(self, instance, validated_data):
+        derived = self.context.get("derived_oral_marks")
+        if derived and any(derived.values()):
+            validated_data["placa"] = derived["placa"]
+            validated_data["sangrado"] = derived["sangrado"]
+            validated_data["sarro"] = derived["sarro"]
+        return super().update(instance, validated_data)
 
     def to_representation(self, instance: Odontogram) -> dict:
         data = super().to_representation(instance)
         if not data.get("teeth"):
             data["teeth"] = default_tooth_findings()
-        for tooth in data["teeth"]:
-            statuses = combine_tooth_statuses(
-                tooth.get("status", ToothStatus.SANO),
-                tooth.get("statuses"),
-            )
-            tooth["statuses"] = statuses
-            tooth["status"] = primary_tooth_status(statuses)
+            return data
+        data["teeth"] = [normalize_tooth(tooth) for tooth in data["teeth"]]
+        derived = derive_oral_marks(data["teeth"])
+        if any(derived.values()):
+            data["placa"] = derived["placa"]
+            data["sangrado"] = derived["sangrado"]
+            data["sarro"] = derived["sarro"]
+        return data
+
+
+class OdontogramRevisionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = OdontogramRevision
+        fields = (
+            "id",
+            "placa",
+            "sangrado",
+            "sarro",
+            "teeth",
+            "visual_snapshot",
+            "created_at",
+            "created_by",
+        )
+        read_only_fields = fields
+
+    def to_representation(self, instance: OdontogramRevision) -> dict:
+        data = super().to_representation(instance)
+        data["teeth"] = [
+            normalize_tooth(tooth) for tooth in (instance.teeth or [])
+        ]
         return data

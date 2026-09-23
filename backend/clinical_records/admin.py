@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Diagnostico, EvolucionClinica, Odontogram, Tratamiento
+from .models import Diagnostico, EvolucionClinica, Odontogram, OdontogramRevision, Tratamiento
 
 
 @admin.register(Diagnostico)
@@ -27,3 +27,12 @@ class EvolucionClinicaAdmin(admin.ModelAdmin):
 class OdontogramAdmin(admin.ModelAdmin):
     list_display = ("patient", "placa", "sangrado", "sarro", "updated_at")
     search_fields = ("patient__first_name", "patient__last_name", "patient__dui")
+
+
+@admin.register(OdontogramRevision)
+class OdontogramRevisionAdmin(admin.ModelAdmin):
+    list_display = ("odontogram", "created_by", "created_at")
+    search_fields = (
+        "odontogram__patient__first_name",
+        "odontogram__patient__last_name",
+    )

@@ -8,12 +8,16 @@ from catalogs.models import ClinicalArea, ClinicalTreatment
 from clinical_records.catalog import (
     FDI_TOOTH_NUMBERS,
     OralGeneralMark,
+    ToothLayer,
     ToothStatus,
     combine_tooth_statuses,
     default_tooth_findings,
     is_fdi_permanent_tooth,
+    is_fdi_tooth,
+    normalize_tooth,
     primary_tooth_status,
 )
+from clinical_records.models import OdontogramRevision
 from clinical_records.models import Diagnostico, EvolucionClinica, Tratamiento
 from patients.models import Patient
 
@@ -25,10 +29,19 @@ class OdontogramCatalogTests(SimpleTestCase):
             [
                 ToothStatus.SANO,
                 ToothStatus.CARIES,
+                ToothStatus.FRACTURA,
                 ToothStatus.OBTURADO,
-                ToothStatus.EXTRAIDO,
+                ToothStatus.SELLANTE,
+                ToothStatus.RESTAURACION_TEMPORAL,
+                ToothStatus.ENDODONCIA,
+                ToothStatus.PULPOTOMIA,
                 ToothStatus.CORONA,
+                ToothStatus.PUENTE,
                 ToothStatus.IMPLANTE,
+                ToothStatus.EXTRAIDO,
+                ToothStatus.RAIZ_RETENIDA,
+                ToothStatus.NO_ERUPCIONADO,
+                ToothStatus.AUSENTE_CONGENITO,
             ],
         )
 
@@ -42,6 +55,8 @@ class OdontogramCatalogTests(SimpleTestCase):
         self.assertFalse(is_fdi_permanent_tooth(8))
         self.assertFalse(is_fdi_permanent_tooth(51))
         self.assertFalse(is_fdi_permanent_tooth(19))
+        self.assertTrue(is_fdi_tooth(51))
+        self.assertTrue(is_fdi_tooth(16))
 
     def test_oral_general_marks_are_boolean_flags(self):
         self.assertEqual(
@@ -73,6 +88,31 @@ class OdontogramCatalogTests(SimpleTestCase):
             [ToothStatus.EXTRAIDO],
         )
 
+    def test_normalizes_legacy_tooth_into_layered_marks(self):
+        tooth = normalize_tooth(
+            {
+                "fdi": 16,
+                "status": ToothStatus.CARIES,
+                "statuses": [ToothStatus.CARIES, ToothStatus.OBTURADO],
+                "surfaces": ["mesial", "oclusal"],
+            }
+        )
+        self.assertEqual(
+            tooth["marks"],
+            [
+                {
+                    "layer": ToothLayer.HALLAZGO,
+                    "status": ToothStatus.CARIES,
+                    "surfaces": ["mesial", "oclusal"],
+                },
+                {
+                    "layer": ToothLayer.HECHO,
+                    "status": ToothStatus.OBTURADO,
+                    "surfaces": ["mesial", "oclusal"],
+                },
+            ],
+        )
+
 
 class OdontogramApiTests(APITestCase):
     def setUp(self):
@@ -102,14 +142,24 @@ class OdontogramApiTests(APITestCase):
         self.assertEqual(len(body["teeth"]), 32)
         self.assertEqual(body["teeth"][0]["fdi"], 18)
         self.assertFalse(body["placa"])
-        self.assertEqual(body["teeth"][0]["status"], ToothStatus.SANO)
+        self.assertEqual(body["teeth"][0]["marks"], [])
 
     def test_put_persists_findings_and_oral_marks(self):
         teeth = default_tooth_findings()
         for finding in teeth:
             if finding["fdi"] == 16:
-                finding["status"] = ToothStatus.CARIES
-                finding["surfaces"] = ["oclusal"]
+                finding["marks"] = [
+                    {
+                        "layer": ToothLayer.HALLAZGO,
+                        "status": ToothStatus.CARIES,
+                        "surfaces": ["mesial", "oclusal"],
+                    },
+                    {
+                        "layer": ToothLayer.PLAN,
+                        "status": ToothStatus.OBTURADO,
+                        "surfaces": ["mesial", "oclusal"],
+                    },
+                ]
         payload = {
             "placa": True,
             "sangrado": False,
@@ -122,9 +172,21 @@ class OdontogramApiTests(APITestCase):
         loaded = self.client.get(self.url)
         body = loaded.json()
         tooth_16 = next(item for item in body["teeth"] if item["fdi"] == 16)
-        self.assertEqual(tooth_16["status"], ToothStatus.CARIES)
-        self.assertEqual(tooth_16["statuses"], [ToothStatus.CARIES])
-        self.assertEqual(tooth_16["surfaces"], ["oclusal"])
+        self.assertEqual(
+            tooth_16["marks"],
+            [
+                {
+                    "layer": ToothLayer.HALLAZGO,
+                    "status": ToothStatus.CARIES,
+                    "surfaces": ["mesial", "oclusal"],
+                },
+                {
+                    "layer": ToothLayer.PLAN,
+                    "status": ToothStatus.OBTURADO,
+                    "surfaces": ["mesial", "oclusal"],
+                },
+            ],
+        )
         self.assertTrue(body["placa"])
         self.assertTrue(body["sarro"])
         self.assertEqual(body["visual_snapshot"]["version"], 2.2)
@@ -199,11 +261,93 @@ class OdontogramApiTests(APITestCase):
         tooth_26 = next(
             item for item in response.json()["teeth"] if item["fdi"] == 26
         )
-        self.assertEqual(tooth_26["status"], ToothStatus.CARIES)
         self.assertEqual(
-            tooth_26["statuses"],
-            [ToothStatus.CARIES, ToothStatus.OBTURADO],
+            tooth_26["marks"],
+            [
+                {
+                    "layer": ToothLayer.HALLAZGO,
+                    "status": ToothStatus.CARIES,
+                    "surfaces": ["mesial", "oclusal"],
+                },
+                {
+                    "layer": ToothLayer.HECHO,
+                    "status": ToothStatus.OBTURADO,
+                    "surfaces": ["mesial", "oclusal"],
+                },
+            ],
         )
+
+    def test_put_accepts_primary_teeth_and_per_tooth_oral_marks(self):
+        teeth = default_tooth_findings(include_primary=True)
+        for finding in teeth:
+            if finding["fdi"] == 51:
+                finding["oralMarks"] = {"placa": True, "sangrado": False, "sarro": True}
+                finding["practice"] = {
+                    "indicated": True,
+                    "clinicalArea": "operatoria",
+                }
+        response = self.client.put(
+            self.url,
+            {
+                "placa": False,
+                "sangrado": False,
+                "sarro": False,
+                "teeth": teeth,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        body = response.json()
+        self.assertEqual(len(body["teeth"]), 52)
+        tooth_51 = next(item for item in body["teeth"] if item["fdi"] == 51)
+        self.assertTrue(tooth_51["oralMarks"]["placa"])
+        self.assertTrue(tooth_51["practice"]["indicated"])
+        self.assertEqual(tooth_51["practice"]["clinicalArea"], "operatoria")
+        self.assertTrue(body["placa"])
+        self.assertTrue(body["sarro"])
+
+    def test_put_records_history_of_previous_content(self):
+        first_teeth = default_tooth_findings()
+        for finding in first_teeth:
+            if finding["fdi"] == 16:
+                finding["marks"] = [
+                    {
+                        "layer": ToothLayer.HALLAZGO,
+                        "status": ToothStatus.CARIES,
+                        "surfaces": ["oclusal"],
+                    }
+                ]
+        first = self.client.put(
+            self.url,
+            {"placa": False, "sangrado": False, "sarro": False, "teeth": first_teeth},
+            format="json",
+        )
+        self.assertEqual(first.status_code, status.HTTP_200_OK)
+
+        second_teeth = default_tooth_findings()
+        for finding in second_teeth:
+            if finding["fdi"] == 16:
+                finding["marks"] = [
+                    {
+                        "layer": ToothLayer.HECHO,
+                        "status": ToothStatus.OBTURADO,
+                        "surfaces": ["oclusal"],
+                    }
+                ]
+        second = self.client.put(
+            self.url,
+            {"placa": False, "sangrado": False, "sarro": False, "teeth": second_teeth},
+            format="json",
+        )
+        self.assertEqual(second.status_code, status.HTTP_200_OK)
+        history = self.client.get(f"{self.url}history/")
+        self.assertEqual(history.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(history.json()), 1)
+        revision_16 = next(
+            item for item in history.json()[0]["teeth"] if item["fdi"] == 16
+        )
+        self.assertEqual(revision_16["marks"][0]["status"], ToothStatus.CARIES)
+        self.assertEqual(OdontogramRevision.objects.count(), 1)
 
 
 class DiagnosisApiTests(APITestCase):

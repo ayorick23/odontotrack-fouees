@@ -3,8 +3,8 @@ from rest_framework.exceptions import PermissionDenied
 from accounts.models import User
 from patients.models import Patient
 
-from .catalog import default_tooth_findings
-from .models import Odontogram
+from .catalog import default_tooth_findings, has_clinical_content
+from .models import Odontogram, OdontogramRevision
 
 
 class OdontogramService:
@@ -28,3 +28,17 @@ class OdontogramService:
     def assert_can_update(user: User, _patient: Patient) -> None:
         if not user.has_acl("odontogram.update"):
             raise PermissionDenied("No puedes actualizar este odontograma.")
+
+    @staticmethod
+    def record_revision(odontogram: Odontogram, user: User) -> OdontogramRevision | None:
+        if not has_clinical_content(odontogram.teeth):
+            return None
+        return OdontogramRevision.objects.create(
+            odontogram=odontogram,
+            teeth=odontogram.teeth,
+            placa=odontogram.placa,
+            sangrado=odontogram.sangrado,
+            sarro=odontogram.sarro,
+            visual_snapshot=odontogram.visual_snapshot,
+            created_by=user,
+        )

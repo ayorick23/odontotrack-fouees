@@ -1,15 +1,22 @@
 import { Save, Undo2 } from "lucide-react";
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { Odontogram } from "../../features/clinical-records/components/Odontogram";
+import { OdontogramExportButtons } from "../../features/clinical-records/components/Odontogram/OdontogramExportButtons";
 import { useOdontogramData } from "../../features/clinical-records/hooks/useOdontogramData";
 import {
   ORAL_GENERAL_MARK_LABELS,
   markedTeeth,
+  type OdontogramValue,
   type OralGeneralMark,
 } from "../../features/clinical-records/types";
 import { primaryActionClass, secondaryActionClass } from "../../lib/actions";
+import {
+  listOdontogramHistory,
+  revisionToDomain,
+  type OdontogramRevisionRecord,
+} from "../../services/odontogram";
 
 const cardClass =
   "rounded-2xl bg-white p-5 shadow-[0_10px_30px_rgba(15,40,80,0.06)] dark:bg-slate-900 dark:shadow-none dark:ring-1 dark:ring-white/10 sm:p-6";
@@ -38,9 +45,34 @@ export function PatientOdontogramSection({
     isDirty,
     editorKey,
   } = useOdontogramData(patientId);
-  const findingCount = markedTeeth(value).length;
+  const [revisions, setRevisions] = useState<OdontogramRevisionRecord[]>([]);
+  const [viewingRevisionId, setViewingRevisionId] = useState<number | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    listOdontogramHistory(patientId)
+      .then((items) => {
+        if (!cancelled) {
+          setRevisions(items);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setRevisions([]);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [patientId, value.visualSnapshot, loadStatus]);
+
+  const viewingRevision = revisions.find((item) => item.id === viewingRevisionId);
+  const displayedValue: OdontogramValue = viewingRevision
+    ? revisionToDomain(viewingRevision)
+    : value;
+  const findingCount = markedTeeth(displayedValue).length;
   const activeMarks = (
-    Object.entries(value.oralMarks) as Array<[OralGeneralMark, boolean]>
+    Object.entries(displayedValue.oralMarks) as Array<[OralGeneralMark, boolean]>
   )
     .filter(([, active]) => active)
     .map(([mark]) => ORAL_GENERAL_MARK_LABELS[mark]);
@@ -48,11 +80,14 @@ export function PatientOdontogramSection({
   const handleSave = useCallback(async () => {
     try {
       await save();
+      const items = await listOdontogramHistory(patientId);
+      setRevisions(items);
+      setViewingRevisionId(null);
       toast.success("Odontograma guardado.");
     } catch {
       toast.error("No se pudo guardar el odontograma.");
     }
-  }, [save]);
+  }, [patientId, save]);
 
   useEffect(() => {
     if (readOnly) {
@@ -83,6 +118,24 @@ export function PatientOdontogramSection({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {revisions.length > 0 ? (
+            <select
+              aria-label="Historial del odontograma"
+              className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+              value={viewingRevisionId ?? ""}
+              onChange={(event) => {
+                const next = event.target.value;
+                setViewingRevisionId(next ? Number(next) : null);
+              }}
+            >
+              <option value="">Estado actual</option>
+              {revisions.map((revision) => (
+                <option key={revision.id} value={revision.id}>
+                  {new Date(revision.created_at).toLocaleString("es-SV")}
+                </option>
+              ))}
+            </select>
+          ) : null}
           {findingCount > 0 ? (
             <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
               {findingCount}{" "}
@@ -97,12 +150,13 @@ export function PatientOdontogramSection({
               {label}
             </span>
           ))}
-          {isDirty && !readOnly ? (
-            <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 dark:bg-amber-950/60 dark:text-amber-300">
+          {isDirty && !readOnly && viewingRevisionId == null ? (
+            <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800 ring-1 ring-amber-300 dark:bg-amber-950 dark:text-amber-200 dark:ring-amber-800">
               Sin guardar
             </span>
           ) : null}
-          {readOnly ? null : (
+          {loadStatus === "ready" ? <OdontogramExportButtons /> : null}
+          {readOnly || viewingRevisionId != null ? null : (
             <>
               <button
                 type="button"
@@ -155,10 +209,10 @@ export function PatientOdontogramSection({
 
       {loadStatus === "ready" ? (
         <Odontogram
-          key={`${patientId}-${editorKey}`}
-          value={value}
+          key={`${patientId}-${editorKey}-${viewingRevisionId ?? "current"}`}
+          value={displayedValue}
           onChange={onChange}
-          readOnly={readOnly}
+          readOnly={readOnly || viewingRevisionId != null}
           darkMode={darkMode}
           patientId={patientId}
           patientName={patientName}

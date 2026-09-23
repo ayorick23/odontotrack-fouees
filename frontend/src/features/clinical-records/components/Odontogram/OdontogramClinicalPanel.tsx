@@ -1,10 +1,8 @@
 import { useState, type ReactNode } from "react";
-import { FileDown, FileJson, Image } from "lucide-react";
-import { toast } from "sonner";
+import { MousePointerClick } from "lucide-react";
 
 import type { OdontogramValue } from "../../types";
 import { OdontogramClinicalFields } from "./OdontogramClinicalFields";
-import { exportChartFhir, exportChartPdf, exportChartPng } from "./engine";
 import { OdontogramToolbar } from "./OdontogramToolbar";
 
 type ClinicalTab =
@@ -26,18 +24,23 @@ type OdontogramClinicalPanelProps = {
   value: OdontogramValue;
   onOralMarksChange: (value: OdontogramValue) => void;
   readOnly: boolean;
-  patientId?: number;
   onOpenPerio: () => void;
+  focusedFdi?: number | null;
+  clinicalAreas?: Array<{ slug: string; name: string }>;
+  onClearFocus?: () => void;
 };
 
 export function OdontogramClinicalPanel({
   value,
   onOralMarksChange,
   readOnly,
-  patientId,
   onOpenPerio,
+  focusedFdi,
+  clinicalAreas = [],
+  onClearFocus,
 }: OdontogramClinicalPanelProps) {
   const [tab, setTab] = useState<ClinicalTab>("tratamiento");
+  const hasTooth = focusedFdi != null;
 
   return (
     <aside className="flex min-w-0 flex-col gap-4 overflow-visible rounded-2xl border border-slate-100 bg-slate-50/80 p-4 dark:border-white/10 dark:bg-slate-950/40">
@@ -66,11 +69,18 @@ export function OdontogramClinicalPanel({
 
       <div className="min-w-0 overflow-visible">
         {tab === "tratamiento" ? (
-          <OdontogramToolbar
-            value={value}
-            onOralMarksChange={onOralMarksChange}
-            readOnly={readOnly}
-          />
+          hasTooth ? (
+            <OdontogramToolbar
+              value={value}
+              onOralMarksChange={onOralMarksChange}
+              readOnly={readOnly}
+              focusedFdi={focusedFdi}
+              clinicalAreas={clinicalAreas}
+              onClearFocus={onClearFocus}
+            />
+          ) : (
+            <EmptyToothState />
+          )
         ) : null}
 
         {tab === "endodoncia" ? (
@@ -115,49 +125,25 @@ export function OdontogramClinicalPanel({
           </ClinicalHint>
         ) : null}
       </div>
-
-      <div className="border-t border-slate-200 pt-3 dark:border-slate-700">
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
-          Exportar
-        </p>
-        <div className="flex flex-wrap gap-2">
-          <ExportButton
-            label="PNG"
-            icon={<Image className="size-4" />}
-            onClick={async () => {
-              try {
-                await exportChartPng();
-              } catch {
-                toast.error("No se pudo exportar el PNG.");
-              }
-            }}
-          />
-          <ExportButton
-            label="PDF"
-            icon={<FileDown className="size-4" />}
-            onClick={async () => {
-              try {
-                await exportChartPdf();
-              } catch {
-                toast.error("No se pudo exportar el PDF.");
-              }
-            }}
-          />
-          <ExportButton
-            label="FHIR"
-            icon={<FileJson className="size-4" />}
-            onClick={() => {
-              try {
-                exportChartFhir(patientId);
-                toast.success("Bundle FHIR descargado.");
-              } catch {
-                toast.error("No se pudo exportar FHIR.");
-              }
-            }}
-          />
-        </div>
-      </div>
     </aside>
+  );
+}
+
+function EmptyToothState() {
+  return (
+    <div className="flex flex-col items-center gap-2 px-3 py-10 text-center">
+      <MousePointerClick
+        className="size-8 text-slate-300 dark:text-slate-600"
+        aria-hidden="true"
+      />
+      <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+        Ningún diente seleccionado
+      </p>
+      <p className="text-sm text-slate-500 dark:text-slate-400">
+        Haz clic en un diente de la carta para registrar estado, superficies y
+        marcas.
+      </p>
+    </div>
   );
 }
 
@@ -180,28 +166,5 @@ function ClinicalHint({
       </div>
       {children}
     </div>
-  );
-}
-
-function ExportButton({
-  label,
-  icon,
-  onClick,
-}: {
-  label: string;
-  icon: ReactNode;
-  onClick: () => void | Promise<void>;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={() => {
-        void onClick();
-      }}
-      className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-teal-300 hover:text-teal-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
-    >
-      {icon}
-      {label}
-    </button>
   );
 }
