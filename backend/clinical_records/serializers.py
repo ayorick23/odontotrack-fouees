@@ -18,33 +18,63 @@ from .models import (
     OdontogramRevision,
     Tratamiento,
 )
+from .services import user_display_name
 
 
 class DiagnosticoSerializer(serializers.ModelSerializer):
+    student_name = serializers.SerializerMethodField()
+    validated_by_name = serializers.SerializerMethodField()
+
     class Meta:
         model = Diagnostico
         fields = (
             "id",
             "patient",
             "student",
+            "student_name",
             "content",
             "validated_by",
+            "validated_by_name",
             "is_validated",
             "validated_at",
             "created_at",
             "updated_at",
         )
-        read_only_fields = ["validated_by", "is_validated", "validated_at"]
+        read_only_fields = [
+            "student",
+            "student_name",
+            "validated_by",
+            "validated_by_name",
+            "is_validated",
+            "validated_at",
+        ]
+
+    def get_student_name(self, obj: Diagnostico) -> str | None:
+        return user_display_name(obj.student)
+
+    def get_validated_by_name(self, obj: Diagnostico) -> str | None:
+        return user_display_name(obj.validated_by)
 
 
 class TratamientoSerializer(serializers.ModelSerializer):
+    clinical_area_name = serializers.CharField(
+        source="clinical_area.name",
+        read_only=True,
+    )
+    clinical_treatment_name = serializers.CharField(
+        source="clinical_treatment.name",
+        read_only=True,
+    )
+
     class Meta:
         model = Tratamiento
         fields = (
             "id",
             "patient",
             "clinical_area",
+            "clinical_area_name",
             "clinical_treatment",
+            "clinical_treatment_name",
             "created_at",
             "updated_at",
         )
@@ -68,17 +98,24 @@ class TratamientoSerializer(serializers.ModelSerializer):
 
 
 class EvolucionClinicaSerializer(serializers.ModelSerializer):
+    student_name = serializers.SerializerMethodField()
+
     class Meta:
         model = EvolucionClinica
         fields = (
             "id",
             "patient",
             "student",
+            "student_name",
             "date",
             "note",
             "created_at",
             "updated_at",
         )
+        read_only_fields = ["student", "student_name"]
+
+    def get_student_name(self, obj: EvolucionClinica) -> str | None:
+        return user_display_name(obj.student)
 
 
 class ToothMarkSerializer(serializers.Serializer):

@@ -11,6 +11,7 @@ import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { can } from "../../acl/can";
+import { PatientClinicalTabs, hasClinicalTabs } from "./PatientClinicalTabs";
 import { useAuth } from "../../hooks/useAuth";
 import { useTheme } from "../../hooks/useTheme";
 import { primaryActionClass } from "../../lib/actions";
@@ -258,6 +259,15 @@ export function PatientDetail() {
           </dl>
         </section>
       </div>
+
+      {hasClinicalTabs(user) ? (
+        <PatientClinicalTabs
+          patientId={patient.id}
+          areas={areas}
+          clinicalAreaSlug={patient.clinical_area}
+          clinicalTreatmentSlug={patient.clinical_subcategory}
+        />
+      ) : null}
 
       {can(user, "odontogram.view") ? (
         <Suspense

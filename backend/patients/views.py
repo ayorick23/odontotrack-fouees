@@ -26,7 +26,7 @@ class PatientViewSet(viewsets.ModelViewSet):
         "assignees": "patients.view",
     }
     filter_backends = [filters.SearchFilter]
-    search_fields = ["first_name", "last_name", "dui"]
+    search_fields = ["first_name", "last_name"]
 
     def get_queryset(self):
         params = self.request.query_params

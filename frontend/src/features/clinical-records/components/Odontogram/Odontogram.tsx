@@ -63,7 +63,6 @@ export function Odontogram({
   onChange,
   readOnly = false,
   darkMode = false,
-  patientId,
   patientName,
 }: OdontogramProps) {
   const onChangeRef = useRef(onChange);
@@ -252,12 +251,17 @@ export function Odontogram({
                 </div>
               </div>
             ) : null}
-            <OdontogramPlanDiff />
-            <OdontogramFindings
-              value={value ?? emptyOdontogram()}
-              focusedFdi={focusedFdi}
-              onFocusTooth={setFocusedFdi}
-            />
+            <div className="space-y-3">
+              <OdontogramPlanDiff
+                focusedFdi={focusedFdi}
+                onFocusTooth={setFocusedFdi}
+              />
+              <OdontogramFindings
+                value={value ?? emptyOdontogram()}
+                focusedFdi={focusedFdi}
+                onFocusTooth={setFocusedFdi}
+              />
+            </div>
           </div>
           {readOnly ? null : (
             <OdontogramClinicalPanel
