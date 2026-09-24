@@ -271,6 +271,28 @@ class PatientDirectoryTests(APITestCase):
         response = self.client.get("/api/patients/available/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
+    def test_detail_shows_note_of_active_assignment(self):
+        student = User.objects.create_user(
+            username="estudiante-nota",
+            password="pass12345",
+            role=User.Role.ESTUDIANTE,
+        )
+        patient = Patient.objects.create(
+            first_name="Rosa",
+            last_name="Nota",
+            dui="NOTA-001",
+        )
+        url = f"/api/patients/{patient.id}/"
+        self.assertEqual(self.client.get(url).json()["assignment_note"], "")
+
+        Assignment.objects.create(
+            patient=patient, student=student, reason="Viene por dolor en una muela"
+        )
+        self.assertEqual(
+            self.client.get(url).json()["assignment_note"],
+            "Viene por dolor en una muela",
+        )
+
     def test_assignees_lists_students_with_active_assignment(self):
         assigned = User.objects.create_user(
             username="estudiante-activo",

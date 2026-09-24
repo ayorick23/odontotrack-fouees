@@ -207,6 +207,11 @@ export function PatientDetail() {
                   locale: es,
                 })}
               </Fact>
+              {patient.assignment_note ? (
+                <Fact label="Nota de asignación" className="sm:col-span-2">
+                  {patient.assignment_note}
+                </Fact>
+              ) : null}
             </dl>
           </div>
         </div>
