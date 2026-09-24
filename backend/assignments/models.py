@@ -57,9 +57,9 @@ class Assignment(models.Model):
                 Assignment.objects.filter(patient_id=self.patient_id).count() + 1
             )
         super().save(*args, **kwargs)
-        if is_new and self.status == self.AssignmentStatus.ACTIVA:
-            from patients.models import Patient
+        if is_new:
+            # Import diferido: services importa patients, que importa
+            # este módulo.
+            from .services import start_case
 
-            if self.patient.case_status == Patient.CaseStatus.PENDIENTE:
-                self.patient.case_status = Patient.CaseStatus.EN_PROCESO
-                self.patient.save(update_fields=["case_status"])
+            start_case(self)

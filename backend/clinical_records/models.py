@@ -6,9 +6,9 @@ from django.db import models
 class Diagnostico(models.Model):
     """
     Diagnóstico de un paciente. Un docente supervisor puede validarlo
-    antes de que se considere parte oficial del expediente (el
-    endpoint de validación se agrega en ODO-31, junto con la regla de
-    que el caso no finaliza sin un diagnóstico validado).
+    antes de que se considere parte oficial del expediente; el caso no
+    puede finalizar sin al menos un diagnóstico validado (ver
+    DiagnosisService en services.py).
     """
 
     patient = models.ForeignKey(

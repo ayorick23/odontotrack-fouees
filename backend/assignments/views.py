@@ -3,6 +3,7 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from accounts.models import User
 from accounts.permissions import HasRequiredAcl
 
 from .models import Assignment
@@ -17,6 +18,7 @@ from .services import (
     assign_patients,
     assignable_students,
     claim_available_patients,
+    finalize_assignment,
 )
 
 # El combo busca en el servidor; con 20 opciones basta para elegir.
@@ -24,7 +26,11 @@ STUDENT_OPTIONS_LIMIT = 20
 
 
 class AssignmentViewSet(viewsets.ModelViewSet):
-    """CRUD de asignaciones paciente-estudiante."""
+    """
+    CRUD de asignaciones paciente-estudiante. El estado no se edita
+    por PATCH: se cambia con acciones explícitas (p. ej. finalize) que
+    delegan en services.py.
+    """
 
     queryset = Assignment.objects.all()
     serializer_class = AssignmentSerializer
@@ -36,10 +42,18 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         "update": "assignments.edit",
         "partial_update": "assignments.edit",
         "destroy": "assignments.edit",
+        "finalize": "assignments.change_status",
         "claim": "assignments.claim",
         "assign": ("assignments.create", "assignments.assign_student"),
         "students": "assignments.assign_student",
     }
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        user = self.request.user
+        if user.role == User.Role.ESTUDIANTE:
+            return queryset.filter(student=user)
+        return queryset
 
     def perform_create(self, serializer):
         fields = dict(serializer.validated_data)
@@ -47,6 +61,11 @@ class AssignmentViewSet(viewsets.ModelViewSet):
             patient_id=fields.pop("patient").pk,
             **fields,
         )
+
+    @action(detail=True, methods=["post"])
+    def finalize(self, request, pk=None):
+        assignment = finalize_assignment(self.get_object())
+        return Response(self.get_serializer(assignment).data)
 
     @action(detail=False, methods=["post"])
     def claim(self, request):

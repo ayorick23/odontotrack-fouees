@@ -202,13 +202,34 @@ class OdontogramApiTests(APITestCase):
         response = self.client.put(self.url, payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
-    def test_student_with_permission_can_view_and_update_unassigned_patient(self):
+    def test_student_can_view_and_update_assigned_patient(self):
+        Assignment.objects.create(
+            patient=self.patient, student=self.student, reason="Control"
+        )
         self.client.force_authenticate(user=self.student)
         loaded = self.client.get(self.url)
         self.assertEqual(loaded.status_code, status.HTTP_200_OK)
         saved = self.client.put(self.url, self._payload(placa=True), format="json")
         self.assertEqual(saved.status_code, status.HTTP_200_OK)
         self.assertTrue(saved.json()["placa"])
+
+    def test_student_can_view_but_not_update_available_patient(self):
+        self.client.force_authenticate(user=self.student)
+        loaded = self.client.get(self.url)
+        self.assertEqual(loaded.status_code, status.HTTP_200_OK)
+        saved = self.client.put(self.url, self._payload(placa=True), format="json")
+        self.assertEqual(saved.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_student_cannot_view_patient_of_another_student(self):
+        other = User.objects.create_user(
+            username="estudiante-otro",
+            password="pass12345",
+            role=User.Role.ESTUDIANTE,
+        )
+        Assignment.objects.create(patient=self.patient, student=other, reason="Control")
+        self.client.force_authenticate(user=self.student)
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_role_without_update_permission_cannot_edit(self):
         docente = User.objects.create_user(
@@ -369,6 +390,9 @@ class DiagnosisApiTests(APITestCase):
             last_name="Diagnostico",
             dui="DX-001",
         )
+        self.assignment = Assignment.objects.create(
+            patient=self.patient, student=self.student, reason="Control"
+        )
         self.url = "/api/clinical-records/diagnoses/"
 
     def test_student_can_create_and_list_own_diagnosis(self):
@@ -443,6 +467,103 @@ class DiagnosisApiTests(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
+    def test_docente_can_validate_diagnosis(self):
+        diagnosis = Diagnostico.objects.create(
+            patient=self.patient,
+            student=self.student,
+            content="Caries en 16.",
+        )
+        self.client.force_authenticate(user=self.docente)
+        response = self.client.post(f"{self.url}{diagnosis.id}/validate/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        body = response.json()
+        self.assertTrue(body["is_validated"])
+        self.assertEqual(body["validated_by"], self.docente.id)
+        self.assertIsNotNone(body["validated_at"])
+
+    def test_student_cannot_validate_diagnosis(self):
+        diagnosis = Diagnostico.objects.create(
+            patient=self.patient,
+            student=self.student,
+            content="Caries en 16.",
+        )
+        self.client.force_authenticate(user=self.student)
+        response = self.client.post(f"{self.url}{diagnosis.id}/validate/")
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        diagnosis.refresh_from_db()
+        self.assertFalse(diagnosis.is_validated)
+
+    def test_cannot_validate_twice(self):
+        diagnosis = Diagnostico.objects.create(
+            patient=self.patient,
+            student=self.student,
+            content="Caries en 16.",
+        )
+        self.client.force_authenticate(user=self.docente)
+        self.client.post(f"{self.url}{diagnosis.id}/validate/")
+        response = self.client.post(f"{self.url}{diagnosis.id}/validate/")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_student_cannot_create_diagnosis_for_unassigned_patient(self):
+        available = Patient.objects.create(
+            first_name="Libre",
+            last_name="Disponible",
+            dui="DX-003",
+        )
+        self.client.force_authenticate(user=self.student)
+        response = self.client.post(
+            self.url,
+            {"patient": available.id, "content": "Intento sin asignación."},
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_student_does_not_see_diagnoses_of_another_student(self):
+        other_student = User.objects.create_user(
+            username="estudiante-dx-otro",
+            password="pass12345",
+            role=User.Role.ESTUDIANTE,
+        )
+        other_patient = Patient.objects.create(
+            first_name="Ajeno",
+            last_name="Caso",
+            dui="DX-004",
+        )
+        Assignment.objects.create(
+            patient=other_patient, student=other_student, reason="Control"
+        )
+        foreign = Diagnostico.objects.create(
+            patient=other_patient, student=other_student, content="Ajeno."
+        )
+        self.client.force_authenticate(user=self.student)
+        listing = self.client.get(self.url)
+        self.assertEqual(listing.json()["count"], 0)
+        detail = self.client.get(f"{self.url}{foreign.id}/")
+        self.assertEqual(detail.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_student_keeps_read_but_loses_write_after_assignment_ends(self):
+        diagnosis = Diagnostico.objects.create(
+            patient=self.patient, student=self.student, content="Caries en 16."
+        )
+        self.assignment.status = Assignment.AssignmentStatus.FINALIZADA
+        self.assignment.save(update_fields=["status"])
+        self.client.force_authenticate(user=self.student)
+        detail = self.client.get(f"{self.url}{diagnosis.id}/")
+        self.assertEqual(detail.status_code, status.HTTP_200_OK)
+        response = self.client.patch(
+            f"{self.url}{diagnosis.id}/", {"content": "Edición tardía."}
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_soporte_has_no_clinical_access(self):
+        soporte = User.objects.create_user(
+            username="soporte-dx",
+            password="pass12345",
+            role=User.Role.SOPORTE,
+        )
+        self.client.force_authenticate(user=soporte)
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
 
 class TreatmentApiTests(APITestCase):
     def setUp(self):
@@ -456,6 +577,9 @@ class TreatmentApiTests(APITestCase):
             first_name="Luis",
             last_name="Tratamiento",
             dui="TX-001",
+        )
+        Assignment.objects.create(
+            patient=self.patient, student=self.student, reason="Control"
         )
         self.area = ClinicalArea.objects.get(slug="endodoncia")
         self.treatment = ClinicalTreatment.objects.filter(area=self.area).first()
@@ -508,6 +632,9 @@ class ClinicalEvolutionApiTests(APITestCase):
         self.url = "/api/clinical-records/evolution/"
 
     def test_student_can_create_evolution_note(self):
+        Assignment.objects.create(
+            patient=self.patient, student=self.student, reason="Control"
+        )
         self.client.force_authenticate(user=self.student)
         response = self.client.post(
             self.url,

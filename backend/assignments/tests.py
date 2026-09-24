@@ -1,11 +1,14 @@
 from rest_framework import status
+from rest_framework.exceptions import ValidationError
 from rest_framework.test import APITestCase
 
 from accounts.models import User
 from accounts.services import sync_acl
+from clinical_records.models import Diagnostico
 from patients.models import Patient
 
 from .models import Assignment
+from .services import can_transition, transition_case_status
 
 
 class AssignmentModelTests(APITestCase):
@@ -399,3 +402,113 @@ class AssignableStudentsTests(APITestCase):
         self.client.force_authenticate(user=self.jose)
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class CaseTransitionTests(APITestCase):
+    def setUp(self):
+        sync_acl()
+        self.admin = User.objects.create_user(
+            username="admin-casos",
+            password="pass12345",
+            role=User.Role.ADMIN,
+        )
+        self.docente = User.objects.create_user(
+            username="docente-casos",
+            password="pass12345",
+            role=User.Role.DOCENTE,
+        )
+        self.recepcion = User.objects.create_user(
+            username="recepcion-casos",
+            password="pass12345",
+            role=User.Role.RECEPCION,
+        )
+        self.student = User.objects.create_user(
+            username="estudiante-casos",
+            password="pass12345",
+            role=User.Role.ESTUDIANTE,
+        )
+        self.patient = Patient.objects.create(
+            first_name="Rosa",
+            last_name="Transicion",
+            dui="ASG-TRANS-001",
+        )
+        self.assignment = Assignment.objects.create(
+            patient=self.patient, student=self.student, reason="Cita"
+        )
+        self.finalize_url = f"/api/assignments/{self.assignment.id}/finalize/"
+
+    def _validated_diagnosis(self):
+        return Diagnostico.objects.create(
+            patient=self.patient,
+            student=self.student,
+            content="Caries en 16.",
+            is_validated=True,
+            validated_by=self.docente,
+        )
+
+    def test_only_forward_transitions_are_allowed(self):
+        pendiente = Patient.CaseStatus.PENDIENTE
+        en_proceso = Patient.CaseStatus.EN_PROCESO
+        finalizado = Patient.CaseStatus.FINALIZADO
+        self.assertTrue(can_transition(pendiente, en_proceso))
+        self.assertTrue(can_transition(en_proceso, finalizado))
+        self.assertFalse(can_transition(pendiente, finalizado))
+        self.assertFalse(can_transition(en_proceso, pendiente))
+        self.assertFalse(can_transition(finalizado, en_proceso))
+
+    def test_transition_case_status_rejects_invalid_jump(self):
+        other = Patient.objects.create(
+            first_name="Sin",
+            last_name="Asignar",
+            dui="ASG-TRANS-002",
+        )
+        with self.assertRaises(ValidationError):
+            transition_case_status(other, Patient.CaseStatus.FINALIZADO)
+        other.refresh_from_db()
+        self.assertEqual(other.case_status, Patient.CaseStatus.PENDIENTE)
+
+    def test_cannot_finalize_without_validated_diagnosis(self):
+        Diagnostico.objects.create(
+            patient=self.patient,
+            student=self.student,
+            content="Sin validar.",
+        )
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.post(self.finalize_url)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assignment.refresh_from_db()
+        self.patient.refresh_from_db()
+        self.assertEqual(self.assignment.status, Assignment.AssignmentStatus.ACTIVA)
+        self.assertEqual(self.patient.case_status, Patient.CaseStatus.EN_PROCESO)
+
+    def test_finalize_with_validated_diagnosis_closes_case(self):
+        self._validated_diagnosis()
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.post(self.finalize_url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()["status"], Assignment.AssignmentStatus.FINALIZADA)
+        self.patient.refresh_from_db()
+        self.assertEqual(self.patient.case_status, Patient.CaseStatus.FINALIZADO)
+
+    def test_cannot_finalize_twice(self):
+        self._validated_diagnosis()
+        self.client.force_authenticate(user=self.admin)
+        self.client.post(self.finalize_url)
+        response = self.client.post(self.finalize_url)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_role_without_change_status_cannot_finalize(self):
+        self._validated_diagnosis()
+        self.client.force_authenticate(user=self.recepcion)
+        response = self.client.post(self.finalize_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_status_cannot_be_changed_by_patch(self):
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.patch(
+            f"/api/assignments/{self.assignment.id}/",
+            {"status": Assignment.AssignmentStatus.FINALIZADA},
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assignment.refresh_from_db()
+        self.assertEqual(self.assignment.status, Assignment.AssignmentStatus.ACTIVA)
