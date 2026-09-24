@@ -1,0 +1,63 @@
+import axios from "axios";
+
+import { api } from "./api";
+
+export type AssignmentPriority = "alta" | "media" | "baja";
+
+export const PRIORITY_LABELS: Record<AssignmentPriority, string> = {
+  alta: "Alta",
+  media: "Media",
+  baja: "Baja",
+};
+
+export type ClaimedAssignment = {
+  id: number;
+  patient: number;
+  student: number;
+  appointment_number: number;
+  reason: string;
+  priority: AssignmentPriority;
+  status: string;
+};
+
+export function claimAvailablePatient(payload: {
+  patient: number;
+  reason: string;
+  priority: AssignmentPriority;
+}): Promise<ClaimedAssignment> {
+  return api
+    .post<ClaimedAssignment>("/assignments/claim/", payload)
+    .then((response) => response.data);
+}
+
+export function getClaimError(error: unknown): string {
+  if (!axios.isAxiosError(error) || error.response === undefined) {
+    return "No se pudo elegir el paciente. Intenta de nuevo.";
+  }
+  if (error.response.status === 403) {
+    return "No tienes permiso para elegir pacientes.";
+  }
+  const data = error.response.data;
+  if (typeof data !== "object" || data === null) {
+    return "No se pudo elegir el paciente. Revisa los datos.";
+  }
+  const record = data as Record<string, unknown>;
+  for (const key of ["patient", "reason", "priority", "detail"]) {
+    const message = firstMessage(record[key]);
+    if (message) {
+      return message;
+    }
+  }
+  return "No se pudo elegir el paciente. Revisa los datos.";
+}
+
+function firstMessage(value: unknown): string | null {
+  if (typeof value === "string" && value.trim()) {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    const first = value.find((item) => typeof item === "string");
+    return typeof first === "string" ? first : null;
+  }
+  return null;
+}

@@ -11,6 +11,10 @@ import { ThemeToggle } from "./ThemeToggle";
 const PAGE_META: Record<string, { title: string; crumb: string }> = {
   "/dashboard": { title: "Panel Administrativo", crumb: "Dashboard › Inicio" },
   "/patients": { title: "Directorio de pacientes", crumb: "Pacientes › Directorio" },
+  "/patients/available": {
+    title: "Pacientes disponibles",
+    crumb: "Pacientes › Disponibles",
+  },
   "/patients/new": {
     title: "Registro de paciente",
     crumb: "Pacientes › Registro",

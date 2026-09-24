@@ -287,8 +287,10 @@ class AclMatrixTests(APITestCase):
 
     def test_estudiante_inherits_role_permissions(self):
         self.assertTrue(self.estudiante.has_acl("patients.view"))
+        self.assertTrue(self.estudiante.has_acl("assignments.claim"))
         self.assertTrue(self.estudiante.has_acl("clinical_records.create"))
         self.assertFalse(self.estudiante.has_acl("patients.create"))
+        self.assertFalse(self.estudiante.has_acl("assignments.create"))
         self.assertFalse(self.estudiante.has_acl("roles.edit"))
 
     def test_recepcion_can_create_patients_not_clinical(self):

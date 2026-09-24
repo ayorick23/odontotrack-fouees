@@ -132,6 +132,24 @@ export function listPatients(
     .then((response) => response.data);
 }
 
+export function listAvailablePatients(params: {
+  page?: number;
+  search?: string;
+} = {}): Promise<PaginatedResponse<PatientListItem>> {
+  const query: Record<string, string | number> = {};
+  if (params.page && params.page > 1) {
+    query.page = params.page;
+  }
+  if (params.search) {
+    query.search = params.search;
+  }
+  return api
+    .get<PaginatedResponse<PatientListItem>>("/patients/available/", {
+      params: query,
+    })
+    .then((response) => response.data);
+}
+
 export function listAssignees(): Promise<PatientAssignee[]> {
   return api
     .get<PatientAssignee[]>("/patients/assignees/")

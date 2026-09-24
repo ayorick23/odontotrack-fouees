@@ -1,10 +1,13 @@
-from rest_framework import viewsets
+from rest_framework import status, viewsets
+from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 
 from accounts.permissions import HasRequiredAcl
 
 from .models import Assignment
-from .serializers import AssignmentSerializer
+from .serializers import AssignmentSerializer, ClaimAssignmentSerializer
+from .services import claim_available_patient
 
 
 class AssignmentViewSet(viewsets.ModelViewSet):
@@ -20,4 +23,20 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         "update": "assignments.edit",
         "partial_update": "assignments.edit",
         "destroy": "assignments.edit",
+        "claim": "assignments.claim",
     }
+
+    @action(detail=False, methods=["post"])
+    def claim(self, request):
+        payload = ClaimAssignmentSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        assignment = claim_available_patient(
+            user=request.user,
+            patient_id=payload.validated_data["patient"],
+            reason=payload.validated_data["reason"],
+            priority=payload.validated_data["priority"],
+        )
+        return Response(
+            AssignmentSerializer(assignment).data,
+            status=status.HTTP_201_CREATED,
+        )

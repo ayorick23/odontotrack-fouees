@@ -23,6 +23,10 @@ class PatientQuerySet(models.QuerySet):
     def unassigned(self):
         return self.exclude(assignments__status=Assignment.AssignmentStatus.ACTIVA)
 
+    def available(self):
+        """Pendientes sin asignación activa: los que el estudiante puede elegir."""
+        return self.unassigned().by_case_status(Patient.CaseStatus.PENDIENTE)
+
     def by_case_status(self, case_status: str | None):
         if case_status in Patient.CaseStatus.values:
             return self.filter(case_status=case_status)

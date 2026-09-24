@@ -48,6 +48,7 @@ DELETE = ActionSpec("delete", "Eliminar")
 EXPORT = ActionSpec("export", "Exportar")
 VALIDATE = ActionSpec("validate", "Validar")
 ASSIGN_STUDENT = ActionSpec("assign_student", "Asignar estudiante")
+CLAIM = ActionSpec("claim", "Elegir paciente")
 CHANGE_STATUS = ActionSpec("change_status", "Cambiar estado")
 UPDATE = ActionSpec("update", "Actualizar")
 
@@ -78,7 +79,7 @@ PERMISSION_CATALOG: Final[tuple[SectionSpec, ...]] = (
                 key="assignments",
                 label="Asignaciones",
                 description="Asignar paciente a estudiante, prioridad y estado del caso.",
-                actions=(VIEW, CREATE, EDIT, ASSIGN_STUDENT, CHANGE_STATUS),
+                actions=(VIEW, CREATE, EDIT, ASSIGN_STUDENT, CLAIM, CHANGE_STATUS),
             ),
             ModuleSpec(
                 key="calendar",
@@ -261,10 +262,11 @@ SYSTEM_ROLES: Final[tuple[SystemRoleSpec, ...]] = (
     SystemRoleSpec(
         slug="estudiante",
         name="Estudiante",
-        description="Carga clínica de sus pacientes: diagnóstico, tratamiento, evolución y odontograma.",
+        description="Elige pacientes disponibles y carga diagnóstico, tratamiento, evolución y odontograma.",
         permissions=_names(
             "dashboard.view",
             "patients.view",
+            "assignments.claim",
             "calendar.view",
             "clinical_records.view",
             "clinical_records.create",

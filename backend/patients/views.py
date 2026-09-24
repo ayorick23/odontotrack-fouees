@@ -24,11 +24,21 @@ class PatientViewSet(viewsets.ModelViewSet):
         "partial_update": "patients.edit",
         "destroy": "patients.delete",
         "assignees": "patients.view",
+        "available": "assignments.claim",
     }
     filter_backends = [filters.SearchFilter]
     search_fields = ["first_name", "last_name"]
 
     def get_queryset(self):
+        # Lista aparte del directorio: un scoping futuro por rol no debe
+        # ocultar los pendientes sin asignación.
+        if self.action == "available":
+            return (
+                Patient.objects.prefetch_related("assignments__student")
+                .select_related("clinical_area", "clinical_treatment")
+                .available()
+                .order_by("id")
+            )
         params = self.request.query_params
         return (
             Patient.objects.prefetch_related("assignments__student")
@@ -44,6 +54,18 @@ class PatientViewSet(viewsets.ModelViewSet):
         if self.action == "list":
             return PatientListSerializer
         return PatientSerializer
+
+    @action(detail=False, methods=["get"])
+    def available(self, request):
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        serializer = PatientListSerializer(
+            page if page is not None else queryset,
+            many=True,
+        )
+        if page is not None:
+            return self.get_paginated_response(serializer.data)
+        return Response(serializer.data)
 
     @action(detail=False, methods=["get"])
     def assignees(self, request):
