@@ -6,6 +6,42 @@ from patients.models import Patient
 
 from .models import Assignment
 
+UNAVAILABLE_MESSAGE = "Ese paciente ya no está disponible."
+
+
+def assign_patient(
+    *,
+    patient_id: int,
+    student: User,
+    only_pending: bool = False,
+    **fields,
+) -> Assignment:
+    """Abre una cita sin dejar al paciente con dos asignaciones activas.
+
+    Bloquea la fila del paciente: si recepción y un estudiante (o dos
+    estudiantes) asignan al mismo tiempo, solo pasa el primero.
+    `fields` son los demás campos de Assignment (reason, priority, ...).
+    """
+    if student.role != User.Role.ESTUDIANTE:
+        raise ValidationError({"student": "Solo se puede asignar a un estudiante."})
+
+    opens_case = (
+        fields.get("status", Assignment.AssignmentStatus.ACTIVA)
+        == Assignment.AssignmentStatus.ACTIVA
+    )
+    with transaction.atomic():
+        try:
+            patient = Patient.objects.select_for_update().get(pk=patient_id)
+        except Patient.DoesNotExist:
+            raise ValidationError({"patient": UNAVAILABLE_MESSAGE})
+        if only_pending and patient.case_status != Patient.CaseStatus.PENDIENTE:
+            raise ValidationError({"patient": UNAVAILABLE_MESSAGE})
+        if opens_case and patient.has_active_assignment():
+            raise ValidationError(
+                {"patient": "Ese paciente ya tiene una asignación activa."}
+            )
+        return Assignment.objects.create(patient=patient, student=student, **fields)
+
 
 def claim_available_patient(
     *,
@@ -17,24 +53,10 @@ def claim_available_patient(
     """El estudiante toma un pendiente sin asignación y abre la cita."""
     if user.role != User.Role.ESTUDIANTE:
         raise PermissionDenied("Solo un estudiante puede elegir un paciente disponible.")
-
-    cleaned_reason = reason.strip()
-    if priority not in Assignment.Priority.values:
-        raise ValidationError({"priority": "Prioridad no válida."})
-
-    with transaction.atomic():
-        try:
-            patient = Patient.objects.select_for_update().get(pk=patient_id)
-        except Patient.DoesNotExist:
-            raise ValidationError({"patient": "Ese paciente ya no está disponible."})
-        if (
-            patient.case_status != Patient.CaseStatus.PENDIENTE
-            or patient.has_active_assignment()
-        ):
-            raise ValidationError({"patient": "Ese paciente ya no está disponible."})
-        return Assignment.objects.create(
-            patient=patient,
-            student=user,
-            reason=cleaned_reason,
-            priority=priority,
-        )
+    return assign_patient(
+        patient_id=patient_id,
+        student=user,
+        only_pending=True,
+        reason=reason,
+        priority=priority,
+    )

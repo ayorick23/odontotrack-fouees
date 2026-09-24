@@ -7,7 +7,7 @@ from accounts.permissions import HasRequiredAcl
 
 from .models import Assignment
 from .serializers import AssignmentSerializer, ClaimAssignmentSerializer
-from .services import claim_available_patient
+from .services import assign_patient, claim_available_patient
 
 
 class AssignmentViewSet(viewsets.ModelViewSet):
@@ -25,6 +25,13 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         "destroy": "assignments.edit",
         "claim": "assignments.claim",
     }
+
+    def perform_create(self, serializer):
+        fields = dict(serializer.validated_data)
+        serializer.instance = assign_patient(
+            patient_id=fields.pop("patient").pk,
+            **fields,
+        )
 
     @action(detail=False, methods=["post"])
     def claim(self, request):

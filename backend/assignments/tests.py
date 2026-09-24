@@ -136,6 +136,70 @@ class AssignmentApiTests(APITestCase):
         self.assertEqual(body["appointment_number"], 1)
         self.assertEqual(body["priority"], Assignment.Priority.ALTA)
 
+    def test_create_rejects_patient_with_active_assignment(self):
+        other = User.objects.create_user(
+            username="estudiante-asg-otro",
+            password="pass12345",
+            role=User.Role.ESTUDIANTE,
+        )
+        Assignment.objects.create(
+            patient=self.patient, student=other, reason="Ya asignado"
+        )
+        response = self.client.post(
+            self.url,
+            {
+                "patient": self.patient.id,
+                "student": self.student.id,
+                "reason": "Dolor agudo",
+            },
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("patient", response.json())
+        self.assertEqual(
+            self.patient.assignments.filter(
+                status=Assignment.AssignmentStatus.ACTIVA
+            ).count(),
+            1,
+        )
+
+    def test_create_reassigns_case_without_active_assignment(self):
+        Assignment.objects.create(
+            patient=self.patient,
+            student=self.student,
+            reason="Primera cita",
+            status=Assignment.AssignmentStatus.CANCELADA,
+        )
+        self.patient.case_status = Patient.CaseStatus.EN_PROCESO
+        self.patient.save(update_fields=["case_status"])
+        response = self.client.post(
+            self.url,
+            {
+                "patient": self.patient.id,
+                "student": self.student.id,
+                "reason": "Cambio de estudiante",
+            },
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.json()["appointment_number"], 2)
+
+    def test_create_only_assigns_students(self):
+        docente = User.objects.create_user(
+            username="docente-asg",
+            password="pass12345",
+            role=User.Role.DOCENTE,
+        )
+        response = self.client.post(
+            self.url,
+            {
+                "patient": self.patient.id,
+                "student": docente.id,
+                "reason": "Dolor agudo",
+            },
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("student", response.json())
+        self.assertFalse(self.patient.has_active_assignment())
+
 
 class ClaimAvailablePatientTests(APITestCase):
     def setUp(self):
