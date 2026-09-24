@@ -1,3 +1,4 @@
+from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
 from accounts.models import User
@@ -5,7 +6,7 @@ from assignments.models import Assignment
 from patients.models import Patient
 
 from .catalog import default_tooth_findings, has_clinical_content
-from .models import Odontogram, OdontogramRevision
+from .models import Diagnostico, Odontogram, OdontogramRevision
 
 
 def user_display_name(user: User | None) -> str | None:
@@ -44,6 +45,32 @@ def resolve_clinical_student(*, user: User, patient: Patient) -> User:
             }
         )
     return assignment.student
+
+
+class DiagnosisService:
+    @staticmethod
+    def validate(diagnosis: Diagnostico, user: User) -> Diagnostico:
+        if diagnosis.is_validated:
+            raise ValidationError({"detail": "Este diagnóstico ya fue validado."})
+        diagnosis.is_validated = True
+        diagnosis.validated_by = user
+        diagnosis.validated_at = timezone.now()
+        diagnosis.save(
+            update_fields=["is_validated", "validated_by", "validated_at", "updated_at"]
+        )
+        return diagnosis
+
+    @staticmethod
+    def assert_patient_has_validated_diagnosis(patient: Patient) -> None:
+        if not patient.diagnoses.filter(is_validated=True).exists():
+            raise ValidationError(
+                {
+                    "detail": (
+                        "El caso no puede finalizar sin un diagnóstico "
+                        "validado por un docente."
+                    )
+                }
+            )
 
 
 class OdontogramService:

@@ -1,4 +1,5 @@
 from django.shortcuts import get_object_or_404
+from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -15,15 +16,20 @@ from .serializers import (
     OdontogramSerializer,
     TratamientoSerializer,
 )
-from .services import OdontogramService, queryset_for_patient, resolve_clinical_student
+from .services import (
+    DiagnosisService,
+    OdontogramService,
+    queryset_for_patient,
+    resolve_clinical_student,
+)
 
 
 class DiagnosisViewSet(ModelViewSet):
     """
     CRUD de diagnósticos. La validación por parte del docente (campos
-    validated_by / is_validated / validated_at) se maneja en un
-    endpoint de acción específico agregado en ODO-31, no por escritura
-    directa desde este serializer.
+    validated_by / is_validated / validated_at) se hace solo con
+    POST /diagnoses/{id}/validate/, no por escritura directa desde el
+    serializer.
     """
 
     queryset = Diagnostico.objects.select_related("student", "validated_by")
@@ -36,6 +42,7 @@ class DiagnosisViewSet(ModelViewSet):
         "update": "diagnoses.edit",
         "partial_update": "diagnoses.edit",
         "destroy": "diagnoses.edit",
+        "validate_diagnosis": "diagnoses.validate",
     }
 
     def get_queryset(self):
@@ -52,6 +59,11 @@ class DiagnosisViewSet(ModelViewSet):
                 patient=patient,
             )
         )
+
+    @action(detail=True, methods=["post"], url_path="validate")
+    def validate_diagnosis(self, request, pk=None):
+        diagnosis = DiagnosisService.validate(self.get_object(), request.user)
+        return Response(self.get_serializer(diagnosis).data)
 
 
 class TreatmentViewSet(ModelViewSet):

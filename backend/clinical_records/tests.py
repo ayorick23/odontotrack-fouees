@@ -443,6 +443,43 @@ class DiagnosisApiTests(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
+    def test_docente_can_validate_diagnosis(self):
+        diagnosis = Diagnostico.objects.create(
+            patient=self.patient,
+            student=self.student,
+            content="Caries en 16.",
+        )
+        self.client.force_authenticate(user=self.docente)
+        response = self.client.post(f"{self.url}{diagnosis.id}/validate/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        body = response.json()
+        self.assertTrue(body["is_validated"])
+        self.assertEqual(body["validated_by"], self.docente.id)
+        self.assertIsNotNone(body["validated_at"])
+
+    def test_student_cannot_validate_diagnosis(self):
+        diagnosis = Diagnostico.objects.create(
+            patient=self.patient,
+            student=self.student,
+            content="Caries en 16.",
+        )
+        self.client.force_authenticate(user=self.student)
+        response = self.client.post(f"{self.url}{diagnosis.id}/validate/")
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        diagnosis.refresh_from_db()
+        self.assertFalse(diagnosis.is_validated)
+
+    def test_cannot_validate_twice(self):
+        diagnosis = Diagnostico.objects.create(
+            patient=self.patient,
+            student=self.student,
+            content="Caries en 16.",
+        )
+        self.client.force_authenticate(user=self.docente)
+        self.client.post(f"{self.url}{diagnosis.id}/validate/")
+        response = self.client.post(f"{self.url}{diagnosis.id}/validate/")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
 
 class TreatmentApiTests(APITestCase):
     def setUp(self):
