@@ -70,7 +70,6 @@ function assignmentFor(patient: number) {
     student: 3,
     appointment_number: 1,
     reason: "",
-    priority: "media",
     status: "activa",
   };
 }
@@ -110,7 +109,6 @@ describe("AvailablePatients", () => {
       expect(api.claimAvailablePatients).toHaveBeenCalledWith({
         patients: [4],
         reason: "Dolor en molar",
-        priority: "media",
       });
     });
     expect(api.assignPatients).not.toHaveBeenCalled();
@@ -141,7 +139,6 @@ describe("AvailablePatients", () => {
         patients: [4],
         student: 3,
         reason: "",
-        priority: "media",
       });
     });
     expect(api.claimAvailablePatients).not.toHaveBeenCalled();
@@ -173,7 +170,6 @@ describe("AvailablePatients", () => {
         patients: [4, 6],
         student: 5,
         reason: "",
-        priority: "media",
       });
     });
   });

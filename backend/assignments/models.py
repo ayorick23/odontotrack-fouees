@@ -15,11 +15,6 @@ class Assignment(models.Model):
         FINALIZADA = "finalizada", "Finalizada"
         CANCELADA = "cancelada", "Cancelada"
 
-    class Priority(models.TextChoices):
-        ALTA = "alta", "Alta"
-        MEDIA = "media", "Media"
-        BAJA = "baja", "Baja"
-
     patient = models.ForeignKey(
         "patients.Patient",
         on_delete=models.CASCADE,
@@ -44,11 +39,6 @@ class Assignment(models.Model):
     # Nota opcional al asignar. El motivo de consulta lo registra el
     # estudiante en el diagnóstico cuando atiende al paciente.
     reason = models.TextField(blank=True, help_text="Motivo o nota al asignar.")
-    priority = models.CharField(
-        max_length=10,
-        choices=Priority.choices,
-        default=Priority.MEDIA,
-    )
     notes = models.TextField(blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)

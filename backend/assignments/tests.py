@@ -108,18 +108,6 @@ class AssignmentApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.json()["reason"], "")
 
-    def test_create_rejects_invalid_priority(self):
-        response = self.client.post(
-            self.url,
-            {
-                "patient": self.patient.id,
-                "student": self.student.id,
-                "reason": "Dolor agudo",
-                "priority": "urgente",
-            },
-        )
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-
     def test_create_returns_appointment_number_as_read_only(self):
         response = self.client.post(
             self.url,
@@ -127,14 +115,11 @@ class AssignmentApiTests(APITestCase):
                 "patient": self.patient.id,
                 "student": self.student.id,
                 "reason": "Dolor agudo",
-                "priority": Assignment.Priority.ALTA,
                 "appointment_number": 99,
             },
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        body = response.json()
-        self.assertEqual(body["appointment_number"], 1)
-        self.assertEqual(body["priority"], Assignment.Priority.ALTA)
+        self.assertEqual(response.json()["appointment_number"], 1)
 
     def test_create_rejects_patient_with_active_assignment(self):
         other = User.objects.create_user(
@@ -237,18 +222,13 @@ class ClaimAvailablePatientTests(APITestCase):
         self.client.force_authenticate(user=self.student)
         response = self.client.post(
             self.url,
-            {
-                "patients": [self.patient.id],
-                "reason": "Dolor en molar",
-                "priority": Assignment.Priority.ALTA,
-            },
+            {"patients": [self.patient.id], "reason": "Dolor en molar"},
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         [body] = response.json()
         self.assertEqual(body["student"], self.student.id)
         self.assertEqual(body["appointment_number"], 1)
-        self.assertEqual(body["priority"], Assignment.Priority.ALTA)
         self.patient.refresh_from_db()
         self.assertEqual(self.patient.case_status, Patient.CaseStatus.EN_PROCESO)
         self.assertTrue(self.patient.has_active_assignment())

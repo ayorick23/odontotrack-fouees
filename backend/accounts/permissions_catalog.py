@@ -78,7 +78,7 @@ PERMISSION_CATALOG: Final[tuple[SectionSpec, ...]] = (
             ModuleSpec(
                 key="assignments",
                 label="Asignaciones",
-                description="Asignar paciente a estudiante, prioridad y estado del caso.",
+                description="Asignar paciente a estudiante y estado del caso.",
                 actions=(VIEW, CREATE, EDIT, ASSIGN_STUDENT, CLAIM, CHANGE_STATUS),
             ),
             ModuleSpec(

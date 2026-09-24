@@ -23,10 +23,6 @@ class ClaimAssignmentSerializer(serializers.Serializer):
         max_length=MAX_PATIENTS_PER_ASSIGNMENT,
     )
     reason = serializers.CharField(required=False, allow_blank=True, default="")
-    priority = serializers.ChoiceField(
-        choices=Assignment.Priority.choices,
-        default=Assignment.Priority.MEDIA,
-    )
 
 
 class BulkAssignmentSerializer(ClaimAssignmentSerializer):

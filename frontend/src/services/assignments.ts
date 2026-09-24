@@ -2,21 +2,12 @@ import axios from "axios";
 
 import { api } from "./api";
 
-export type AssignmentPriority = "alta" | "media" | "baja";
-
-export const PRIORITY_LABELS: Record<AssignmentPriority, string> = {
-  alta: "Alta",
-  media: "Media",
-  baja: "Baja",
-};
-
 export type AssignmentRecord = {
   id: number;
   patient: number;
   student: number;
   appointment_number: number;
   reason: string;
-  priority: AssignmentPriority;
   status: string;
 };
 
@@ -30,7 +21,6 @@ export type AssignableStudent = {
 export function claimAvailablePatients(payload: {
   patients: number[];
   reason: string;
-  priority: AssignmentPriority;
 }): Promise<AssignmentRecord[]> {
   return api
     .post<AssignmentRecord[]>("/assignments/claim/", payload)
@@ -41,7 +31,6 @@ export function assignPatients(payload: {
   patients: number[];
   student: number;
   reason: string;
-  priority: AssignmentPriority;
 }): Promise<AssignmentRecord[]> {
   return api
     .post<AssignmentRecord[]>("/assignments/assign/", payload)
@@ -68,7 +57,7 @@ export function getAssignmentError(error: unknown): string {
     return "No se pudo guardar la asignación. Revisa los datos.";
   }
   const record = data as Record<string, unknown>;
-  for (const key of ["patient", "student", "reason", "priority", "detail"]) {
+  for (const key of ["patient", "student", "reason", "detail"]) {
     const message = firstMessage(record[key]);
     if (message) {
       return message;

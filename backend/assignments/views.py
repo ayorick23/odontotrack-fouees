@@ -57,7 +57,6 @@ class AssignmentViewSet(viewsets.ModelViewSet):
             user=request.user,
             patient_ids=data["patients"],
             reason=data["reason"],
-            priority=data["priority"],
         )
         return Response(
             AssignmentSerializer(assignments, many=True).data,
@@ -73,7 +72,6 @@ class AssignmentViewSet(viewsets.ModelViewSet):
             patient_ids=data["patients"],
             student=data["student"],
             reason=data["reason"],
-            priority=data["priority"],
         )
         return Response(
             AssignmentSerializer(assignments, many=True).data,

@@ -22,7 +22,7 @@ def assign_patients(
     asignaciones simultáneas no se traben entre sí): si recepción y un
     estudiante asignan al mismo paciente a la vez, solo pasa el primero.
     Un paciente nunca queda con dos asignaciones activas.
-    `fields` son los demás campos de Assignment (reason, priority, ...).
+    `fields` son los demás campos de Assignment (reason, notes, ...).
     """
     if student.role != User.Role.ESTUDIANTE:
         raise ValidationError({"student": "Solo se puede asignar a un estudiante."})
@@ -62,7 +62,6 @@ def claim_available_patients(
     user: User,
     patient_ids: Iterable[int],
     reason: str,
-    priority: str,
 ) -> list[Assignment]:
     """El estudiante toma pendientes sin asignación y abre una cita por cada uno."""
     if user.role != User.Role.ESTUDIANTE:
@@ -72,7 +71,6 @@ def claim_available_patients(
         student=user,
         only_pending=True,
         reason=reason,
-        priority=priority,
     )
 
 

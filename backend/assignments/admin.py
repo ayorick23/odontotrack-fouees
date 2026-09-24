@@ -10,8 +10,7 @@ class AssignmentAdmin(admin.ModelAdmin):
         "student",
         "assigned_date",
         "appointment_number",
-        "priority",
         "status",
     )
-    list_filter = ("status", "priority")
+    list_filter = ("status",)
     search_fields = ("patient__first_name", "patient__last_name", "student__username")

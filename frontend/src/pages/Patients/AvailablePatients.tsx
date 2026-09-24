@@ -5,22 +5,13 @@ import { toast } from "sonner";
 import { can } from "../../acl/can";
 import { Modal } from "../../components/Modal";
 import { Table } from "../../components/Table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../../components/ui/select";
 import { useAuth } from "../../hooks/useAuth";
 import { primaryActionClass, secondaryActionClass } from "../../lib/actions";
 import {
   assignPatients,
   claimAvailablePatients,
   getAssignmentError,
-  PRIORITY_LABELS,
   type AssignableStudent,
-  type AssignmentPriority,
   type AssignmentRecord,
 } from "../../services/assignments";
 import {
@@ -61,7 +52,6 @@ export function AvailablePatients() {
   const [targets, setTargets] = useState<PatientListItem[]>([]);
   const [student, setStudent] = useState<AssignableStudent | null>(null);
   const [reason, setReason] = useState("");
-  const [priority, setPriority] = useState<AssignmentPriority>("media");
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -130,7 +120,6 @@ export function AvailablePatients() {
     setTargets(patients);
     setStudent(null);
     setReason("");
-    setPriority("media");
     setFormError(null);
   }
 
@@ -152,8 +141,8 @@ export function AvailablePatients() {
       // `student` solo tiene valor cuando quien asigna eligió a alguien.
       const assignments =
         student !== null
-          ? await assignPatients({ patients, student: student.id, reason, priority })
-          : await claimAvailablePatients({ patients, reason, priority });
+          ? await assignPatients({ patients, student: student.id, reason })
+          : await claimAvailablePatients({ patients, reason });
       toast.success(successMessage(targets, assignments, student));
       setChecked((current) => {
         const next = new Map(current);
@@ -351,24 +340,6 @@ export function AvailablePatients() {
               placeholder="Ej. viene por dolor en una muela"
               className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none focus:border-teal-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
             />
-          </label>
-          <label className="block text-sm text-slate-600 dark:text-slate-300">
-            Prioridad
-            <Select
-              value={priority}
-              onValueChange={(value) => setPriority(value as AssignmentPriority)}
-            >
-              <SelectTrigger className="mt-1 w-full" aria-label="Prioridad">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {(Object.keys(PRIORITY_LABELS) as AssignmentPriority[]).map((value) => (
-                  <SelectItem key={value} value={value}>
-                    {PRIORITY_LABELS[value]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </label>
           {formError ? (
             <p className="text-sm text-red-600" role="alert">
