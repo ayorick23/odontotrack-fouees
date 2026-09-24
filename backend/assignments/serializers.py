@@ -12,13 +12,25 @@ class AssignmentSerializer(serializers.ModelSerializer):
         read_only_fields = ["appointment_number"]
 
 
+# Igual al tamaño de página de "Pacientes disponibles".
+MAX_PATIENTS_PER_ASSIGNMENT = 20
+
+
 class ClaimAssignmentSerializer(serializers.Serializer):
-    patient = serializers.IntegerField(min_value=1)
+    patients = serializers.ListField(
+        child=serializers.IntegerField(min_value=1),
+        min_length=1,
+        max_length=MAX_PATIENTS_PER_ASSIGNMENT,
+    )
     reason = serializers.CharField(required=False, allow_blank=True, default="")
     priority = serializers.ChoiceField(
         choices=Assignment.Priority.choices,
         default=Assignment.Priority.MEDIA,
     )
+
+
+class BulkAssignmentSerializer(ClaimAssignmentSerializer):
+    student = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
 
 
 class AssignableStudentSerializer(serializers.ModelSerializer):

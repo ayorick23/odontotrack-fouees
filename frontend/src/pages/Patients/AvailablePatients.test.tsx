@@ -7,8 +7,8 @@ import { AvailablePatients } from "./AvailablePatients";
 const api = vi.hoisted(() => ({
   listAvailablePatients: vi.fn(),
   listClinicalAreas: vi.fn(),
-  claimAvailablePatient: vi.fn(),
-  assignPatient: vi.fn(),
+  claimAvailablePatients: vi.fn(),
+  assignPatients: vi.fn(),
   listAssignableStudents: vi.fn(),
 }));
 
@@ -41,13 +41,13 @@ vi.mock("../../services/assignments", async () => {
   );
   return {
     ...actual,
-    claimAvailablePatient: api.claimAvailablePatient,
-    assignPatient: api.assignPatient,
+    claimAvailablePatients: api.claimAvailablePatients,
+    assignPatients: api.assignPatients,
     listAssignableStudents: api.listAssignableStudents,
   };
 });
 
-const patient = {
+const ana = {
   id: 4,
   first_name: "Ana",
   last_name: "Disponible",
@@ -61,36 +61,44 @@ const patient = {
   assigned_to: null,
 };
 
-const createdAssignment = {
-  id: 9,
-  patient: 4,
-  student: 3,
-  appointment_number: 1,
-  reason: "Dolor en molar",
-  priority: "media",
-  status: "activa",
-};
+const luis = { ...ana, id: 6, first_name: "Luis", dui: "DISP-002" };
+
+function assignmentFor(patient: number) {
+  return {
+    id: patient + 100,
+    patient,
+    student: 3,
+    appointment_number: 1,
+    reason: "",
+    priority: "media",
+    status: "activa",
+  };
+}
 
 describe("AvailablePatients", () => {
   beforeEach(() => {
     Object.values(api).forEach((mock) => mock.mockReset());
     api.listClinicalAreas.mockResolvedValue([]);
     api.listAvailablePatients.mockResolvedValue({
-      count: 1,
+      count: 2,
       next: null,
       previous: null,
-      results: [patient],
+      results: [ana, luis],
     });
+    api.listAssignableStudents.mockResolvedValue([
+      { id: 3, name: "Maria Lopez", active_cases: 1 },
+      { id: 5, name: "Jose Ramirez", active_cases: 0 },
+    ]);
   });
 
   it("lets a student claim an available patient", async () => {
     auth.permissions = ["assignments.claim"];
-    api.claimAvailablePatient.mockResolvedValue(createdAssignment);
+    api.claimAvailablePatients.mockResolvedValue([assignmentFor(4)]);
     const user = userEvent.setup();
     render(<AvailablePatients />);
 
     expect(await screen.findByText("Ana Disponible")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Elegir" }));
+    await user.click(screen.getAllByRole("button", { name: "Elegir" })[0]);
     expect(screen.queryByRole("combobox", { name: "Estudiante" })).toBeNull();
     await user.type(
       screen.getByRole("textbox", { name: /motivo/i }),
@@ -99,31 +107,23 @@ describe("AvailablePatients", () => {
     await user.click(screen.getByRole("button", { name: "Confirmar" }));
 
     await waitFor(() => {
-      expect(api.claimAvailablePatient).toHaveBeenCalledWith({
-        patient: 4,
+      expect(api.claimAvailablePatients).toHaveBeenCalledWith({
+        patients: [4],
         reason: "Dolor en molar",
         priority: "media",
       });
     });
-    expect(api.assignPatient).not.toHaveBeenCalled();
+    expect(api.assignPatients).not.toHaveBeenCalled();
   });
 
   it("lets reception search a student and assign the patient", async () => {
     auth.permissions = ["assignments.assign_student"];
-    api.listAssignableStudents.mockResolvedValue([
-      { id: 3, name: "Maria Lopez", active_cases: 1 },
-      { id: 5, name: "Jose Ramirez", active_cases: 0 },
-    ]);
-    api.assignPatient.mockResolvedValue(createdAssignment);
+    api.assignPatients.mockResolvedValue([assignmentFor(4)]);
     const user = userEvent.setup();
     render(<AvailablePatients />);
 
     expect(await screen.findByText("Ana Disponible")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Asignar" }));
-    await user.type(
-      screen.getByRole("textbox", { name: /motivo/i }),
-      "Dolor en molar",
-    );
+    await user.click(screen.getAllByRole("button", { name: "Asignar" })[0]);
     expect(screen.getByRole("button", { name: "Confirmar" })).toBeDisabled();
 
     await user.type(screen.getByRole("combobox", { name: "Estudiante" }), "mar");
@@ -137,13 +137,44 @@ describe("AvailablePatients", () => {
     await user.click(screen.getByRole("button", { name: "Confirmar" }));
 
     await waitFor(() => {
-      expect(api.assignPatient).toHaveBeenCalledWith({
-        patient: 4,
+      expect(api.assignPatients).toHaveBeenCalledWith({
+        patients: [4],
         student: 3,
-        reason: "Dolor en molar",
+        reason: "",
         priority: "media",
       });
     });
-    expect(api.claimAvailablePatient).not.toHaveBeenCalled();
+    expect(api.claimAvailablePatients).not.toHaveBeenCalled();
+  });
+
+  it("assigns several selected patients at once", async () => {
+    auth.permissions = ["assignments.assign_student"];
+    api.assignPatients.mockResolvedValue([assignmentFor(4), assignmentFor(6)]);
+    const user = userEvent.setup();
+    render(<AvailablePatients />);
+
+    await user.click(
+      await screen.findByRole("checkbox", { name: "Seleccionar a Ana Disponible" }),
+    );
+    await user.click(
+      screen.getByRole("checkbox", { name: "Seleccionar a Luis Disponible" }),
+    );
+    await user.click(screen.getByRole("button", { name: /Asignar seleccionados \(2\)/ }));
+
+    expect(
+      screen.getByRole("heading", { name: "Asignar 2 pacientes" }),
+    ).toBeInTheDocument();
+    await user.type(screen.getByRole("combobox", { name: "Estudiante" }), "jose");
+    await user.click(await screen.findByRole("option", { name: /Jose Ramirez/ }));
+    await user.click(screen.getByRole("button", { name: "Confirmar" }));
+
+    await waitFor(() => {
+      expect(api.assignPatients).toHaveBeenCalledWith({
+        patients: [4, 6],
+        student: 5,
+        reason: "",
+        priority: "media",
+      });
+    });
   });
 });

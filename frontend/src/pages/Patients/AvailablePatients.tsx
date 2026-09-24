@@ -15,12 +15,13 @@ import {
 import { useAuth } from "../../hooks/useAuth";
 import { primaryActionClass, secondaryActionClass } from "../../lib/actions";
 import {
-  assignPatient,
-  claimAvailablePatient,
+  assignPatients,
+  claimAvailablePatients,
   getAssignmentError,
   PRIORITY_LABELS,
   type AssignableStudent,
   type AssignmentPriority,
+  type AssignmentRecord,
 } from "../../services/assignments";
 import {
   areaLabel,
@@ -52,7 +53,12 @@ export function AvailablePatients() {
   const [reloadToken, setReloadToken] = useState(0);
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const [areas, setAreas] = useState<ClinicalAreaRecord[]>([]);
-  const [selected, setSelected] = useState<PatientListItem | null>(null);
+  // Marcados con la casilla; se mantienen al cambiar de página o buscar.
+  const [checked, setChecked] = useState<ReadonlyMap<number, PatientListItem>>(
+    new Map(),
+  );
+  // Pacientes del modal abierto (vacío = cerrado).
+  const [targets, setTargets] = useState<PatientListItem[]>([]);
   const [student, setStudent] = useState<AssignableStudent | null>(null);
   const [reason, setReason] = useState("");
   const [priority, setPriority] = useState<AssignmentPriority>("media");
@@ -105,10 +111,23 @@ export function AvailablePatients() {
   const pageCount =
     state.status === "ready" ? Math.max(Math.ceil(state.count / PAGE_SIZE), 1) : 1;
 
+  const verb = assignsOthers ? "Asignar" : "Elegir";
   const canSubmit = !submitting && (!assignsOthers || student !== null);
 
-  function openAssignment(patient: PatientListItem) {
-    setSelected(patient);
+  function toggleChecked(patient: PatientListItem) {
+    setChecked((current) => {
+      const next = new Map(current);
+      if (next.has(patient.id)) {
+        next.delete(patient.id);
+      } else {
+        next.set(patient.id, patient);
+      }
+      return next;
+    });
+  }
+
+  function openAssignment(patients: PatientListItem[]) {
+    setTargets(patients);
     setStudent(null);
     setReason("");
     setPriority("media");
@@ -119,40 +138,29 @@ export function AvailablePatients() {
     if (submitting) {
       return;
     }
-    setSelected(null);
+    setTargets([]);
   }
 
   async function submitAssignment() {
-    if (selected === null) {
+    if (!canSubmit || targets.length === 0) {
       return;
     }
+    const patients = targets.map((patient) => patient.id);
     setSubmitting(true);
     setFormError(null);
     try {
-      if (assignsOthers) {
-        if (student === null) {
-          return;
-        }
-        const assignment = await assignPatient({
-          patient: selected.id,
-          student: student.id,
-          reason,
-          priority,
-        });
-        toast.success(
-          `${patientFullName(selected)} quedó asignado a ${student.name}. Cita ${assignment.appointment_number}.`,
-        );
-      } else {
-        const assignment = await claimAvailablePatient({
-          patient: selected.id,
-          reason,
-          priority,
-        });
-        toast.success(
-          `${patientFullName(selected)} quedó en tu carga. Cita ${assignment.appointment_number}.`,
-        );
-      }
-      setSelected(null);
+      // `student` solo tiene valor cuando quien asigna eligió a alguien.
+      const assignments =
+        student !== null
+          ? await assignPatients({ patients, student: student.id, reason, priority })
+          : await claimAvailablePatients({ patients, reason, priority });
+      toast.success(successMessage(targets, assignments, student));
+      setChecked((current) => {
+        const next = new Map(current);
+        patients.forEach((id) => next.delete(id));
+        return next;
+      });
+      setTargets([]);
       setReloadToken((token) => token + 1);
     } catch (error) {
       setFormError(getAssignmentError(error));
@@ -175,23 +183,35 @@ export function AvailablePatients() {
       </div>
 
       <section className="rounded-2xl bg-white p-4 shadow-[0_10px_30px_rgba(15,40,80,0.06)] dark:bg-slate-900 dark:shadow-none dark:ring-1 dark:ring-white/10 sm:p-5">
-        <form
-          className="mb-4 flex max-w-md items-center gap-2 rounded-full bg-slate-50 px-3 py-2 dark:bg-slate-800"
-          onSubmit={(event) => {
-            event.preventDefault();
-            setPage(1);
-            setSearch(searchInput.trim());
-          }}
-        >
-          <Search className="size-4 text-slate-400" />
-          <input
-            value={searchInput}
-            onChange={(event) => setSearchInput(event.target.value)}
-            placeholder="Buscar por nombre"
-            aria-label="Buscar paciente disponible"
-            className="w-full bg-transparent text-sm text-slate-700 outline-none dark:text-slate-100"
-          />
-        </form>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <form
+            className="flex w-full max-w-md items-center gap-2 rounded-full bg-slate-50 px-3 py-2 dark:bg-slate-800"
+            onSubmit={(event) => {
+              event.preventDefault();
+              setPage(1);
+              setSearch(searchInput.trim());
+            }}
+          >
+            <Search className="size-4 text-slate-400" />
+            <input
+              value={searchInput}
+              onChange={(event) => setSearchInput(event.target.value)}
+              placeholder="Buscar por nombre"
+              aria-label="Buscar paciente disponible"
+              className="w-full bg-transparent text-sm text-slate-700 outline-none dark:text-slate-100"
+            />
+          </form>
+          {checked.size > 0 ? (
+            <button
+              type="button"
+              className={primaryActionClass}
+              onClick={() => openAssignment([...checked.values()])}
+            >
+              <UserCheck className="size-4" />
+              {verb} seleccionados ({checked.size})
+            </button>
+          ) : null}
+        </div>
 
         {state.status === "loading" ? (
           <p className="px-2 py-10 text-center text-sm text-slate-500">Cargando…</p>
@@ -206,6 +226,18 @@ export function AvailablePatients() {
             emptyMessage="No hay pacientes pendientes de asignación."
             getRowKey={(patient) => patient.id}
             columns={[
+              {
+                header: "Selección",
+                render: (patient) => (
+                  <input
+                    type="checkbox"
+                    checked={checked.has(patient.id)}
+                    onChange={() => toggleChecked(patient)}
+                    aria-label={`Seleccionar a ${patientFullName(patient)}`}
+                    className="size-4 accent-teal-600"
+                  />
+                ),
+              },
               {
                 header: "Paciente",
                 render: (patient) => (
@@ -245,10 +277,10 @@ export function AvailablePatients() {
                   <button
                     type="button"
                     className={primaryActionClass}
-                    onClick={() => openAssignment(patient)}
+                    onClick={() => openAssignment([patient])}
                   >
                     <UserCheck className="size-4" />
-                    {assignsOthers ? "Asignar" : "Elegir"}
+                    {verb}
                   </button>
                 ),
               },
@@ -282,12 +314,12 @@ export function AvailablePatients() {
       </section>
 
       <Modal
-        isOpen={selected !== null}
+        isOpen={targets.length > 0}
         onClose={closeAssignment}
         title={
-          selected
-            ? `${assignsOthers ? "Asignar" : "Elegir"} a ${patientFullName(selected)}`
-            : "Asignar paciente"
+          targets.length === 1
+            ? `${verb} a ${patientFullName(targets[0])}`
+            : `${verb} ${targets.length} pacientes`
         }
       >
         <form
@@ -297,6 +329,16 @@ export function AvailablePatients() {
             void submitAssignment();
           }}
         >
+          {targets.length > 1 ? (
+            <ul
+              aria-label="Pacientes seleccionados"
+              className="max-h-32 space-y-1 overflow-auto rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:bg-slate-800 dark:text-slate-200"
+            >
+              {targets.map((patient) => (
+                <li key={patient.id}>{patientFullName(patient)}</li>
+              ))}
+            </ul>
+          ) : null}
           {assignsOthers ? (
             <StudentCombobox value={student} onChange={setStudent} />
           ) : null}
@@ -349,4 +391,17 @@ export function AvailablePatients() {
       </Modal>
     </div>
   );
+}
+
+function successMessage(
+  patients: PatientListItem[],
+  assignments: AssignmentRecord[],
+  student: AssignableStudent | null,
+): string {
+  const owner = student ? `quedó asignado a ${student.name}` : "quedó en tu carga";
+  if (patients.length === 1) {
+    return `${patientFullName(patients[0])} ${owner}. Cita ${assignments[0].appointment_number}.`;
+  }
+  const owners = student ? `quedaron asignados a ${student.name}` : "quedaron en tu carga";
+  return `${patients.length} pacientes ${owners}.`;
 }

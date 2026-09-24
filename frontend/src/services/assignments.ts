@@ -26,24 +26,25 @@ export type AssignableStudent = {
   active_cases: number;
 };
 
-export function claimAvailablePatient(payload: {
-  patient: number;
+// Todo o nada: si un paciente ya no está disponible, no se asigna ninguno.
+export function claimAvailablePatients(payload: {
+  patients: number[];
   reason: string;
   priority: AssignmentPriority;
-}): Promise<AssignmentRecord> {
+}): Promise<AssignmentRecord[]> {
   return api
-    .post<AssignmentRecord>("/assignments/claim/", payload)
+    .post<AssignmentRecord[]>("/assignments/claim/", payload)
     .then((response) => response.data);
 }
 
-export function assignPatient(payload: {
-  patient: number;
+export function assignPatients(payload: {
+  patients: number[];
   student: number;
   reason: string;
   priority: AssignmentPriority;
-}): Promise<AssignmentRecord> {
+}): Promise<AssignmentRecord[]> {
   return api
-    .post<AssignmentRecord>("/assignments/", payload)
+    .post<AssignmentRecord[]>("/assignments/assign/", payload)
     .then((response) => response.data);
 }
 

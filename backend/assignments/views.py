@@ -9,9 +9,15 @@ from .models import Assignment
 from .serializers import (
     AssignableStudentSerializer,
     AssignmentSerializer,
+    BulkAssignmentSerializer,
     ClaimAssignmentSerializer,
 )
-from .services import assign_patient, assignable_students, claim_available_patient
+from .services import (
+    assign_patient,
+    assign_patients,
+    assignable_students,
+    claim_available_patients,
+)
 
 # El combo busca en el servidor; con 20 opciones basta para elegir.
 STUDENT_OPTIONS_LIMIT = 20
@@ -31,6 +37,7 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         "partial_update": "assignments.edit",
         "destroy": "assignments.edit",
         "claim": "assignments.claim",
+        "assign": ("assignments.create", "assignments.assign_student"),
         "students": "assignments.assign_student",
     }
 
@@ -45,14 +52,31 @@ class AssignmentViewSet(viewsets.ModelViewSet):
     def claim(self, request):
         payload = ClaimAssignmentSerializer(data=request.data)
         payload.is_valid(raise_exception=True)
-        assignment = claim_available_patient(
+        data = payload.validated_data
+        assignments = claim_available_patients(
             user=request.user,
-            patient_id=payload.validated_data["patient"],
-            reason=payload.validated_data["reason"],
-            priority=payload.validated_data["priority"],
+            patient_ids=data["patients"],
+            reason=data["reason"],
+            priority=data["priority"],
         )
         return Response(
-            AssignmentSerializer(assignment).data,
+            AssignmentSerializer(assignments, many=True).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+    @action(detail=False, methods=["post"])
+    def assign(self, request):
+        payload = BulkAssignmentSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        data = payload.validated_data
+        assignments = assign_patients(
+            patient_ids=data["patients"],
+            student=data["student"],
+            reason=data["reason"],
+            priority=data["priority"],
+        )
+        return Response(
+            AssignmentSerializer(assignments, many=True).data,
             status=status.HTTP_201_CREATED,
         )
 

@@ -226,19 +226,26 @@ class ClaimAvailablePatientTests(APITestCase):
         )
         self.url = "/api/assignments/claim/"
 
+    def _second_patient(self):
+        return Patient.objects.create(
+            first_name="Luis",
+            last_name="Disponible",
+            dui="CLAIM-002",
+        )
+
     def test_student_claims_available_patient_and_opens_case(self):
         self.client.force_authenticate(user=self.student)
         response = self.client.post(
             self.url,
             {
-                "patient": self.patient.id,
+                "patients": [self.patient.id],
                 "reason": "Dolor en molar",
                 "priority": Assignment.Priority.ALTA,
             },
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        body = response.json()
+        [body] = response.json()
         self.assertEqual(body["student"], self.student.id)
         self.assertEqual(body["appointment_number"], 1)
         self.assertEqual(body["priority"], Assignment.Priority.ALTA)
@@ -246,15 +253,30 @@ class ClaimAvailablePatientTests(APITestCase):
         self.assertEqual(self.patient.case_status, Patient.CaseStatus.EN_PROCESO)
         self.assertTrue(self.patient.has_active_assignment())
 
+    def test_student_claims_several_patients_at_once(self):
+        second = self._second_patient()
+        self.client.force_authenticate(user=self.student)
+        response = self.client.post(
+            self.url,
+            {"patients": [self.patient.id, second.id]},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(
+            [row["patient"] for row in response.json()],
+            [self.patient.id, second.id],
+        )
+        self.assertEqual(Assignment.objects.filter(student=self.student).count(), 2)
+
     def test_claim_allows_empty_reason(self):
         self.client.force_authenticate(user=self.student)
         response = self.client.post(
             self.url,
-            {"patient": self.patient.id, "reason": "   "},
+            {"patients": [self.patient.id], "reason": "   "},
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(response.json()["reason"], "")
+        self.assertEqual(response.json()[0]["reason"], "")
 
     def test_cannot_claim_a_patient_already_taken(self):
         Assignment.objects.create(
@@ -265,22 +287,50 @@ class ClaimAvailablePatientTests(APITestCase):
         self.client.force_authenticate(user=self.student)
         response = self.client.post(
             self.url,
-            {"patient": self.patient.id, "reason": "Quiero este caso"},
+            {"patients": [self.patient.id], "reason": "Quiero este caso"},
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(Assignment.objects.filter(student=self.student).count(), 0)
 
+    def test_claim_is_all_or_nothing(self):
+        second = self._second_patient()
+        Assignment.objects.create(patient=second, student=self.other, reason="")
+        self.client.force_authenticate(user=self.student)
+        response = self.client.post(
+            self.url,
+            {"patients": [self.patient.id, second.id]},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("Luis Disponible", response.json()["patient"])
+        self.assertFalse(self.patient.has_active_assignment())
+
     def test_recepcion_cannot_claim(self):
         self.client.force_authenticate(user=self.recepcion)
         response = self.client.post(
             self.url,
-            {"patient": self.patient.id, "reason": "Desde recepción"},
+            {"patients": [self.patient.id], "reason": "Desde recepción"},
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-    def test_student_cannot_assign_through_the_reception_endpoint(self):
+    def test_recepcion_assigns_several_patients_to_a_student(self):
+        second = self._second_patient()
+        self.client.force_authenticate(user=self.recepcion)
+        response = self.client.post(
+            "/api/assignments/assign/",
+            {"patients": [self.patient.id, second.id], "student": self.student.id},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(
+            {row["student"] for row in response.json()},
+            {self.student.id},
+        )
+        self.assertEqual(Assignment.objects.filter(student=self.student).count(), 2)
+
+    def test_student_cannot_assign_to_others(self):
         self.client.force_authenticate(user=self.student)
         response = self.client.post(
             "/api/assignments/",
@@ -289,6 +339,12 @@ class ClaimAvailablePatientTests(APITestCase):
                 "student": self.other.id,
                 "reason": "Asignar a otro",
             },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        response = self.client.post(
+            "/api/assignments/assign/",
+            {"patients": [self.patient.id], "student": self.other.id},
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
