@@ -3,6 +3,7 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from accounts.models import User
 from accounts.permissions import HasRequiredAcl
 
 from .models import Assignment
@@ -29,6 +30,13 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         "destroy": "assignments.edit",
         "finalize": "assignments.change_status",
     }
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        user = self.request.user
+        if user.role == User.Role.ESTUDIANTE:
+            return queryset.filter(student=user)
+        return queryset
 
     @action(detail=True, methods=["post"])
     def finalize(self, request, pk=None):

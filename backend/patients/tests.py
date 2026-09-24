@@ -750,3 +750,78 @@ def _jpeg_upload(name="foto.jpg") -> SimpleUploadedFile:
     buffer = BytesIO()
     Image.new("RGB", (8, 8), color="#2ad4c5").save(buffer, format="JPEG")
     return SimpleUploadedFile(name, buffer.getvalue(), content_type="image/jpeg")
+
+
+class StudentPatientScopingTests(APITestCase):
+    def setUp(self):
+        sync_acl()
+        self.student = User.objects.create_user(
+            username="estudiante-scope",
+            password="pass12345",
+            role=User.Role.ESTUDIANTE,
+        )
+        other_student = User.objects.create_user(
+            username="estudiante-scope-otro",
+            password="pass12345",
+            role=User.Role.ESTUDIANTE,
+        )
+        self.own = Patient.objects.create(
+            first_name="Propio", last_name="Caso", dui="SCOPE-001"
+        )
+        Assignment.objects.create(
+            patient=self.own, student=self.student, reason="Control"
+        )
+        self.available = Patient.objects.create(
+            first_name="Libre", last_name="Caso", dui="SCOPE-002"
+        )
+        self.foreign = Patient.objects.create(
+            first_name="Ajeno", last_name="Caso", dui="SCOPE-003"
+        )
+        Assignment.objects.create(
+            patient=self.foreign, student=other_student, reason="Control"
+        )
+        self.foreign_finished = Patient.objects.create(
+            first_name="Cerrado",
+            last_name="Ajeno",
+            dui="SCOPE-004",
+            case_status=Patient.CaseStatus.FINALIZADO,
+        )
+        Assignment.objects.create(
+            patient=self.foreign_finished,
+            student=other_student,
+            reason="Control",
+            status=Assignment.AssignmentStatus.FINALIZADA,
+        )
+        self.url = "/api/patients/"
+
+    def _ids(self, response):
+        return {item["id"] for item in response.json()["results"]}
+
+    def test_student_sees_own_and_available_patients_only(self):
+        self.client.force_authenticate(user=self.student)
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(self._ids(response), {self.own.id, self.available.id})
+
+    def test_student_cannot_retrieve_patient_of_another_student(self):
+        self.client.force_authenticate(user=self.student)
+        response = self.client.get(f"{self.url}{self.foreign.id}/")
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_student_keeps_seeing_own_finished_case(self):
+        assignment = self.own.assignments.get()
+        assignment.status = Assignment.AssignmentStatus.FINALIZADA
+        assignment.save(update_fields=["status"])
+        self.client.force_authenticate(user=self.student)
+        response = self.client.get(f"{self.url}{self.own.id}/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_recepcion_is_not_scoped_by_row(self):
+        recepcion = User.objects.create_user(
+            username="recepcion-scope",
+            password="pass12345",
+            role=User.Role.RECEPCION,
+        )
+        self.client.force_authenticate(user=recepcion)
+        response = self.client.get(self.url)
+        self.assertEqual(len(self._ids(response)), 4)
