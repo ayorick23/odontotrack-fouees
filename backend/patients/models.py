@@ -2,8 +2,10 @@ from datetime import timedelta
 
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.db.models import Q
 from django.utils import timezone
 
+from accounts.models import User
 from assignments.models import Assignment
 
 PERIOD_DAYS = {
@@ -22,6 +24,22 @@ class PatientQuerySet(models.QuerySet):
 
     def unassigned(self):
         return self.exclude(assignments__status=Assignment.AssignmentStatus.ACTIVA)
+
+    def visible_to(self, user):
+        """
+        Scoping por rol. El estudiante ve los pacientes que tiene o tuvo
+        asignados, más los disponibles para elegir (pendientes y sin
+        asignación activa). El resto de roles no se filtra por fila: la
+        matriz ACL ya decide si pueden entrar al módulo.
+        """
+        if user.role != User.Role.ESTUDIANTE:
+            return self
+        own = Assignment.objects.filter(student=user).values("patient_id")
+        active = Assignment.objects.filter(
+            status=Assignment.AssignmentStatus.ACTIVA
+        ).values("patient_id")
+        available = Q(case_status=Patient.CaseStatus.PENDIENTE) & ~Q(id__in=active)
+        return self.filter(Q(id__in=own) | available)
 
     def by_case_status(self, case_status: str | None):
         if case_status in Patient.CaseStatus.values:

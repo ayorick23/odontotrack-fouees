@@ -28,6 +28,27 @@ def queryset_for_patient(queryset, patient_id: str | None):
     return queryset.filter(patient_id=pk)
 
 
+def scope_clinical_queryset(queryset, user: User):
+    """Registros clínicos de los pacientes que `user` puede ver."""
+    if user.role != User.Role.ESTUDIANTE:
+        return queryset
+    return queryset.filter(patient__in=Patient.objects.visible_to(user))
+
+
+def assert_can_write_clinical(user: User, patient: Patient) -> None:
+    """El estudiante solo escribe expediente de sus asignaciones activas."""
+    if user.role != User.Role.ESTUDIANTE:
+        return
+    has_active = patient.assignments.filter(
+        student=user,
+        status=Assignment.AssignmentStatus.ACTIVA,
+    ).exists()
+    if not has_active:
+        raise PermissionDenied(
+            "Solo puedes registrar información clínica de pacientes asignados a ti."
+        )
+
+
 def resolve_clinical_student(*, user: User, patient: Patient) -> User:
     if user.role == User.Role.ESTUDIANTE:
         return user
@@ -86,14 +107,17 @@ class OdontogramService:
         return odontogram
 
     @staticmethod
-    def assert_can_view(user: User, _patient: Patient) -> None:
+    def assert_can_view(user: User, patient: Patient) -> None:
         if not user.has_acl("odontogram.view"):
+            raise PermissionDenied("No puedes ver este odontograma.")
+        if not Patient.objects.visible_to(user).filter(pk=patient.pk).exists():
             raise PermissionDenied("No puedes ver este odontograma.")
 
     @staticmethod
-    def assert_can_update(user: User, _patient: Patient) -> None:
+    def assert_can_update(user: User, patient: Patient) -> None:
         if not user.has_acl("odontogram.update"):
             raise PermissionDenied("No puedes actualizar este odontograma.")
+        assert_can_write_clinical(user, patient)
 
     @staticmethod
     def record_revision(odontogram: Odontogram, user: User) -> OdontogramRevision | None:

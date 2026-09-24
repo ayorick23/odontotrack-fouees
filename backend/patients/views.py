@@ -33,6 +33,7 @@ class PatientViewSet(viewsets.ModelViewSet):
         return (
             Patient.objects.prefetch_related("assignments__student")
             .select_related("clinical_area", "clinical_treatment")
+            .visible_to(self.request.user)
             .in_period(params.get("period"))
             .by_case_status(params.get("case_status"))
             .by_clinical_area(params.get("clinical_area"))
