@@ -5,9 +5,11 @@ from django.db.models.functions import TruncMonth
 from django.utils import timezone
 
 from assignments.models import Assignment
+from assignments.services import assignable_students
 from patients.models import PERIOD_DAYS, Patient
 
-DEFAULT_SERIES_DAYS = PERIOD_DAYS["1a"]
+# La gráfica de carga muestra solo a los estudiantes con más casos.
+STUDENT_LOAD_LIMIT = 10
 MONTH_LABELS = (
     "",
     "Ene",
@@ -25,8 +27,11 @@ MONTH_LABELS = (
 )
 
 
-def _period_start(period: str | None):
-    days = PERIOD_DAYS.get(period or "", DEFAULT_SERIES_DAYS)
+def period_start(period: str | None) -> datetime | None:
+    """Inicio del período; None significa "todos" (sin filtro)."""
+    days = PERIOD_DAYS.get(period or "")
+    if days is None:
+        return None
     return timezone.now() - timedelta(days=days)
 
 
@@ -69,64 +74,64 @@ def _counts_by_month(queryset, field: str) -> dict[date, int]:
     return counts
 
 
-def _status_counts_by_month(queryset) -> dict[date, dict[str, int]]:
+def _pending_by_area(patients) -> list[dict]:
+    """Pendientes sin asignación activa, agrupados por área clínica."""
     rows = (
-        queryset.annotate(bucket=TruncMonth("created_at"))
-        .values("bucket", "case_status")
+        patients.available()
+        .values("clinical_area__name")
         .annotate(total=Count("id"))
+        .order_by("-total", "clinical_area__name")
     )
-    empty = {status: 0 for status in Patient.CaseStatus.values}
-    counts: dict[date, dict[str, int]] = {}
-    for row in rows:
-        bucket = row["bucket"]
-        if bucket is None:
-            continue
-        month = _month_start(bucket)
-        month_counts = counts.setdefault(month, dict(empty))
-        month_counts[row["case_status"]] = row["total"]
-    return counts
+    return [
+        {"area": row["clinical_area__name"] or "Sin área", "count": row["total"]}
+        for row in rows
+    ]
+
+
+def _student_load() -> list[dict]:
+    """Casos activos por estudiante hoy; no depende del período."""
+    students = (
+        assignable_students()
+        .filter(active_cases__gt=0)
+        .order_by("-active_cases", "last_name", "first_name", "id")
+    )
+    return [
+        {
+            "student": student.get_full_name() or student.username,
+            "active_cases": student.active_cases,
+        }
+        for student in students[:STUDENT_LOAD_LIMIT]
+    ]
 
 
 def build_dashboard_series(period: str | None) -> dict:
-    start = _period_start(period)
-    start_date = _as_local_date(start)
+    start = period_start(period)
     today = timezone.localdate()
 
-    patients = Patient.objects.filter(created_at__gte=start)
-    assignments = Assignment.objects.filter(created_at__gte=start)
+    patients = Patient.objects.all()
+    assignments = Assignment.objects.all()
+    if start is not None:
+        patients = patients.filter(created_at__gte=start)
+        assignments = assignments.filter(created_at__gte=start)
 
+    patient_counts = _counts_by_month(patients, "created_at")
     assignment_counts = _counts_by_month(assignments, "created_at")
-    status_by_month = _status_counts_by_month(patients)
-    empty_status = {status: 0 for status in Patient.CaseStatus.values}
+    if start is not None:
+        first_month = _month_start(start)
+    else:
+        first_month = min([*patient_counts, *assignment_counts], default=today)
 
-    months = []
-    for month in _iter_months(start_date, today):
-        status_counts = status_by_month.get(month, empty_status)
-        pendiente = status_counts[Patient.CaseStatus.PENDIENTE]
-        en_proceso = status_counts[Patient.CaseStatus.EN_PROCESO]
-        finalizado = status_counts[Patient.CaseStatus.FINALIZADO]
-        months.append(
-            {
-                "month": month.isoformat()[:7],
-                "label": f"{MONTH_LABELS[month.month]} {str(month.year)[2:]}",
-                "patients": pendiente + en_proceso + finalizado,
-                "pendiente": pendiente,
-                "en_proceso": en_proceso,
-                "finalizado": finalizado,
-                "assignments": assignment_counts.get(month, 0),
-            }
-        )
-
-    status_rows = {
-        row["case_status"]: row["total"]
-        for row in patients.values("case_status").annotate(total=Count("id"))
-    }
-    by_status = [
+    months = [
         {
-            "status": status,
-            "label": label,
-            "count": status_rows.get(status, 0),
+            "month": month.isoformat()[:7],
+            "label": f"{MONTH_LABELS[month.month]} {str(month.year)[2:]}",
+            "patients": patient_counts.get(month, 0),
+            "assignments": assignment_counts.get(month, 0),
         }
-        for status, label in Patient.CaseStatus.choices
+        for month in _iter_months(first_month, today)
     ]
-    return {"months": months, "by_status": by_status}
+    return {
+        "months": months,
+        "pending_by_area": _pending_by_area(patients),
+        "student_load": _student_load(),
+    }

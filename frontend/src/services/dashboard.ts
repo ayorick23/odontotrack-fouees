@@ -7,6 +7,8 @@ export type DashboardSummary = {
   total_assignments: number;
   total_clinical_records: number;
   patients_by_status: Partial<Record<CaseStatus, number>>;
+  /** Diagnósticos sin validar hoy; no depende del período. */
+  pending_validations: number;
 };
 
 export type SummaryPeriod = "1m" | "6m" | "1a";
@@ -15,21 +17,24 @@ export type DashboardMonthPoint = {
   month: string;
   label: string;
   patients: number;
-  pendiente: number;
-  en_proceso: number;
-  finalizado: number;
   assignments: number;
 };
 
-export type DashboardStatusSlice = {
-  status: CaseStatus;
-  label: string;
+export type DashboardAreaCount = {
+  area: string;
   count: number;
+};
+
+export type DashboardStudentLoad = {
+  student: string;
+  active_cases: number;
 };
 
 export type DashboardSeries = {
   months: DashboardMonthPoint[];
-  by_status: DashboardStatusSlice[];
+  pending_by_area: DashboardAreaCount[];
+  /** Casos activos hoy; no depende del período. */
+  student_load: DashboardStudentLoad[];
 };
 
 export function getDashboardSummary(

@@ -54,6 +54,10 @@ class DashboardSummaryView(APIView):
             "patients_by_status": dict(
                 patients.values_list("case_status").annotate(count=Count("id"))
             ),
+            # Pendiente de trabajo del docente: no depende del período.
+            "pending_validations": Diagnostico.objects.filter(
+                is_validated=False
+            ).count(),
         }
         return Response(data)
 
@@ -67,7 +71,11 @@ class DashboardSeriesView(APIView):
         parameters=[
             OpenApiParameter(
                 name="period",
-                description="Filtra series del último mes (1m), 6 meses (6m) o año (1a).",
+                description=(
+                    "Filtra series del último mes (1m), 6 meses (6m) o año (1a). "
+                    "Sin período cubre toda la historia. La carga por estudiante "
+                    "es siempre la de hoy."
+                ),
                 required=False,
                 type=str,
                 enum=["1m", "6m", "1a"],

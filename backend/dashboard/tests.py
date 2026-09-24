@@ -7,6 +7,8 @@ from rest_framework.test import APITestCase
 from accounts.models import User
 from accounts.services import sync_acl
 from assignments.models import Assignment
+from catalogs.models import ClinicalArea
+from clinical_records.models import Diagnostico
 from patients.models import Patient
 
 
@@ -69,6 +71,28 @@ class DashboardSummaryTests(APITestCase):
         self.assertEqual(body["total_patients"], 1)
         self.assertEqual(recent.dui, "REC-001")
 
+    def test_summary_counts_diagnoses_pending_validation(self):
+        student = User.objects.create_user(
+            username="estudiante-diag",
+            password="pass12345",
+            role=User.Role.ESTUDIANTE,
+        )
+        patient = Patient.objects.create(
+            first_name="Rosa",
+            last_name="Diagnostico",
+            dui="DIAG-001",
+        )
+        Diagnostico.objects.create(patient=patient, student=student, content="Caries")
+        Diagnostico.objects.create(
+            patient=patient,
+            student=student,
+            content="Gingivitis",
+            is_validated=True,
+        )
+
+        response = self.client.get("/api/dashboard/summary/", {"period": "1m"})
+        self.assertEqual(response.json()["pending_validations"], 1)
+
 
 class DashboardSeriesTests(APITestCase):
     def setUp(self):
@@ -85,54 +109,85 @@ class DashboardSeriesTests(APITestCase):
         )
         self.client.force_authenticate(user=self.admin)
 
+    def _patient(self, dui, **fields):
+        return Patient.objects.create(
+            first_name="Paciente",
+            last_name=dui,
+            dui=dui,
+            **fields,
+        )
+
     def test_series_groups_patients_and_assignments_by_month(self):
-        recent = Patient.objects.create(
-            first_name="Reciente",
-            last_name="Hoy",
-            dui="SER-REC-001",
-            case_status=Patient.CaseStatus.PENDIENTE,
-        )
-        old = Patient.objects.create(
-            first_name="Antigua",
-            last_name="Año",
-            dui="SER-OLD-001",
-            case_status=Patient.CaseStatus.FINALIZADO,
-        )
+        recent = self._patient("SER-REC-001")
+        old = self._patient("SER-OLD-001")
         Patient.objects.filter(pk=old.pk).update(
             created_at=timezone.now() - timedelta(days=40),
         )
-        Assignment.objects.create(
-            patient=recent,
-            student=self.student,
-            reason="Control de caries",
-        )
+        Assignment.objects.create(patient=recent, student=self.student, reason="")
 
         response = self.client.get("/api/dashboard/series/", {"period": "1m"})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        body = response.json()
-
-        months = {row["month"]: row for row in body["months"]}
+        months = {row["month"]: row for row in response.json()["months"]}
         this_month = timezone.localdate().replace(day=1).isoformat()[:7]
-        self.assertIn(this_month, months)
         self.assertEqual(months[this_month]["patients"], 1)
-        self.assertEqual(months[this_month][Patient.CaseStatus.PENDIENTE], 0)
-        self.assertEqual(months[this_month][Patient.CaseStatus.EN_PROCESO], 1)
-        self.assertEqual(months[this_month][Patient.CaseStatus.FINALIZADO], 0)
         self.assertEqual(months[this_month]["assignments"], 1)
-        self.assertTrue(all("label" in row for row in body["months"]))
+        self.assertTrue(all("label" in row for row in months.values()))
 
-        by_status = {row["status"]: row["count"] for row in body["by_status"]}
-        self.assertEqual(by_status[Patient.CaseStatus.PENDIENTE], 0)
-        self.assertEqual(by_status[Patient.CaseStatus.EN_PROCESO], 1)
-        self.assertEqual(by_status[Patient.CaseStatus.FINALIZADO], 0)
+    def test_series_without_period_covers_all_history(self):
+        old = self._patient("SER-HIST-001")
+        Patient.objects.filter(pk=old.pk).update(
+            created_at=timezone.now() - timedelta(days=800),
+        )
 
-    def test_series_without_period_covers_last_year(self):
         response = self.client.get("/api/dashboard/series/")
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
         months = response.json()["months"]
-        self.assertGreaterEqual(len(months), 12)
-        self.assertLessEqual(len(months), 13)
+        self.assertGreaterEqual(len(months), 26)
+        self.assertEqual(sum(row["patients"] for row in months), 1)
         self.assertEqual(
             months[-1]["month"],
             timezone.localdate().replace(day=1).isoformat()[:7],
+        )
+
+    def test_series_without_data_has_only_current_month(self):
+        response = self.client.get("/api/dashboard/series/")
+        self.assertEqual(len(response.json()["months"]), 1)
+
+    def test_pending_by_area_counts_only_available_patients(self):
+        endo = ClinicalArea.objects.create(slug="endo-test", name="Endodoncia test")
+        self._patient("AREA-001", clinical_area=endo)
+        self._patient("AREA-002", clinical_area=endo)
+        self._patient("AREA-003")
+        taken = self._patient("AREA-004", clinical_area=endo)
+        Assignment.objects.create(patient=taken, student=self.student, reason="")
+
+        response = self.client.get("/api/dashboard/series/")
+        self.assertEqual(
+            response.json()["pending_by_area"],
+            [
+                {"area": "Endodoncia test", "count": 2},
+                {"area": "Sin área", "count": 1},
+            ],
+        )
+
+    def test_student_load_lists_students_with_active_cases(self):
+        busy = User.objects.create_user(
+            username="estudiante-ocupado",
+            password="pass12345",
+            role=User.Role.ESTUDIANTE,
+            first_name="Maria",
+            last_name="Lopez",
+        )
+        for dui in ("CARGA-001", "CARGA-002"):
+            Assignment.objects.create(patient=self._patient(dui), student=busy, reason="")
+        Assignment.objects.create(
+            patient=self._patient("CARGA-003"), student=self.student, reason=""
+        )
+
+        response = self.client.get("/api/dashboard/series/", {"period": "1m"})
+        self.assertEqual(
+            response.json()["student_load"],
+            [
+                {"student": "Maria Lopez", "active_cases": 2},
+                {"student": "estudiante-series", "active_cases": 1},
+            ],
         )
