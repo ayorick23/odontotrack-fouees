@@ -14,7 +14,7 @@ class AssignmentSerializer(serializers.ModelSerializer):
 
 class ClaimAssignmentSerializer(serializers.Serializer):
     patient = serializers.IntegerField(min_value=1)
-    reason = serializers.CharField()
+    reason = serializers.CharField(required=False, allow_blank=True, default="")
     priority = serializers.ChoiceField(
         choices=Assignment.Priority.choices,
         default=Assignment.Priority.MEDIA,

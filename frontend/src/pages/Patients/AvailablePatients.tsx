@@ -105,8 +105,7 @@ export function AvailablePatients() {
   const pageCount =
     state.status === "ready" ? Math.max(Math.ceil(state.count / PAGE_SIZE), 1) : 1;
 
-  const canSubmit =
-    !submitting && reason.trim() !== "" && (!assignsOthers || student !== null);
+  const canSubmit = !submitting && (!assignsOthers || student !== null);
 
   function openAssignment(patient: PatientListItem) {
     setSelected(patient);
@@ -302,13 +301,12 @@ export function AvailablePatients() {
             <StudentCombobox value={student} onChange={setStudent} />
           ) : null}
           <label className="block text-sm text-slate-600 dark:text-slate-300">
-            Motivo de ingreso
+            Motivo <span className="text-xs text-slate-400">(opcional)</span>
             <textarea
               value={reason}
               onChange={(event) => setReason(event.target.value)}
               rows={4}
-              required
-              placeholder="Ej. dolor en molar inferior"
+              placeholder="Ej. viene por dolor en una muela"
               className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none focus:border-teal-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
             />
           </label>

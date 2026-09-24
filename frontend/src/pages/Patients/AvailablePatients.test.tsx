@@ -92,9 +92,8 @@ describe("AvailablePatients", () => {
     expect(await screen.findByText("Ana Disponible")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Elegir" }));
     expect(screen.queryByRole("combobox", { name: "Estudiante" })).toBeNull();
-    expect(screen.getByRole("button", { name: "Confirmar" })).toBeDisabled();
     await user.type(
-      screen.getByRole("textbox", { name: "Motivo de ingreso" }),
+      screen.getByRole("textbox", { name: /motivo/i }),
       "Dolor en molar",
     );
     await user.click(screen.getByRole("button", { name: "Confirmar" }));
@@ -122,7 +121,7 @@ describe("AvailablePatients", () => {
     expect(await screen.findByText("Ana Disponible")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Asignar" }));
     await user.type(
-      screen.getByRole("textbox", { name: "Motivo de ingreso" }),
+      screen.getByRole("textbox", { name: /motivo/i }),
       "Dolor en molar",
     );
     expect(screen.getByRole("button", { name: "Confirmar" })).toBeDisabled();

@@ -100,13 +100,13 @@ class AssignmentApiTests(APITestCase):
         self.url = "/api/assignments/"
         self.client.force_authenticate(user=self.recepcion)
 
-    def test_create_requires_reason(self):
+    def test_create_allows_empty_reason(self):
         response = self.client.post(
             self.url,
             {"patient": self.patient.id, "student": self.student.id},
         )
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("reason", response.json())
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.json()["reason"], "")
 
     def test_create_rejects_invalid_priority(self):
         response = self.client.post(
@@ -246,16 +246,15 @@ class ClaimAvailablePatientTests(APITestCase):
         self.assertEqual(self.patient.case_status, Patient.CaseStatus.EN_PROCESO)
         self.assertTrue(self.patient.has_active_assignment())
 
-    def test_claim_requires_reason(self):
+    def test_claim_allows_empty_reason(self):
         self.client.force_authenticate(user=self.student)
         response = self.client.post(
             self.url,
             {"patient": self.patient.id, "reason": "   "},
             format="json",
         )
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("reason", response.json())
-        self.assertFalse(self.patient.has_active_assignment())
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.json()["reason"], "")
 
     def test_cannot_claim_a_patient_already_taken(self):
         Assignment.objects.create(

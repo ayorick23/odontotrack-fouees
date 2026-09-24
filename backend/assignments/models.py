@@ -41,7 +41,9 @@ class Assignment(models.Model):
         editable=False,
         help_text="Número de cita del paciente, correlativo por paciente.",
     )
-    reason = models.TextField(help_text="Motivo de la cita/ingreso.")
+    # Nota opcional al asignar. El motivo de consulta lo registra el
+    # estudiante en el diagnóstico cuando atiende al paciente.
+    reason = models.TextField(blank=True, help_text="Motivo o nota al asignar.")
     priority = models.CharField(
         max_length=10,
         choices=Priority.choices,
