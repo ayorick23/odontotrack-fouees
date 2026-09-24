@@ -19,12 +19,40 @@ from .serializers import (
 from .services import (
     DiagnosisService,
     OdontogramService,
+    assert_can_write_clinical,
     queryset_for_patient,
     resolve_clinical_student,
+    scope_clinical_queryset,
 )
 
 
-class DiagnosisViewSet(ModelViewSet):
+class ClinicalScopeMixin:
+    """
+    Scoping por rol de los ViewSets clínicos: filtra por ?patient= y por
+    los pacientes visibles para el usuario, y bloquea la escritura del
+    estudiante sobre pacientes que no tiene asignados (ODO-33).
+    """
+
+    def get_queryset(self):
+        queryset = queryset_for_patient(
+            super().get_queryset(),
+            self.request.query_params.get("patient"),
+        )
+        return scope_clinical_queryset(queryset, self.request.user)
+
+    def perform_update(self, serializer):
+        assert_can_write_clinical(self.request.user, serializer.instance.patient)
+        new_patient = serializer.validated_data.get("patient")
+        if new_patient is not None:
+            assert_can_write_clinical(self.request.user, new_patient)
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        assert_can_write_clinical(self.request.user, instance.patient)
+        instance.delete()
+
+
+class DiagnosisViewSet(ClinicalScopeMixin, ModelViewSet):
     """
     CRUD de diagnósticos. La validación por parte del docente (campos
     validated_by / is_validated / validated_at) se hace solo con
@@ -45,14 +73,9 @@ class DiagnosisViewSet(ModelViewSet):
         "validate_diagnosis": "diagnoses.validate",
     }
 
-    def get_queryset(self):
-        return queryset_for_patient(
-            super().get_queryset(),
-            self.request.query_params.get("patient"),
-        )
-
     def perform_create(self, serializer):
         patient = serializer.validated_data["patient"]
+        assert_can_write_clinical(self.request.user, patient)
         serializer.save(
             student=resolve_clinical_student(
                 user=self.request.user,
@@ -66,7 +89,7 @@ class DiagnosisViewSet(ModelViewSet):
         return Response(self.get_serializer(diagnosis).data)
 
 
-class TreatmentViewSet(ModelViewSet):
+class TreatmentViewSet(ClinicalScopeMixin, ModelViewSet):
     """CRUD de tratamientos del caso."""
 
     queryset = Tratamiento.objects.select_related(
@@ -84,14 +107,14 @@ class TreatmentViewSet(ModelViewSet):
         "destroy": "treatments.edit",
     }
 
-    def get_queryset(self):
-        return queryset_for_patient(
-            super().get_queryset(),
-            self.request.query_params.get("patient"),
+    def perform_create(self, serializer):
+        assert_can_write_clinical(
+            self.request.user, serializer.validated_data["patient"]
         )
+        serializer.save()
 
 
-class ClinicalEvolutionViewSet(ModelViewSet):
+class ClinicalEvolutionViewSet(ClinicalScopeMixin, ModelViewSet):
     """CRUD de notas de evolución clínica del caso."""
 
     queryset = EvolucionClinica.objects.select_related("student")
@@ -106,14 +129,9 @@ class ClinicalEvolutionViewSet(ModelViewSet):
         "destroy": "evolution.edit",
     }
 
-    def get_queryset(self):
-        return queryset_for_patient(
-            super().get_queryset(),
-            self.request.query_params.get("patient"),
-        )
-
     def perform_create(self, serializer):
         patient = serializer.validated_data["patient"]
+        assert_can_write_clinical(self.request.user, patient)
         serializer.save(
             student=resolve_clinical_student(
                 user=self.request.user,
