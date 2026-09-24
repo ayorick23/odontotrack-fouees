@@ -15,7 +15,7 @@ from .serializers import (
     OdontogramSerializer,
     TratamientoSerializer,
 )
-from .services import OdontogramService
+from .services import OdontogramService, queryset_for_patient, resolve_clinical_student
 
 
 class DiagnosisViewSet(ModelViewSet):
@@ -26,7 +26,7 @@ class DiagnosisViewSet(ModelViewSet):
     directa desde este serializer.
     """
 
-    queryset = Diagnostico.objects.all()
+    queryset = Diagnostico.objects.select_related("student", "validated_by")
     serializer_class = DiagnosticoSerializer
     permission_classes = [IsAuthenticated, HasRequiredAcl]
     acl_permissions = {
@@ -38,11 +38,29 @@ class DiagnosisViewSet(ModelViewSet):
         "destroy": "diagnoses.edit",
     }
 
+    def get_queryset(self):
+        return queryset_for_patient(
+            super().get_queryset(),
+            self.request.query_params.get("patient"),
+        )
+
+    def perform_create(self, serializer):
+        patient = serializer.validated_data["patient"]
+        serializer.save(
+            student=resolve_clinical_student(
+                user=self.request.user,
+                patient=patient,
+            )
+        )
+
 
 class TreatmentViewSet(ModelViewSet):
     """CRUD de tratamientos del caso."""
 
-    queryset = Tratamiento.objects.all()
+    queryset = Tratamiento.objects.select_related(
+        "clinical_area",
+        "clinical_treatment",
+    )
     serializer_class = TratamientoSerializer
     permission_classes = [IsAuthenticated, HasRequiredAcl]
     acl_permissions = {
@@ -54,11 +72,17 @@ class TreatmentViewSet(ModelViewSet):
         "destroy": "treatments.edit",
     }
 
+    def get_queryset(self):
+        return queryset_for_patient(
+            super().get_queryset(),
+            self.request.query_params.get("patient"),
+        )
+
 
 class ClinicalEvolutionViewSet(ModelViewSet):
     """CRUD de notas de evolución clínica del caso."""
 
-    queryset = EvolucionClinica.objects.all()
+    queryset = EvolucionClinica.objects.select_related("student")
     serializer_class = EvolucionClinicaSerializer
     permission_classes = [IsAuthenticated, HasRequiredAcl]
     acl_permissions = {
@@ -69,6 +93,21 @@ class ClinicalEvolutionViewSet(ModelViewSet):
         "partial_update": "evolution.edit",
         "destroy": "evolution.edit",
     }
+
+    def get_queryset(self):
+        return queryset_for_patient(
+            super().get_queryset(),
+            self.request.query_params.get("patient"),
+        )
+
+    def perform_create(self, serializer):
+        patient = serializer.validated_data["patient"]
+        serializer.save(
+            student=resolve_clinical_student(
+                user=self.request.user,
+                patient=patient,
+            )
+        )
 
 
 class PatientOdontogramView(APIView):

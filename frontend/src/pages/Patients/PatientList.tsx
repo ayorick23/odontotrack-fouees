@@ -368,10 +368,6 @@ export function PatientList() {
         ),
       },
       {
-        header: "Documento",
-        render: (patient: PatientListItem) => patient.dui,
-      },
-      {
         header: "Área",
         render: (patient: PatientListItem) =>
           patient.clinical_area ? (
@@ -555,7 +551,7 @@ export function PatientList() {
               type="search"
               value={searchInput}
               onChange={(event) => setSearchInput(event.target.value)}
-              placeholder="Buscar por nombre o DUI"
+              placeholder="Buscar por nombre"
               className="w-52 bg-transparent outline-none placeholder:text-slate-400"
             />
           </label>

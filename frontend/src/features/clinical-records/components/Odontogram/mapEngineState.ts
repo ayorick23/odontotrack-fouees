@@ -213,6 +213,8 @@ function planMarksToChart(teeth: ToothFinding[]): Record<string, unknown> {
     const planOnly: ToothFinding = {
       fdi: finding.fdi,
       marks: finding.marks.filter((mark) => mark.layer === "plan"),
+      oralMarks: finding.oralMarks,
+      practice: finding.practice,
     };
     if (planOnly.marks.length === 0) {
       continue;
@@ -279,15 +281,15 @@ function mergeToothMarks(
     if (kept && kept !== "plan") {
       return { ...mark, layer: kept };
     }
-    if (previous && activeLayer !== "plan") {
+    if (previous) {
       return { ...mark, layer: activeLayer };
     }
     return mark;
   });
-  const keptPlan =
-    planMarks.length > 0
-      ? planMarks
-      : (previous?.marks.filter((mark) => mark.layer === "plan") ?? []);
+  const inferredKeys = new Set(inferred.map((mark) => markKey(mark)));
+  const extraPlan = planMarks.filter((mark) => !inferredKeys.has(markKey(mark)));
+  const previousPlan = previous?.marks.filter((mark) => mark.layer === "plan") ?? [];
+  const keptPlan = extraPlan.length > 0 ? extraPlan : previousPlan;
   const merged = [...statusMarks, ...keptPlan];
   const seen = new Set<string>();
   return merged.filter((mark) => {

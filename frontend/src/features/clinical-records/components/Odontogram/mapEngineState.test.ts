@@ -120,6 +120,22 @@ describe("chartToDomain", () => {
       { layer: "plan", status: "obturado", surfaces: ["mesial", "oclusal"] },
     ]);
   });
+
+  it("asigna a plan un puente nuevo marcado en esa capa", () => {
+    const value = chartToDomain(
+      {
+        version: 2.2,
+        teeth: {
+          "13": { toothSelection: "tooth-base", restorationType: "bridge" },
+        },
+      },
+      { previous: emptyOdontogram(), activeLayer: "plan" },
+    );
+
+    expect(value.teeth.find((tooth) => tooth.fdi === 13)?.marks).toEqual([
+      { layer: "plan", status: "puente", surfaces: [] },
+    ]);
+  });
 });
 
 describe("domainToChart", () => {

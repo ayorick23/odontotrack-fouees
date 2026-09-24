@@ -97,7 +97,7 @@ class PatientDirectoryTests(APITestCase):
         )
         self.client.force_authenticate(user=self.admin)
 
-    def test_search_matches_last_name_and_document(self):
+    def test_search_matches_last_name_not_dui(self):
         Patient.objects.create(
             first_name="María",
             last_name="Gómez",
@@ -118,10 +118,7 @@ class PatientDirectoryTests(APITestCase):
 
         by_document = self.client.get("/api/patients/", {"search": "99999999-9"})
         self.assertEqual(by_document.status_code, status.HTTP_200_OK)
-        self.assertEqual(
-            [row["dui"] for row in by_document.json()["results"]],
-            ["99999999-9"],
-        )
+        self.assertEqual(by_document.json()["results"], [])
 
     def test_filter_by_clinical_area(self):
         Patient.objects.create(

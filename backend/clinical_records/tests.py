@@ -4,6 +4,7 @@ from rest_framework.test import APITestCase
 
 from accounts.models import AclPermission, Role, User
 from accounts.services import sync_acl
+from assignments.models import Assignment
 from catalogs.models import ClinicalArea, ClinicalTreatment
 from clinical_records.catalog import (
     FDI_TOOTH_NUMBERS,
@@ -387,6 +388,30 @@ class DiagnosisApiTests(APITestCase):
 
         listing = self.client.get(self.url)
         self.assertEqual(listing.json()["count"], 1)
+        self.assertEqual(listing.json()["results"][0]["student_name"], self.student.username)
+
+    def test_list_filters_by_patient(self):
+        other = Patient.objects.create(
+            first_name="Otra",
+            last_name="Ficha",
+            dui="DX-002",
+        )
+        Diagnostico.objects.create(
+            patient=self.patient,
+            student=self.student,
+            content="Caries en 16.",
+        )
+        Diagnostico.objects.create(
+            patient=other,
+            student=self.student,
+            content="Fractura en 21.",
+        )
+        self.client.force_authenticate(user=self.student)
+        response = self.client.get(self.url, {"patient": self.patient.id})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        body = response.json()
+        self.assertEqual(body["count"], 1)
+        self.assertEqual(body["results"][0]["content"], "Caries en 16.")
 
     def test_is_validated_is_read_only(self):
         self.client.force_authenticate(user=self.student)
@@ -495,6 +520,47 @@ class ClinicalEvolutionApiTests(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(EvolucionClinica.objects.count(), 1)
+
+    def test_admin_uses_assigned_student_when_creating_evolution(self):
+        admin = User.objects.create_user(
+            username="admin-evo",
+            password="pass12345",
+            role=User.Role.ADMIN,
+        )
+        Assignment.objects.create(
+            patient=self.patient,
+            student=self.student,
+            reason="Control",
+        )
+        self.client.force_authenticate(user=admin)
+        response = self.client.post(
+            self.url,
+            {
+                "patient": self.patient.id,
+                "date": "2026-09-22",
+                "note": "Nota creada por administración.",
+            },
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.json()["student"], self.student.id)
+
+    def test_admin_cannot_create_evolution_without_assigned_student(self):
+        admin = User.objects.create_user(
+            username="admin-evo-sin",
+            password="pass12345",
+            role=User.Role.ADMIN,
+        )
+        self.client.force_authenticate(user=admin)
+        response = self.client.post(
+            self.url,
+            {
+                "patient": self.patient.id,
+                "date": "2026-09-22",
+                "note": "No hay estudiante asignado.",
+            },
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("student", response.json())
 
     def test_recepcion_has_no_clinical_write_access(self):
         self.client.force_authenticate(user=self.recepcion)

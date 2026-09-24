@@ -78,10 +78,11 @@ export function subscribeEngine(onChange: () => void): () => void {
 export function readEngineChart(): unknown {
   const status = getStatusChart();
   const chart = isRecord(status) ? status : { version: 2.2, teeth: {} };
-  if (readPlanChanges().length === 0) {
-    return chart;
+  const plan = getPlanChart();
+  if (isRecord(plan)) {
+    return { ...chart, plan };
   }
-  return { ...chart, plan: getPlanChart() };
+  return chart;
 }
 
 export function writeEngineChart(payload: unknown): void {
