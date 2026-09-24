@@ -293,3 +293,74 @@ class ClaimAvailablePatientTests(APITestCase):
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class AssignableStudentsTests(APITestCase):
+    def setUp(self):
+        sync_acl()
+        self.recepcion = User.objects.create_user(
+            username="recepcion-combo",
+            password="pass12345",
+            role=User.Role.RECEPCION,
+        )
+        self.maria = User.objects.create_user(
+            username="mlopez",
+            password="pass12345",
+            role=User.Role.ESTUDIANTE,
+            first_name="Maria",
+            last_name="Lopez",
+        )
+        self.jose = User.objects.create_user(
+            username="jramirez",
+            password="pass12345",
+            role=User.Role.ESTUDIANTE,
+            first_name="Jose",
+            last_name="Ramirez",
+        )
+        User.objects.create_user(
+            username="inactivo",
+            password="pass12345",
+            role=User.Role.ESTUDIANTE,
+            first_name="Maria",
+            last_name="Inactiva",
+            is_active=False,
+        )
+        User.objects.create_user(
+            username="docente-combo",
+            password="pass12345",
+            role=User.Role.DOCENTE,
+            first_name="Maria",
+            last_name="Docente",
+        )
+        patient = Patient.objects.create(
+            first_name="Ana",
+            last_name="Carga",
+            dui="COMBO-001",
+        )
+        Assignment.objects.create(patient=patient, student=self.maria, reason="Cita")
+        self.url = "/api/assignments/students/"
+
+    def test_lists_active_students_with_their_load(self):
+        self.client.force_authenticate(user=self.recepcion)
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            response.json(),
+            [
+                {"id": self.maria.id, "name": "Maria Lopez", "active_cases": 1},
+                {"id": self.jose.id, "name": "Jose Ramirez", "active_cases": 0},
+            ],
+        )
+
+    def test_search_matches_every_term(self):
+        self.client.force_authenticate(user=self.recepcion)
+        response = self.client.get(self.url, {"search": "mar lop"})
+        self.assertEqual(
+            [row["id"] for row in response.json()],
+            [self.maria.id],
+        )
+
+    def test_student_cannot_list_assignable_students(self):
+        self.client.force_authenticate(user=self.jose)
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)

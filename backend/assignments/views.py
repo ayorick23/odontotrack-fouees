@@ -6,8 +6,15 @@ from rest_framework.response import Response
 from accounts.permissions import HasRequiredAcl
 
 from .models import Assignment
-from .serializers import AssignmentSerializer, ClaimAssignmentSerializer
-from .services import assign_patient, claim_available_patient
+from .serializers import (
+    AssignableStudentSerializer,
+    AssignmentSerializer,
+    ClaimAssignmentSerializer,
+)
+from .services import assign_patient, assignable_students, claim_available_patient
+
+# El combo busca en el servidor; con 20 opciones basta para elegir.
+STUDENT_OPTIONS_LIMIT = 20
 
 
 class AssignmentViewSet(viewsets.ModelViewSet):
@@ -24,6 +31,7 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         "partial_update": "assignments.edit",
         "destroy": "assignments.edit",
         "claim": "assignments.claim",
+        "students": "assignments.assign_student",
     }
 
     def perform_create(self, serializer):
@@ -46,4 +54,14 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         return Response(
             AssignmentSerializer(assignment).data,
             status=status.HTTP_201_CREATED,
+        )
+
+    @action(detail=False, methods=["get"])
+    def students(self, request):
+        students = assignable_students(request.query_params.get("search", ""))
+        return Response(
+            AssignableStudentSerializer(
+                students[:STUDENT_OPTIONS_LIMIT],
+                many=True,
+            ).data
         )

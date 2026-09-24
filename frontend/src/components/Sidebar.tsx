@@ -14,13 +14,13 @@ import { useState, type ReactNode } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 
 import logoUees from "../assets/logo-uees.png";
-import { can } from "../acl/can";
 import {
   displayName,
   ROLE_LABELS,
   type AuthUser,
 } from "../context/AuthContext";
 import {
+  canSeeLeaf,
   isNavVisible,
   NAV_ENTRIES,
   type NavEntry,
@@ -92,7 +92,7 @@ function PatientsGroup({
   user: AuthUser;
 }) {
   const location = useLocation();
-  const children = entry.children.filter((child) => can(user, child.permission));
+  const children = entry.children.filter((child) => canSeeLeaf(user, child));
   const childActive = children.some(
     (child) =>
       location.pathname === child.to ||

@@ -2,6 +2,7 @@ import { Search, UserCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
+import { can } from "../../acl/can";
 import { Modal } from "../../components/Modal";
 import { Table } from "../../components/Table";
 import {
@@ -11,11 +12,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../../components/ui/select";
+import { useAuth } from "../../hooks/useAuth";
 import { primaryActionClass, secondaryActionClass } from "../../lib/actions";
 import {
+  assignPatient,
   claimAvailablePatient,
-  getClaimError,
+  getAssignmentError,
   PRIORITY_LABELS,
+  type AssignableStudent,
   type AssignmentPriority,
 } from "../../services/assignments";
 import {
@@ -29,6 +33,7 @@ import {
   patientInitials,
   type PatientListItem,
 } from "../../services/patients";
+import { StudentCombobox } from "./StudentCombobox";
 
 const PAGE_SIZE = 20;
 
@@ -38,6 +43,9 @@ type LoadState =
   | { status: "ready"; patients: PatientListItem[]; count: number };
 
 export function AvailablePatients() {
+  const { user } = useAuth();
+  // Quien asigna elige al estudiante; si no, el estudiante se elige a sí mismo.
+  const assignsOthers = can(user, "assignments.assign_student");
   const [page, setPage] = useState(1);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
@@ -45,6 +53,7 @@ export function AvailablePatients() {
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const [areas, setAreas] = useState<ClinicalAreaRecord[]>([]);
   const [selected, setSelected] = useState<PatientListItem | null>(null);
+  const [student, setStudent] = useState<AssignableStudent | null>(null);
   const [reason, setReason] = useState("");
   const [priority, setPriority] = useState<AssignmentPriority>("media");
   const [submitting, setSubmitting] = useState(false);
@@ -96,39 +105,58 @@ export function AvailablePatients() {
   const pageCount =
     state.status === "ready" ? Math.max(Math.ceil(state.count / PAGE_SIZE), 1) : 1;
 
-  function openClaim(patient: PatientListItem) {
+  const canSubmit =
+    !submitting && reason.trim() !== "" && (!assignsOthers || student !== null);
+
+  function openAssignment(patient: PatientListItem) {
     setSelected(patient);
+    setStudent(null);
     setReason("");
     setPriority("media");
     setFormError(null);
   }
 
-  function closeClaim() {
+  function closeAssignment() {
     if (submitting) {
       return;
     }
     setSelected(null);
   }
 
-  async function submitClaim() {
+  async function submitAssignment() {
     if (selected === null) {
       return;
     }
     setSubmitting(true);
     setFormError(null);
     try {
-      const assignment = await claimAvailablePatient({
-        patient: selected.id,
-        reason,
-        priority,
-      });
-      toast.success(
-        `${patientFullName(selected)} quedó en tu carga. Cita ${assignment.appointment_number}.`,
-      );
+      if (assignsOthers) {
+        if (student === null) {
+          return;
+        }
+        const assignment = await assignPatient({
+          patient: selected.id,
+          student: student.id,
+          reason,
+          priority,
+        });
+        toast.success(
+          `${patientFullName(selected)} quedó asignado a ${student.name}. Cita ${assignment.appointment_number}.`,
+        );
+      } else {
+        const assignment = await claimAvailablePatient({
+          patient: selected.id,
+          reason,
+          priority,
+        });
+        toast.success(
+          `${patientFullName(selected)} quedó en tu carga. Cita ${assignment.appointment_number}.`,
+        );
+      }
       setSelected(null);
       setReloadToken((token) => token + 1);
     } catch (error) {
-      setFormError(getClaimError(error));
+      setFormError(getAssignmentError(error));
     } finally {
       setSubmitting(false);
     }
@@ -141,7 +169,9 @@ export function AvailablePatients() {
           Pacientes disponibles
         </h2>
         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-          Pendientes de asignación. Al elegir uno se abre la cita y el caso pasa a en proceso.
+          {assignsOthers
+            ? "Pendientes de asignación. Al asignar uno a un estudiante se abre la cita y el caso pasa a en proceso."
+            : "Pendientes de asignación. Al elegir uno se abre la cita y el caso pasa a en proceso."}
         </p>
       </div>
 
@@ -216,10 +246,10 @@ export function AvailablePatients() {
                   <button
                     type="button"
                     className={primaryActionClass}
-                    onClick={() => openClaim(patient)}
+                    onClick={() => openAssignment(patient)}
                   >
                     <UserCheck className="size-4" />
-                    Elegir
+                    {assignsOthers ? "Asignar" : "Elegir"}
                   </button>
                 ),
               },
@@ -254,16 +284,23 @@ export function AvailablePatients() {
 
       <Modal
         isOpen={selected !== null}
-        onClose={closeClaim}
-        title={selected ? `Elegir a ${patientFullName(selected)}` : "Elegir paciente"}
+        onClose={closeAssignment}
+        title={
+          selected
+            ? `${assignsOthers ? "Asignar" : "Elegir"} a ${patientFullName(selected)}`
+            : "Asignar paciente"
+        }
       >
         <form
           className="space-y-4"
           onSubmit={(event) => {
             event.preventDefault();
-            void submitClaim();
+            void submitAssignment();
           }}
         >
+          {assignsOthers ? (
+            <StudentCombobox value={student} onChange={setStudent} />
+          ) : null}
           <label className="block text-sm text-slate-600 dark:text-slate-300">
             Motivo de ingreso
             <textarea
@@ -299,14 +336,14 @@ export function AvailablePatients() {
             </p>
           ) : null}
           <div className="flex justify-end gap-2">
-            <button type="button" className={secondaryActionClass} onClick={closeClaim}>
+            <button
+              type="button"
+              className={secondaryActionClass}
+              onClick={closeAssignment}
+            >
               Cancelar
             </button>
-            <button
-              type="submit"
-              className={primaryActionClass}
-              disabled={submitting || reason.trim() === ""}
-            >
+            <button type="submit" className={primaryActionClass} disabled={!canSubmit}>
               {submitting ? "Guardando…" : "Confirmar"}
             </button>
           </div>

@@ -1,4 +1,5 @@
 from django.db import transaction
+from django.db.models import Count, Q, QuerySet
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
 from accounts.models import User
@@ -60,3 +61,26 @@ def claim_available_patient(
         reason=reason,
         priority=priority,
     )
+
+
+def assignable_students(search: str = "") -> QuerySet[User]:
+    """Estudiantes activos para el combo de asignación, con su carga actual.
+
+    Cada palabra de `search` debe aparecer en el nombre, apellido o usuario.
+    """
+    students = User.objects.filter(
+        role=User.Role.ESTUDIANTE,
+        is_active=True,
+    ).annotate(
+        active_cases=Count(
+            "patient_assignments",
+            filter=Q(patient_assignments__status=Assignment.AssignmentStatus.ACTIVA),
+        )
+    )
+    for term in search.split():
+        students = students.filter(
+            Q(first_name__icontains=term)
+            | Q(last_name__icontains=term)
+            | Q(username__icontains=term)
+        )
+    return students.order_by("last_name", "first_name", "id")

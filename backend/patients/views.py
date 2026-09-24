@@ -24,7 +24,7 @@ class PatientViewSet(viewsets.ModelViewSet):
         "partial_update": "patients.edit",
         "destroy": "patients.delete",
         "assignees": "patients.view",
-        "available": "assignments.claim",
+        "available": ("assignments.claim", "assignments.assign_student"),
     }
     filter_backends = [filters.SearchFilter]
     search_fields = ["first_name", "last_name"]

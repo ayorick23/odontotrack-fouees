@@ -10,7 +10,7 @@ export const PRIORITY_LABELS: Record<AssignmentPriority, string> = {
   baja: "Baja",
 };
 
-export type ClaimedAssignment = {
+export type AssignmentRecord = {
   id: number;
   patient: number;
   student: number;
@@ -20,35 +20,60 @@ export type ClaimedAssignment = {
   status: string;
 };
 
+export type AssignableStudent = {
+  id: number;
+  name: string;
+  active_cases: number;
+};
+
 export function claimAvailablePatient(payload: {
   patient: number;
   reason: string;
   priority: AssignmentPriority;
-}): Promise<ClaimedAssignment> {
+}): Promise<AssignmentRecord> {
   return api
-    .post<ClaimedAssignment>("/assignments/claim/", payload)
+    .post<AssignmentRecord>("/assignments/claim/", payload)
     .then((response) => response.data);
 }
 
-export function getClaimError(error: unknown): string {
+export function assignPatient(payload: {
+  patient: number;
+  student: number;
+  reason: string;
+  priority: AssignmentPriority;
+}): Promise<AssignmentRecord> {
+  return api
+    .post<AssignmentRecord>("/assignments/", payload)
+    .then((response) => response.data);
+}
+
+export function listAssignableStudents(search: string): Promise<AssignableStudent[]> {
+  return api
+    .get<AssignableStudent[]>("/assignments/students/", {
+      params: search ? { search } : {},
+    })
+    .then((response) => response.data);
+}
+
+export function getAssignmentError(error: unknown): string {
   if (!axios.isAxiosError(error) || error.response === undefined) {
-    return "No se pudo elegir el paciente. Intenta de nuevo.";
+    return "No se pudo guardar la asignación. Intenta de nuevo.";
   }
   if (error.response.status === 403) {
-    return "No tienes permiso para elegir pacientes.";
+    return "No tienes permiso para asignar pacientes.";
   }
   const data = error.response.data;
   if (typeof data !== "object" || data === null) {
-    return "No se pudo elegir el paciente. Revisa los datos.";
+    return "No se pudo guardar la asignación. Revisa los datos.";
   }
   const record = data as Record<string, unknown>;
-  for (const key of ["patient", "reason", "priority", "detail"]) {
+  for (const key of ["patient", "student", "reason", "priority", "detail"]) {
     const message = firstMessage(record[key]);
     if (message) {
       return message;
     }
   }
-  return "No se pudo elegir el paciente. Revisa los datos.";
+  return "No se pudo guardar la asignación. Revisa los datos.";
 }
 
 function firstMessage(value: unknown): string | null {

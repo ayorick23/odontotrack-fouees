@@ -252,15 +252,24 @@ class PatientDirectoryTests(APITestCase):
             [available.dui],
         )
 
-    def test_available_requires_claim_permission(self):
+    def test_available_requires_claim_or_assign_permission(self):
         docente = User.objects.create_user(
             username="docente-disponibles",
             password="pass12345",
             role=User.Role.DOCENTE,
         )
+        recepcion = User.objects.create_user(
+            username="recepcion-disponibles",
+            password="pass12345",
+            role=User.Role.RECEPCION,
+        )
         self.client.force_authenticate(user=docente)
         response = self.client.get("/api/patients/available/")
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+        self.client.force_authenticate(user=recepcion)
+        response = self.client.get("/api/patients/available/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_assignees_lists_students_with_active_assignment(self):
         assigned = User.objects.create_user(
