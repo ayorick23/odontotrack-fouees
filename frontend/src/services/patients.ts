@@ -67,6 +67,8 @@ export type Patient = {
   case_status: CaseStatus;
   has_active_assignment: boolean;
   assigned_to: string | null;
+  /** Nota que se dejó al asignar; vacía si no hay o no hay asignación activa. */
+  assignment_note: string;
   created_at: string;
   updated_at: string;
 };
@@ -129,6 +131,24 @@ export function listPatients(
 
   return api
     .get<PaginatedResponse<PatientListItem>>("/patients/", { params: query })
+    .then((response) => response.data);
+}
+
+export function listAvailablePatients(params: {
+  page?: number;
+  search?: string;
+} = {}): Promise<PaginatedResponse<PatientListItem>> {
+  const query: Record<string, string | number> = {};
+  if (params.page && params.page > 1) {
+    query.page = params.page;
+  }
+  if (params.search) {
+    query.search = params.search;
+  }
+  return api
+    .get<PaginatedResponse<PatientListItem>>("/patients/available/", {
+      params: query,
+    })
     .then((response) => response.data);
 }
 

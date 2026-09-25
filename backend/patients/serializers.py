@@ -39,15 +39,23 @@ def empty_catalog_slugs(data: dict) -> dict:
     return data
 
 
+def active_assignment(patient: Patient) -> Assignment | None:
+    # Recorre el prefetch de assignments en vez de otra consulta.
+    return next(
+        (
+            assignment
+            for assignment in patient.assignments.all()
+            if assignment.status == Assignment.AssignmentStatus.ACTIVA
+        ),
+        None,
+    )
+
+
 def assigned_student_name(patient: Patient) -> str | None:
-    active = [
-        assignment
-        for assignment in patient.assignments.all()
-        if assignment.status == Assignment.AssignmentStatus.ACTIVA
-    ]
-    if not active:
+    assignment = active_assignment(patient)
+    if assignment is None:
         return None
-    student = active[0].student
+    student = assignment.student
     return student.get_full_name() or student.username
 
 
@@ -99,6 +107,7 @@ class PatientSerializer(serializers.ModelSerializer):
     photo = PatientPhotoField(required=False, allow_null=True)
     has_active_assignment = serializers.SerializerMethodField()
     assigned_to = serializers.SerializerMethodField()
+    assignment_note = serializers.SerializerMethodField()
     clinical_area = OptionalSlugRelatedField(
         slug_field="slug",
         queryset=ClinicalArea.objects.all(),
@@ -134,6 +143,7 @@ class PatientSerializer(serializers.ModelSerializer):
             "case_status",
             "has_active_assignment",
             "assigned_to",
+            "assignment_note",
             "created_at",
             "updated_at",
         )
@@ -142,6 +152,7 @@ class PatientSerializer(serializers.ModelSerializer):
             "case_status",
             "has_active_assignment",
             "assigned_to",
+            "assignment_note",
             "created_at",
             "updated_at",
         )
@@ -154,6 +165,10 @@ class PatientSerializer(serializers.ModelSerializer):
 
     def get_assigned_to(self, patient: Patient) -> str | None:
         return assigned_student_name(patient)
+
+    def get_assignment_note(self, patient: Patient) -> str:
+        assignment = active_assignment(patient)
+        return assignment.reason if assignment else ""
 
     def validate(self, attrs):
         attrs = super().validate(attrs)

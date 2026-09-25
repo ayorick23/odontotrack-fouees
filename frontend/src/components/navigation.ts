@@ -1,10 +1,11 @@
 import type { AuthUser } from "../context/AuthContext";
-import { can } from "../acl/can";
+import { can, canAny } from "../acl/can";
 
 export type NavLeaf = {
   to: string;
   label: string;
-  permission: string;
+  /** Con varios permisos, basta con tener uno. */
+  permission: string | readonly string[];
 };
 
 export type NavGroup = {
@@ -42,6 +43,11 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
         to: "/patients",
         label: "Directorio",
         permission: "patients.view",
+      },
+      {
+        to: "/patients/available",
+        label: "Pacientes disponibles",
+        permission: ["assignments.claim", "assignments.assign_student"],
       },
       {
         to: "/assignments",
@@ -82,21 +88,27 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   },
 ];
 
+export function canSeeLeaf(user: AuthUser, leaf: NavLeaf): boolean {
+  return typeof leaf.permission === "string"
+    ? can(user, leaf.permission)
+    : canAny(user, leaf.permission);
+}
+
 export function isNavVisible(entry: NavEntry, user: AuthUser): boolean {
   if ("children" in entry) {
-    return entry.children.some((child) => can(user, child.permission));
+    return entry.children.some((child) => canSeeLeaf(user, child));
   }
-  return can(user, entry.permission);
+  return canSeeLeaf(user, entry);
 }
 
 export function firstAllowedPath(user: AuthUser): string | null {
   for (const entry of NAV_ENTRIES) {
     if ("children" in entry) {
-      const child = entry.children.find((item) => can(user, item.permission));
+      const child = entry.children.find((item) => canSeeLeaf(user, item));
       if (child) {
         return child.to;
       }
-    } else if (can(user, entry.permission)) {
+    } else if (canSeeLeaf(user, entry)) {
       return entry.to;
     }
   }
@@ -114,7 +126,7 @@ export function canAccessPath(pathname: string, user: AuthUser): boolean {
   const leaves = navLeaves();
   const exact = leaves.find((leaf) => leaf.to === normalized);
   if (exact) {
-    return can(user, exact.permission);
+    return canSeeLeaf(user, exact);
   }
 
   if (/^\/patients\/\d+\/edit$/.test(normalized)) {

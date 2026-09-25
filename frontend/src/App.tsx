@@ -8,6 +8,7 @@ import { Assignments } from "./pages/Assignments/Assignments";
 import { Calendar } from "./pages/Calendar/Calendar";
 import { Dashboard } from "./pages/Dashboard/Dashboard";
 import { Login } from "./pages/Login/Login";
+import { AvailablePatients } from "./pages/Patients/AvailablePatients";
 import { PatientDetail } from "./pages/Patients/PatientDetail";
 import { PatientForm } from "./pages/Patients/PatientForm";
 import { PatientList } from "./pages/Patients/PatientList";
@@ -30,6 +31,7 @@ function App() {
             <Route element={<AppLayout />}>
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/patients" element={<PatientList />} />
+              <Route path="/patients/available" element={<AvailablePatients />} />
               <Route path="/patients/new" element={<PatientForm />} />
               <Route path="/patients/:id/edit" element={<PatientForm />} />
               <Route path="/patients/:id" element={<PatientDetail />} />
