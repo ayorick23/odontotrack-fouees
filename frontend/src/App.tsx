@@ -4,11 +4,10 @@ import { AppLayout } from "./components/AppLayout";
 import { Toaster } from "./components/ui/sonner";
 import { AuthProvider } from "./context/AuthContext";
 import { ThemeProvider } from "./context/ThemeContext";
-import { Assignments } from "./pages/Assignments/Assignments";
+import { AvailablePatients } from "./pages/Assignments/AvailablePatients";
 import { Calendar } from "./pages/Calendar/Calendar";
 import { Dashboard } from "./pages/Dashboard/Dashboard";
 import { Login } from "./pages/Login/Login";
-import { AvailablePatients } from "./pages/Patients/AvailablePatients";
 import { PatientDetail } from "./pages/Patients/PatientDetail";
 import { PatientForm } from "./pages/Patients/PatientForm";
 import { PatientList } from "./pages/Patients/PatientList";
@@ -31,11 +30,15 @@ function App() {
             <Route element={<AppLayout />}>
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/patients" element={<PatientList />} />
-              <Route path="/patients/available" element={<AvailablePatients />} />
+              {/* Antes vivía en Pacientes; se redirige por si alguien guardó el enlace. */}
+              <Route
+                path="/patients/available"
+                element={<Navigate to="/assignments" replace />}
+              />
               <Route path="/patients/new" element={<PatientForm />} />
               <Route path="/patients/:id/edit" element={<PatientForm />} />
               <Route path="/patients/:id" element={<PatientDetail />} />
-              <Route path="/assignments" element={<Assignments />} />
+              <Route path="/assignments" element={<AvailablePatients />} />
               <Route path="/calendar" element={<Calendar />} />
               <Route path="/supervision" element={<Supervision />} />
               <Route path="/students" element={<Students />} />

@@ -11,17 +11,13 @@ import { ThemeToggle } from "./ThemeToggle";
 const PAGE_META: Record<string, { title: string; crumb: string }> = {
   "/dashboard": { title: "Panel Administrativo", crumb: "Dashboard › Inicio" },
   "/patients": { title: "Directorio de pacientes", crumb: "Pacientes › Directorio" },
-  "/patients/available": {
-    title: "Pacientes disponibles",
-    crumb: "Pacientes › Disponibles",
-  },
   "/patients/new": {
     title: "Registro de paciente",
     crumb: "Pacientes › Registro",
   },
   "/assignments": {
-    title: "Asignación de paciente",
-    crumb: "Pacientes › Asignación",
+    title: "Asignaciones",
+    crumb: "Pacientes › Asignaciones",
   },
   "/calendar": { title: "Calendario de citas", crumb: "Dashboard › Calendario" },
   "/supervision": { title: "Supervisión", crumb: "Dashboard › Supervisión" },
