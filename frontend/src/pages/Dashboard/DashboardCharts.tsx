@@ -177,7 +177,6 @@ function MonthlyFlowChart({
               stroke={COLORS[item.color]}
               fill={`url(#fill-${item.key})`}
               strokeWidth={2.5}
-              isAnimationActive={false}
             />
           ))}
         </AreaChart>
@@ -270,7 +269,6 @@ function AreaStatusChart({
               fill={COLORS[slice.color]}
               radius={[4, 4, 0, 0]}
               maxBarSize={6}
-              isAnimationActive={false}
             />
           ))}
         </BarChart>
@@ -335,7 +333,6 @@ function StatusDonut({ summary, colors }: { summary: DashboardSummary; colors: T
               outerRadius={66}
               paddingAngle={2}
               stroke="none"
-              isAnimationActive={false}
             >
               {visible.map((slice) => (
                 <Cell key={slice.status} fill={COLORS[slice.color]} />
