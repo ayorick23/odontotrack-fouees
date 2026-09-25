@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import {
   Bar,
   BarChart,
@@ -82,7 +82,9 @@ export function DashboardCharts({
   const tokens = theme === "dark" ? TOKENS.dark : TOKENS.light;
 
   return (
-    <section className="grid gap-4 xl:grid-cols-3">
+    // 5 columnas: las columnas por área necesitan más ancho (3/5) que la
+    // línea (2/5) para que los nombres de las áreas no se encimen.
+    <section className="grid gap-4 xl:grid-cols-5">
       <ChartCard
         title="Ingresos y asignaciones por mes"
         description="Pacientes registrados frente a pacientes asignados a un estudiante."
@@ -99,20 +101,13 @@ export function DashboardCharts({
         }
         className="xl:col-span-2"
       >
-        <div className="min-h-72 flex-1">
+        <div className="min-h-64 flex-1">
           {series ? (
             <MonthlyFlowChart months={series.months} tokens={tokens} />
           ) : (
             <ChartPlaceholder />
           )}
         </div>
-      </ChartCard>
-
-      <ChartCard
-        title="Estado de los pacientes"
-        description="Registrados en el período, según su estado actual."
-      >
-        <StatusDonut summary={summary} tokens={tokens} />
       </ChartCard>
 
       <ChartCard
@@ -130,6 +125,14 @@ export function DashboardCharts({
         </div>
         <StatusLegend tokens={tokens} className="mt-3" />
       </ChartCard>
+
+      <ChartCard
+        title="Estado de los pacientes"
+        description="Registrados en el período, según su estado actual."
+        className="xl:col-span-5"
+      >
+        <StatusDonut summary={summary} tokens={tokens} />
+      </ChartCard>
     </section>
   );
 }
@@ -141,25 +144,47 @@ function AreaStatusChart({
   rows: DashboardAreaStatus[];
   tokens: Tokens;
 }) {
+  const [chartWidth, setChartWidth] = useState(0);
+  // Ancho de cada área (el eje Y y los márgenes ocupan ~52px).
+  const slot = rows.length > 0 ? (chartWidth - 52) / rows.length : 0;
+  const longestWord = Math.max(
+    0,
+    ...rows.flatMap((row) => row.area.split(" ").map((word) => word.length)),
+  );
+  // ~6px por letra a 11px. Si la palabra más larga no cabe en su columna,
+  // las etiquetas se inclinan para no encimarse; si cabe, van rectas y los
+  // nombres de varias palabras pasan a dos líneas.
+  const tilted = slot > 0 && longestWord * 6 > slot - 8;
+
   return (
     <>
-      <ResponsiveContainer width="100%" height="100%">
+      <ResponsiveContainer
+        width="100%"
+        height="100%"
+        onResize={(width) => setChartWidth(width)}
+      >
         {/* Columnas finas agrupadas: una por estado dentro de cada área. */}
         <BarChart
           data={rows}
           barCategoryGap="24%"
           barGap={2}
-          margin={{ top: 8, right: 8, left: -16, bottom: 0 }}
+          // Inclinada, la primera etiqueta sobresale a la izquierda: más margen.
+          margin={{ top: 8, right: 8, left: tilted ? 24 : -16, bottom: 0 }}
         >
           <CartesianGrid stroke={tokens.grid} vertical={false} />
           <XAxis
             dataKey="area"
             interval={0}
-            height={36}
+            height={tilted ? 64 : 36}
+            angle={tilted ? -30 : 0}
+            textAnchor={tilted ? "end" : "middle"}
             tickLine={false}
             axisLine={{ stroke: tokens.grid }}
-            // width hace que los nombres largos pasen a dos líneas.
-            tick={{ fill: tokens.text, fontSize: 11, width: 96 }}
+            tick={{
+              fill: tokens.text,
+              fontSize: 11,
+              width: tilted ? undefined : Math.max(slot - 8, 40),
+            }}
           />
           <YAxis
             allowDecimals={false}
@@ -350,7 +375,8 @@ function MonthlyFlowChart({
 
 /**
  * Dona de estados: tamaño fijo, no crece con los datos. El total va al
- * centro y la leyenda muestra cantidad y porcentaje de cada estado.
+ * centro y, a su lado, cantidad y porcentaje de cada estado (en pantallas
+ * chicas pasan debajo).
  */
 function StatusDonut({ summary, tokens }: { summary: DashboardSummary; tokens: Tokens }) {
   const slices = STATUS_SLICES.map((slice) => ({
@@ -369,15 +395,15 @@ function StatusDonut({ summary, tokens }: { summary: DashboardSummary; tokens: T
   const visible = slices.filter((slice) => slice.count > 0);
 
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-5">
-      <div className="relative">
-        <PieChart width={192} height={192}>
+    <div className="flex flex-1 flex-col items-center justify-center gap-6 sm:flex-row sm:gap-10">
+      <div className="relative shrink-0">
+        <PieChart width={176} height={176}>
           <Pie
             data={visible}
             dataKey="count"
             nameKey="label"
-            innerRadius={64}
-            outerRadius={94}
+            innerRadius={58}
+            outerRadius={86}
             startAngle={90}
             endAngle={-270}
             stroke={tokens.surface}
@@ -397,19 +423,29 @@ function StatusDonut({ summary, tokens }: { summary: DashboardSummary; tokens: T
           <span className="text-xs text-slate-500 dark:text-slate-400">pacientes</span>
         </div>
       </div>
-      <ul className="w-full space-y-2" aria-label="Pacientes por estado">
+      <ul
+        className="grid w-full max-w-2xl grid-cols-1 gap-3 sm:grid-cols-3"
+        aria-label="Pacientes por estado"
+      >
         {slices.map((slice) => (
-          <li key={slice.status} className="flex items-center gap-2 text-sm">
-            <span
-              className="size-2.5 shrink-0 rounded-full"
-              style={{ backgroundColor: tokens[slice.color] }}
-            />
-            <span className="flex-1 text-slate-600 dark:text-slate-300">{slice.label}</span>
-            <span className="font-semibold tabular-nums text-slate-800 dark:text-slate-100">
-              {slice.count.toLocaleString("es-SV")}
+          <li
+            key={slice.status}
+            className="rounded-xl bg-slate-50 px-4 py-3 dark:bg-slate-800/60"
+          >
+            <span className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300">
+              <span
+                className="size-2.5 shrink-0 rounded-full"
+                style={{ backgroundColor: tokens[slice.color] }}
+              />
+              {slice.label}
             </span>
-            <span className="w-10 text-right text-xs tabular-nums text-slate-500 dark:text-slate-400">
-              {Math.round((slice.count / total) * 100)}%
+            <span className="mt-1 flex items-baseline justify-between gap-2">
+              <span className="text-2xl font-semibold text-slate-800 dark:text-slate-100">
+                {slice.count.toLocaleString("es-SV")}
+              </span>
+              <span className="text-xs text-slate-500 dark:text-slate-400">
+                {Math.round((slice.count / total) * 100)}%
+              </span>
             </span>
           </li>
         ))}
