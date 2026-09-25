@@ -85,10 +85,9 @@ export function DashboardCharts({
   const colors = theme === "dark" ? THEME.dark : THEME.light;
 
   return (
-    // 5 columnas: las columnas por área necesitan más ancho (3/5) que la
-    // de ingresos (2/5) para que los nombres de las áreas no se encimen.
-    <section className="grid gap-4 xl:grid-cols-5">
-      <ChartCard title="Ingresos y asignaciones por mes" className="xl:col-span-2">
+    // Dos mitades como en el diseño original; la dona va abajo a todo el ancho.
+    <section className="grid gap-4 xl:grid-cols-2">
+      <ChartCard title="Ingresos y asignaciones por mes">
         {series ? (
           <div className="flex h-full flex-col">
             <div className="min-h-0 flex-1">
@@ -101,7 +100,7 @@ export function DashboardCharts({
         )}
       </ChartCard>
 
-      <ChartCard title="Pacientes por área clínica" className="xl:col-span-3">
+      <ChartCard title="Pacientes por área clínica">
         {series ? (
           <div className="flex h-full flex-col">
             <div className="min-h-0 flex-1">
@@ -114,7 +113,7 @@ export function DashboardCharts({
         )}
       </ChartCard>
 
-      <ChartCard title="Estado de los pacientes" className="xl:col-span-5" height="auto">
+      <ChartCard title="Estado de los pacientes" className="xl:col-span-2" height="auto">
         <StatusDonut summary={summary} colors={colors} />
       </ChartCard>
     </section>
@@ -261,7 +260,7 @@ function AreaStatusChart({
               name={slice.label}
               fill={COLORS[slice.color]}
               radius={[4, 4, 0, 0]}
-              maxBarSize={16}
+              maxBarSize={6}
               isAnimationActive={false}
             />
           ))}

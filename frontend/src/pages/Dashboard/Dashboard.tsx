@@ -238,10 +238,10 @@ function DashboardSkeleton() {
           />
         ))}
       </section>
-      <section className="grid gap-4 xl:grid-cols-5">
-        <div className="h-96 animate-pulse rounded-2xl bg-white shadow-sm xl:col-span-2 dark:bg-slate-900" />
-        <div className="h-96 animate-pulse rounded-2xl bg-white shadow-sm xl:col-span-3 dark:bg-slate-900" />
-        <div className="h-56 animate-pulse rounded-2xl bg-white shadow-sm xl:col-span-5 dark:bg-slate-900" />
+      <section className="grid gap-4 xl:grid-cols-2">
+        <div className="h-96 animate-pulse rounded-2xl bg-white shadow-sm dark:bg-slate-900" />
+        <div className="h-96 animate-pulse rounded-2xl bg-white shadow-sm dark:bg-slate-900" />
+        <div className="h-56 animate-pulse rounded-2xl bg-white shadow-sm xl:col-span-2 dark:bg-slate-900" />
       </section>
     </>
   );
