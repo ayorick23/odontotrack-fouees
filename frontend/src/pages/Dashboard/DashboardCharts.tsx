@@ -85,9 +85,10 @@ export function DashboardCharts({
   const colors = theme === "dark" ? THEME.dark : THEME.light;
 
   return (
-    // Dos mitades como en el diseño original; la dona va abajo a todo el ancho.
-    <section className="grid gap-4 xl:grid-cols-2">
-      <ChartCard title="Ingresos y asignaciones por mes">
+    // 6 columnas: arriba dos mitades como en el diseño original y abajo la
+    // dona en una tarjeta de 1/3.
+    <section className="grid gap-4 xl:grid-cols-6">
+      <ChartCard title="Ingresos y asignaciones por mes" className="xl:col-span-3">
         {series ? (
           <div className="flex h-full flex-col">
             <div className="min-h-0 flex-1">
@@ -100,7 +101,7 @@ export function DashboardCharts({
         )}
       </ChartCard>
 
-      <ChartCard title="Pacientes por área clínica">
+      <ChartCard title="Pacientes por área clínica" className="xl:col-span-3">
         {series ? (
           <div className="flex h-full flex-col">
             <div className="min-h-0 flex-1">
@@ -113,7 +114,7 @@ export function DashboardCharts({
         )}
       </ChartCard>
 
-      <ChartCard title="Estado de los pacientes" className="xl:col-span-2" height="auto">
+      <ChartCard title="Estado de los pacientes" className="xl:col-span-2">
         <StatusDonut summary={summary} colors={colors} />
       </ChartCard>
     </section>
@@ -294,8 +295,8 @@ function AreaStatusChart({
 }
 
 /**
- * Dona de estados: tamaño fijo, no crece con los datos. A su lado van la
- * cantidad y el porcentaje de cada estado (en pantallas chicas, debajo).
+ * Dona de estados: tamaño fijo, no crece con los datos. Debajo, la cantidad
+ * y el porcentaje de cada estado.
  */
 function StatusDonut({ summary, colors }: { summary: DashboardSummary; colors: Theme }) {
   const slices = STATUS_SLICES.map((slice) => ({
@@ -306,7 +307,7 @@ function StatusDonut({ summary, colors }: { summary: DashboardSummary; colors: T
 
   if (total === 0) {
     return (
-      <p className="flex h-48 items-center justify-center text-sm text-slate-400">
+      <p className="flex h-full items-center justify-center text-sm text-slate-400">
         Sin pacientes en este período
       </p>
     );
@@ -314,16 +315,16 @@ function StatusDonut({ summary, colors }: { summary: DashboardSummary; colors: T
   const visible = slices.filter((slice) => slice.count > 0);
 
   return (
-    <div className="flex flex-col items-center justify-center gap-6 sm:flex-row sm:gap-12">
-      <div className="size-48 shrink-0">
+    <div className="flex h-full flex-col items-center justify-center gap-4">
+      <div className="size-40 shrink-0">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
               data={visible}
               dataKey="count"
               nameKey="legend"
-              innerRadius={52}
-              outerRadius={74}
+              innerRadius={46}
+              outerRadius={66}
               paddingAngle={2}
               stroke="none"
               isAnimationActive={false}
@@ -336,29 +337,22 @@ function StatusDonut({ summary, colors }: { summary: DashboardSummary; colors: T
           </PieChart>
         </ResponsiveContainer>
       </div>
-      <ul
-        className="grid w-full max-w-2xl grid-cols-1 gap-3 sm:grid-cols-3"
-        aria-label="Pacientes por estado"
-      >
+      <ul className="w-full max-w-xs space-y-1.5" aria-label="Pacientes por estado">
         {slices.map((slice) => (
           <li
             key={slice.status}
-            className="rounded-xl bg-slate-50 px-4 py-3 dark:bg-slate-800/60"
+            className="flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400"
           >
-            <span className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
-              <span
-                className="size-2 shrink-0 rounded-full"
-                style={{ backgroundColor: COLORS[slice.color] }}
-              />
-              {slice.legend}
+            <span
+              className="size-2 shrink-0 rounded-full"
+              style={{ backgroundColor: COLORS[slice.color] }}
+            />
+            <span className="flex-1">{slice.legend}</span>
+            <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+              {slice.count.toLocaleString("es-SV")}
             </span>
-            <span className="mt-1 flex items-baseline justify-between gap-2">
-              <span className="text-2xl font-semibold text-slate-800 dark:text-slate-100">
-                {slice.count.toLocaleString("es-SV")}
-              </span>
-              <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                {Math.round((slice.count / total) * 100)}%
-              </span>
+            <span className="w-8 text-right">
+              {Math.round((slice.count / total) * 100)}%
             </span>
           </li>
         ))}
@@ -401,20 +395,17 @@ function ChartCard({
   title,
   children,
   className = "",
-  height = "fixed",
 }: {
   title: string;
   children: ReactNode;
   className?: string;
-  /** "fixed" = alto de gráfica (h-72); "auto" = crece con el contenido. */
-  height?: "fixed" | "auto";
 }) {
   return (
     <article
       className={`rounded-2xl bg-white p-5 shadow-[0_10px_30px_rgba(15,40,80,0.06)] dark:bg-slate-900 dark:shadow-none dark:ring-1 dark:ring-white/10 ${className}`}
     >
       <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">{title}</h2>
-      <div className={`mt-3 ${height === "fixed" ? "h-72" : ""}`}>{children}</div>
+      <div className="mt-3 h-72">{children}</div>
     </article>
   );
 }
