@@ -1,14 +1,8 @@
-import { useEffect, useId, useState, type KeyboardEvent } from "react";
-
+import { SearchCombobox } from "../../components/SearchCombobox";
 import {
   listAssignableStudents,
   type AssignableStudent,
 } from "../../services/assignments";
-
-// Espera a que se deje de escribir antes de buscar en el servidor.
-const SEARCH_DELAY_MS = 250;
-
-type LoadStatus = "loading" | "ready" | "error";
 
 type StudentComboboxProps = {
   value: AssignableStudent | null;
@@ -16,139 +10,19 @@ type StudentComboboxProps = {
 };
 
 export function StudentCombobox({ value, onChange }: StudentComboboxProps) {
-  const inputId = useId();
-  const listId = useId();
-  const [query, setQuery] = useState("");
-  const [open, setOpen] = useState(false);
-  const [options, setOptions] = useState<AssignableStudent[]>([]);
-  const [status, setStatus] = useState<LoadStatus>("loading");
-  const [activeIndex, setActiveIndex] = useState(0);
-
-  useEffect(() => {
-    let cancelled = false;
-    const timer = window.setTimeout(() => {
-      listAssignableStudents(query.trim())
-        .then((students) => {
-          if (!cancelled) {
-            setOptions(students);
-            setActiveIndex(0);
-            setStatus("ready");
-          }
-        })
-        .catch(() => {
-          if (!cancelled) {
-            setStatus("error");
-          }
-        });
-    }, SEARCH_DELAY_MS);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
-  }, [query]);
-
-  function choose(student: AssignableStudent) {
-    onChange(student);
-    setQuery(student.name);
-    setOpen(false);
-  }
-
-  function onKeyDown(event: KeyboardEvent<HTMLInputElement>) {
-    if (event.key === "ArrowDown") {
-      event.preventDefault();
-      setOpen(true);
-      setActiveIndex((index) => Math.min(index + 1, options.length - 1));
-    } else if (event.key === "ArrowUp") {
-      event.preventDefault();
-      setActiveIndex((index) => Math.max(index - 1, 0));
-    } else if (event.key === "Enter" && open && options[activeIndex]) {
-      // Elegir la opción sin enviar el formulario del modal.
-      event.preventDefault();
-      choose(options[activeIndex]);
-    } else if (event.key === "Escape" && open) {
-      // Cierra solo la lista, no el modal.
-      event.stopPropagation();
-      setOpen(false);
-    }
-  }
-
-  const activeOption = open ? options[activeIndex] : undefined;
-
   return (
-    <div className="text-sm text-slate-600 dark:text-slate-300">
-      <label htmlFor={inputId}>Estudiante</label>
-      <div className="relative mt-1">
-        <input
-          id={inputId}
-          role="combobox"
-          aria-expanded={open}
-          aria-controls={listId}
-          aria-autocomplete="list"
-          aria-activedescendant={
-            activeOption ? `${listId}-${activeOption.id}` : undefined
-          }
-          autoComplete="off"
-          value={query}
-          placeholder="Buscar estudiante por nombre"
-          onFocus={() => setOpen(true)}
-          onBlur={() => setOpen(false)}
-          onChange={(event) => {
-            setQuery(event.target.value);
-            setStatus("loading");
-            setOpen(true);
-            if (value !== null) {
-              onChange(null);
-            }
-          }}
-          onKeyDown={onKeyDown}
-          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none focus:border-teal-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-        />
-        {open ? (
-          <div className="absolute z-10 mt-1 max-h-56 w-full overflow-auto rounded-xl border border-slate-200 bg-white py-1 shadow-[0_10px_30px_rgba(15,40,80,0.12)] dark:border-slate-700 dark:bg-slate-900">
-            {status === "loading" ? (
-              <p className="px-3 py-2 text-slate-500">Buscando…</p>
-            ) : null}
-            {status === "error" ? (
-              <p className="px-3 py-2 text-red-600">
-                No se pudieron cargar los estudiantes.
-              </p>
-            ) : null}
-            {status === "ready" && options.length === 0 ? (
-              <p className="px-3 py-2 text-slate-500">Ningún estudiante coincide.</p>
-            ) : null}
-            {status === "ready" && options.length > 0 ? (
-              <ul id={listId} role="listbox" aria-label="Estudiantes">
-                {options.map((student, index) => (
-                  <li
-                    key={student.id}
-                    id={`${listId}-${student.id}`}
-                    role="option"
-                    aria-selected={value?.id === student.id}
-                    // mousedown antes que blur: evita que la lista se cierre
-                    // antes de registrar el clic.
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => choose(student)}
-                    onMouseEnter={() => setActiveIndex(index)}
-                    className={`flex cursor-pointer items-center justify-between gap-3 px-3 py-2 ${
-                      index === activeIndex
-                        ? "bg-teal-50 dark:bg-teal-950/60"
-                        : ""
-                    }`}
-                  >
-                    <span className="text-slate-800 dark:text-slate-100">
-                      {student.name}
-                    </span>
-                    <span className="shrink-0 text-xs text-slate-500">
-                      {activeCasesLabel(student.active_cases)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-          </div>
-        ) : null}
-      </div>
-    </div>
+    <SearchCombobox
+      label="Estudiante"
+      placeholder="Buscar estudiante por nombre"
+      listLabel="Estudiantes"
+      value={value}
+      onChange={onChange}
+      search={listAssignableStudents}
+      getLabel={(student) => student.name}
+      getHint={(student) => activeCasesLabel(student.active_cases)}
+      emptyMessage="Ningún estudiante coincide."
+      errorMessage="No se pudieron cargar los estudiantes."
+    />
   );
 }
 
