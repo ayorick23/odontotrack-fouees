@@ -5,11 +5,8 @@ from django.db.models.functions import TruncMonth
 from django.utils import timezone
 
 from assignments.models import Assignment
-from assignments.services import assignable_students
 from patients.models import PERIOD_DAYS, Patient
 
-# La gráfica de carga muestra solo a los estudiantes con más casos.
-STUDENT_LOAD_LIMIT = 10
 MONTH_LABELS = (
     "",
     "Ene",
@@ -74,36 +71,6 @@ def _counts_by_month(queryset, field: str) -> dict[date, int]:
     return counts
 
 
-def _pending_by_area(patients) -> list[dict]:
-    """Pendientes sin asignación activa, agrupados por área clínica."""
-    rows = (
-        patients.available()
-        .values("clinical_area__name")
-        .annotate(total=Count("id"))
-        .order_by("-total", "clinical_area__name")
-    )
-    return [
-        {"area": row["clinical_area__name"] or "Sin área", "count": row["total"]}
-        for row in rows
-    ]
-
-
-def _student_load() -> list[dict]:
-    """Casos activos por estudiante hoy; no depende del período."""
-    students = (
-        assignable_students()
-        .filter(active_cases__gt=0)
-        .order_by("-active_cases", "last_name", "first_name", "id")
-    )
-    return [
-        {
-            "student": student.get_full_name() or student.username,
-            "active_cases": student.active_cases,
-        }
-        for student in students[:STUDENT_LOAD_LIMIT]
-    ]
-
-
 def build_dashboard_series(period: str | None) -> dict:
     start = period_start(period)
     today = timezone.localdate()
@@ -130,8 +97,4 @@ def build_dashboard_series(period: str | None) -> dict:
         }
         for month in _iter_months(first_month, today)
     ]
-    return {
-        "months": months,
-        "pending_by_area": _pending_by_area(patients),
-        "student_load": _student_load(),
-    }
+    return {"months": months}

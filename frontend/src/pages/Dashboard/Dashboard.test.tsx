@@ -35,11 +35,6 @@ const series = {
     { month: "2026-08", label: "Ago 26", patients: 2, assignments: 1 },
     { month: "2026-09", label: "Sep 26", patients: 3, assignments: 2 },
   ],
-  pending_by_area: [
-    { area: "Endodoncia", count: 3 },
-    { area: "Sin área", count: 2 },
-  ],
-  student_load: [{ student: "Maria Lopez", active_cases: 2 }],
 };
 
 function renderDashboard() {
@@ -78,33 +73,31 @@ describe("Dashboard", () => {
   it("carga tarjetas y gráficas del período 1A", async () => {
     renderDashboard();
 
-    expect(await screen.findByText("14")).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: "Ingresos y asignaciones por mes" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Estado de los pacientes" })).toBeInTheDocument();
     expect(screen.getByText("7")).toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", { name: "Ingresos y asignaciones por mes" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", { name: "Pendientes por área clínica" }),
-    ).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Carga por estudiante" })).toBeInTheDocument();
     expect(api.getDashboardSummary).toHaveBeenCalledWith({ period: "1a" });
     expect(api.getDashboardSeries).toHaveBeenCalledWith({ period: "1a" });
   });
 
-  it("expone los datos de cada gráfica en una tabla accesible", async () => {
+  it("la dona muestra cantidad y porcentaje de cada estado", async () => {
     renderDashboard();
-    await screen.findByText("14");
 
-    const areas = screen.getByRole("table", { name: "Pendientes por área clínica" });
-    expect(within(areas).getByRole("rowheader", { name: "Endodoncia" })).toBeInTheDocument();
-    const load = screen.getByRole("table", { name: "Carga por estudiante" });
-    expect(within(load).getByRole("rowheader", { name: "Maria Lopez" })).toBeInTheDocument();
+    const legend = await screen.findByRole("list", { name: "Pacientes por estado" });
+    const rows = within(legend).getAllByRole("listitem");
+    expect(rows.map((row) => row.textContent)).toEqual([
+      "Pendientes536%",
+      "En proceso643%",
+      "Finalizados321%",
+    ]);
   });
 
   it("el filtro de período aplica a tarjetas y gráficas", async () => {
     const user = userEvent.setup();
     renderDashboard();
-    await screen.findByText("14");
+    await screen.findByRole("heading", { name: "Estado de los pacientes" });
 
     await user.click(screen.getByRole("button", { name: "1M" }));
     await waitFor(() => {

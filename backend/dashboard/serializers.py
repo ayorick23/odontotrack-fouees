@@ -16,17 +16,5 @@ class DashboardMonthPointSerializer(serializers.Serializer):
     assignments = serializers.IntegerField()
 
 
-class DashboardAreaCountSerializer(serializers.Serializer):
-    area = serializers.CharField()
-    count = serializers.IntegerField()
-
-
-class DashboardStudentLoadSerializer(serializers.Serializer):
-    student = serializers.CharField()
-    active_cases = serializers.IntegerField()
-
-
 class DashboardSeriesSerializer(serializers.Serializer):
     months = DashboardMonthPointSerializer(many=True)
-    pending_by_area = DashboardAreaCountSerializer(many=True)
-    student_load = DashboardStudentLoadSerializer(many=True)

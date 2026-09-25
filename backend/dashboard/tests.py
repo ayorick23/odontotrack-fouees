@@ -7,7 +7,6 @@ from rest_framework.test import APITestCase
 from accounts.models import User
 from accounts.services import sync_acl
 from assignments.models import Assignment
-from catalogs.models import ClinicalArea
 from clinical_records.models import Diagnostico
 from patients.models import Patient
 
@@ -151,43 +150,3 @@ class DashboardSeriesTests(APITestCase):
     def test_series_without_data_has_only_current_month(self):
         response = self.client.get("/api/dashboard/series/")
         self.assertEqual(len(response.json()["months"]), 1)
-
-    def test_pending_by_area_counts_only_available_patients(self):
-        endo = ClinicalArea.objects.create(slug="endo-test", name="Endodoncia test")
-        self._patient("AREA-001", clinical_area=endo)
-        self._patient("AREA-002", clinical_area=endo)
-        self._patient("AREA-003")
-        taken = self._patient("AREA-004", clinical_area=endo)
-        Assignment.objects.create(patient=taken, student=self.student, reason="")
-
-        response = self.client.get("/api/dashboard/series/")
-        self.assertEqual(
-            response.json()["pending_by_area"],
-            [
-                {"area": "Endodoncia test", "count": 2},
-                {"area": "Sin área", "count": 1},
-            ],
-        )
-
-    def test_student_load_lists_students_with_active_cases(self):
-        busy = User.objects.create_user(
-            username="estudiante-ocupado",
-            password="pass12345",
-            role=User.Role.ESTUDIANTE,
-            first_name="Maria",
-            last_name="Lopez",
-        )
-        for dui in ("CARGA-001", "CARGA-002"):
-            Assignment.objects.create(patient=self._patient(dui), student=busy, reason="")
-        Assignment.objects.create(
-            patient=self._patient("CARGA-003"), student=self.student, reason=""
-        )
-
-        response = self.client.get("/api/dashboard/series/", {"period": "1m"})
-        self.assertEqual(
-            response.json()["student_load"],
-            [
-                {"student": "Maria Lopez", "active_cases": 2},
-                {"student": "estudiante-series", "active_cases": 1},
-            ],
-        )

@@ -20,21 +20,8 @@ export type DashboardMonthPoint = {
   assignments: number;
 };
 
-export type DashboardAreaCount = {
-  area: string;
-  count: number;
-};
-
-export type DashboardStudentLoad = {
-  student: string;
-  active_cases: number;
-};
-
 export type DashboardSeries = {
   months: DashboardMonthPoint[];
-  pending_by_area: DashboardAreaCount[];
-  /** Casos activos hoy; no depende del período. */
-  student_load: DashboardStudentLoad[];
 };
 
 export function getDashboardSummary(

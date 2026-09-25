@@ -73,8 +73,7 @@ class DashboardSeriesView(APIView):
                 name="period",
                 description=(
                     "Filtra series del último mes (1m), 6 meses (6m) o año (1a). "
-                    "Sin período cubre toda la historia. La carga por estudiante "
-                    "es siempre la de hoy."
+                    "Sin período cubre toda la historia."
                 ),
                 required=False,
                 type=str,

@@ -131,7 +131,7 @@ export function Dashboard() {
             icon={<ClipboardCheck className="size-5" />}
           />
         </section>
-        <DashboardCharts series={series} />
+        <DashboardCharts series={series} summary={summary} />
       </div>
     </div>
   );

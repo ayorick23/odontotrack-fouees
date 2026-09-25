@@ -1,8 +1,11 @@
 import type { ReactNode } from "react";
 import {
   CartesianGrid,
+  Cell,
   Line,
   LineChart,
+  Pie,
+  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -10,11 +13,17 @@ import {
 } from "recharts";
 
 import { useTheme } from "../../hooks/useTheme";
-import type { DashboardMonthPoint, DashboardSeries } from "../../services/dashboard";
+import {
+  countByStatus,
+  type CaseStatus,
+  type DashboardMonthPoint,
+  type DashboardSeries,
+  type DashboardSummary,
+} from "../../services/dashboard";
 
-// Paleta validada (dataviz/validate_palette.js) contra las superficies del
-// dashboard: blanco en claro y slate-900 en oscuro. La serie 1 va siempre
-// en turquesa y la 2 en violeta.
+// Paleta validada (dataviz/validate_palette.js, todos los pares) contra las
+// superficies del dashboard: blanco en claro y slate-900 en oscuro. Cada
+// slot mantiene su color en todas las gráficas.
 const TOKENS = {
   light: {
     surface: "#ffffff",
@@ -24,6 +33,7 @@ const TOKENS = {
     tooltipBorder: "#e2e8f0",
     series1: "#0d9488",
     series2: "#7c3aed",
+    series3: "#d97706",
   },
   dark: {
     surface: "#0f172a",
@@ -33,6 +43,7 @@ const TOKENS = {
     tooltipBorder: "#334155",
     series1: "#0d9488",
     series2: "#8b5cf6",
+    series3: "#d97706",
   },
 } as const;
 
@@ -43,7 +54,25 @@ const LINE_SERIES = [
   { key: "assignments", label: "Asignaciones", color: "series2" },
 ] as const;
 
-export function DashboardCharts({ series }: { series: DashboardSeries | null }) {
+// Pendiente comparte color con "Ingresos" (así llega todo paciente) y en
+// proceso con "Asignaciones" (lo que pasa al asignar).
+const STATUS_SLICES: ReadonlyArray<{
+  status: CaseStatus;
+  label: string;
+  color: "series1" | "series2" | "series3";
+}> = [
+  { status: "pendiente", label: "Pendientes", color: "series1" },
+  { status: "en_proceso", label: "En proceso", color: "series2" },
+  { status: "finalizado", label: "Finalizados", color: "series3" },
+];
+
+export function DashboardCharts({
+  series,
+  summary,
+}: {
+  series: DashboardSeries | null;
+  summary: DashboardSummary;
+}) {
   const { theme } = useTheme();
   const tokens = theme === "dark" ? TOKENS.dark : TOKENS.light;
 
@@ -74,47 +103,12 @@ export function DashboardCharts({ series }: { series: DashboardSeries | null }) 
         </div>
       </ChartCard>
 
-      <div className="grid content-start gap-4">
-        <ChartCard
-          title="Pendientes por área clínica"
-          description="Registrados en el período que siguen sin asignar."
-        >
-          {series ? (
-            <BarList
-              caption="Pendientes por área clínica"
-              rows={series.pending_by_area.map((row) => ({
-                name: row.area,
-                value: row.count,
-              }))}
-              valueLabel="Pendientes"
-              emptyMessage="No hay pacientes pendientes en este período."
-              color={tokens.series1}
-            />
-          ) : (
-            <ChartPlaceholder className="h-40" />
-          )}
-        </ChartCard>
-
-        <ChartCard
-          title="Carga por estudiante"
-          description="Casos activos hoy, los 10 con más carga. No depende del período."
-        >
-          {series ? (
-            <BarList
-              caption="Carga por estudiante"
-              rows={series.student_load.map((row) => ({
-                name: row.student,
-                value: row.active_cases,
-              }))}
-              valueLabel="Casos activos"
-              emptyMessage="Ningún estudiante tiene casos activos."
-              color={tokens.series1}
-            />
-          ) : (
-            <ChartPlaceholder className="h-32" />
-          )}
-        </ChartCard>
-      </div>
+      <ChartCard
+        title="Estado de los pacientes"
+        description="Registrados en el período, según su estado actual."
+      >
+        <StatusDonut summary={summary} tokens={tokens} />
+      </ChartCard>
     </section>
   );
 }
@@ -160,13 +154,7 @@ function MonthlyFlowChart({
           />
           <Tooltip
             cursor={{ stroke: tokens.axis, strokeWidth: 1 }}
-            contentStyle={{
-              backgroundColor: tokens.surface,
-              border: `1px solid ${tokens.tooltipBorder}`,
-              borderRadius: 12,
-              color: tokens.text,
-              fontSize: 12,
-            }}
+            contentStyle={tooltipStyle(tokens)}
             labelStyle={{ color: tokens.text, fontWeight: 600 }}
           />
           {LINE_SERIES.map((item) => (
@@ -239,76 +227,84 @@ function MonthlyFlowChart({
   );
 }
 
-type BarRow = { name: string; value: number };
-
 /**
- * Lista de barras horizontales: nombre, barra y valor en cada fila. Crece
- * con los datos (3 filas ocupan 3 filas) y el valor se lee sin tooltip.
+ * Dona de estados: tamaño fijo, no crece con los datos. El total va al
+ * centro y la leyenda muestra cantidad y porcentaje de cada estado.
  */
-function BarList({
-  caption,
-  rows,
-  valueLabel,
-  emptyMessage,
-  color,
-}: {
-  caption: string;
-  rows: BarRow[];
-  valueLabel: string;
-  emptyMessage: string;
-  color: string;
-}) {
-  if (rows.length === 0) {
-    return <p className="py-6 text-center text-sm text-slate-400">{emptyMessage}</p>;
+function StatusDonut({ summary, tokens }: { summary: DashboardSummary; tokens: Tokens }) {
+  const slices = STATUS_SLICES.map((slice) => ({
+    ...slice,
+    count: countByStatus(summary, slice.status),
+  }));
+  const total = slices.reduce((sum, slice) => sum + slice.count, 0);
+
+  if (total === 0) {
+    return (
+      <p className="flex flex-1 items-center justify-center text-sm text-slate-400">
+        Sin pacientes en este período.
+      </p>
+    );
   }
-  const max = Math.max(...rows.map((row) => row.value), 1);
+  const visible = slices.filter((slice) => slice.count > 0);
 
   return (
-    <table className="w-full table-fixed text-sm">
-      <caption className="sr-only">{caption}</caption>
-      <colgroup>
-        <col className="w-2/5" />
-        <col />
-      </colgroup>
-      <thead className="sr-only">
-        <tr>
-          <th scope="col">Nombre</th>
-          <th scope="col">{valueLabel}</th>
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((row) => (
-          <tr key={row.name}>
-            <th
-              scope="row"
-              title={row.name}
-              className="truncate py-1.5 pr-3 text-left text-xs font-normal text-slate-600 dark:text-slate-300"
-            >
-              {row.name}
-            </th>
-            <td className="py-1.5">
-              <div className="flex items-center gap-2">
-                <div className="min-w-0 flex-1">
-                  <div
-                    aria-hidden="true"
-                    className="h-2.5 rounded-r-[4px]"
-                    style={{
-                      width: `${(row.value / max) * 100}%`,
-                      minWidth: 2,
-                      backgroundColor: color,
-                    }}
-                  />
-                </div>
-                <span className="w-7 shrink-0 text-right text-xs font-semibold tabular-nums text-slate-700 dark:text-slate-200">
-                  {row.value}
-                </span>
-              </div>
-            </td>
-          </tr>
+    <div className="flex flex-1 flex-col items-center justify-center gap-5">
+      <div className="relative">
+        <PieChart width={192} height={192}>
+          <Pie
+            data={visible}
+            dataKey="count"
+            nameKey="label"
+            innerRadius={64}
+            outerRadius={94}
+            startAngle={90}
+            endAngle={-270}
+            stroke={tokens.surface}
+            strokeWidth={2}
+            isAnimationActive={false}
+          >
+            {visible.map((slice) => (
+              <Cell key={slice.status} fill={tokens[slice.color]} />
+            ))}
+          </Pie>
+          <Tooltip contentStyle={tooltipStyle(tokens)} />
+        </PieChart>
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+          <span className="text-3xl font-semibold text-slate-800 dark:text-slate-100">
+            {total.toLocaleString("es-SV")}
+          </span>
+          <span className="text-xs text-slate-500 dark:text-slate-400">pacientes</span>
+        </div>
+      </div>
+      <ul className="w-full space-y-2" aria-label="Pacientes por estado">
+        {slices.map((slice) => (
+          <li key={slice.status} className="flex items-center gap-2 text-sm">
+            <span
+              className="size-2.5 shrink-0 rounded-full"
+              style={{ backgroundColor: tokens[slice.color] }}
+            />
+            <span className="flex-1 text-slate-600 dark:text-slate-300">{slice.label}</span>
+            <span className="font-semibold tabular-nums text-slate-800 dark:text-slate-100">
+              {slice.count.toLocaleString("es-SV")}
+            </span>
+            <span className="w-10 text-right text-xs tabular-nums text-slate-500 dark:text-slate-400">
+              {Math.round((slice.count / total) * 100)}%
+            </span>
+          </li>
         ))}
-      </tbody>
-    </table>
+      </ul>
+    </div>
   );
+}
+
+function tooltipStyle(tokens: Tokens) {
+  return {
+    backgroundColor: tokens.surface,
+    border: `1px solid ${tokens.tooltipBorder}`,
+    borderRadius: 12,
+    color: tokens.text,
+    fontSize: 12,
+  };
 }
 
 function SeriesTotals({
@@ -360,8 +356,6 @@ function ChartCard({
   );
 }
 
-function ChartPlaceholder({ className = "h-full" }: { className?: string }) {
-  return (
-    <div className={`animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800 ${className}`} />
-  );
+function ChartPlaceholder() {
+  return <div className="h-full animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800" />;
 }
