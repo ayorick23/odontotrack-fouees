@@ -1,14 +1,16 @@
 from collections.abc import Iterable
+from datetime import datetime, timedelta
 
 from django.db import transaction
 from django.db.models import Count, Q, QuerySet
+from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
 from accounts.models import User
 from clinical_records.services import DiagnosisService
 from patients.models import Patient
 
-from .models import Assignment
+from .models import Appointment, Assignment
 
 # Transiciones válidas del estado del caso (Patient.case_status).
 # Cualquier cambio de estado tiene que pasar por aquí; el ViewSet no
@@ -149,3 +151,133 @@ def assignable_students(search: str = "") -> QuerySet[User]:
             | Q(username__icontains=term)
         )
     return students.order_by("last_name", "first_name", "id")
+
+
+# --- Citas del calendario ---------------------------------------------------
+
+
+def schedulable_assignments(user: User, search: str = "") -> QuerySet[Assignment]:
+    """Asignaciones activas sobre las que el usuario puede agendar citas.
+
+    El estudiante solo agenda sobre sus propios casos; el resto ve todos.
+    Cada palabra de `search` debe aparecer en el nombre del paciente o del
+    estudiante.
+    """
+    assignments = Assignment.objects.filter(
+        status=Assignment.AssignmentStatus.ACTIVA
+    ).select_related("patient", "student")
+    if user.role == User.Role.ESTUDIANTE:
+        assignments = assignments.filter(student=user)
+    for term in search.split():
+        assignments = assignments.filter(
+            Q(patient__first_name__icontains=term)
+            | Q(patient__last_name__icontains=term)
+            | Q(student__first_name__icontains=term)
+            | Q(student__last_name__icontains=term)
+        )
+    return assignments.order_by("patient__last_name", "patient__first_name", "id")
+
+
+def _check_not_in_past(starts_at: datetime) -> None:
+    if starts_at < timezone.now():
+        raise ValidationError({"starts_at": "No se puede agendar una cita en el pasado."})
+
+
+def _check_student_is_free(
+    assignment: Assignment,
+    starts_at: datetime,
+    duration_minutes: int,
+    exclude_id: int | None = None,
+) -> None:
+    """Un estudiante no puede tener dos citas programadas que se crucen.
+
+    Bloquea al estudiante mientras se revisa: si dos personas agendan al
+    mismo estudiante a la vez, solo pasa la primera.
+    """
+    User.objects.select_for_update().get(pk=assignment.student_id)
+    ends_at = starts_at + timedelta(minutes=duration_minutes)
+    longest = max(Appointment.Duration.values)
+    nearby = (
+        Appointment.objects.filter(
+            assignment__student_id=assignment.student_id,
+            status=Appointment.Status.PROGRAMADA,
+            starts_at__lt=ends_at,
+            starts_at__gt=starts_at - timedelta(minutes=longest),
+        )
+        .exclude(pk=exclude_id)
+        .select_related("assignment__student")
+    )
+    for other in nearby:
+        if other.ends_at > starts_at:
+            start = timezone.localtime(other.starts_at).strftime("%H:%M")
+            end = timezone.localtime(other.ends_at).strftime("%H:%M")
+            student = other.assignment.student
+            name = student.get_full_name() or student.username
+            raise ValidationError(
+                {"starts_at": f"{name} ya tiene una cita de {start} a {end}."}
+            )
+
+
+@transaction.atomic
+def schedule_appointment(
+    *,
+    user: User,
+    assignment_id: int,
+    starts_at: datetime,
+    duration_minutes: int,
+    notes: str = "",
+) -> Appointment:
+    """Agenda una cita sobre una asignación activa visible para el usuario."""
+    assignment = schedulable_assignments(user).filter(pk=assignment_id).first()
+    if assignment is None:
+        raise ValidationError(
+            {"assignment": "Esa asignación no está activa o no puedes agendar sobre ella."}
+        )
+    _check_not_in_past(starts_at)
+    _check_student_is_free(assignment, starts_at, duration_minutes)
+    return Appointment.objects.create(
+        assignment=assignment,
+        starts_at=starts_at,
+        duration_minutes=duration_minutes,
+        notes=notes,
+    )
+
+
+def _check_is_programada(appointment: Appointment) -> None:
+    if appointment.status != Appointment.Status.PROGRAMADA:
+        raise ValidationError(
+            {"status": "Solo se pueden cambiar las citas programadas."}
+        )
+
+
+@transaction.atomic
+def reschedule_appointment(
+    appointment: Appointment,
+    *,
+    starts_at: datetime | None = None,
+    duration_minutes: int | None = None,
+    notes: str | None = None,
+) -> Appointment:
+    """Cambia fecha, hora, duración o nota de una cita programada."""
+    _check_is_programada(appointment)
+    new_start = starts_at or appointment.starts_at
+    new_duration = duration_minutes or appointment.duration_minutes
+    if new_start != appointment.starts_at or new_duration != appointment.duration_minutes:
+        _check_not_in_past(new_start)
+        _check_student_is_free(
+            appointment.assignment, new_start, new_duration, exclude_id=appointment.pk
+        )
+    appointment.starts_at = new_start
+    appointment.duration_minutes = new_duration
+    if notes is not None:
+        appointment.notes = notes
+    appointment.save(update_fields=["starts_at", "duration_minutes", "notes", "updated_at"])
+    return appointment
+
+
+def change_appointment_status(appointment: Appointment, status: str) -> Appointment:
+    """Marca una cita programada como atendida o cancelada."""
+    _check_is_programada(appointment)
+    appointment.status = status
+    appointment.save(update_fields=["status", "updated_at"])
+    return appointment

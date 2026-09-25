@@ -1,13 +1,16 @@
+from datetime import timedelta
+
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
 from rest_framework.test import APITestCase
 
-from accounts.models import User
+from accounts.models import Role, User
 from accounts.services import sync_acl
 from clinical_records.models import Diagnostico
 from patients.models import Patient
 
-from .models import Assignment
+from .models import Appointment, Assignment
 from .services import can_transition, transition_case_status
 
 
@@ -512,3 +515,152 @@ class CaseTransitionTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assignment.refresh_from_db()
         self.assertEqual(self.assignment.status, Assignment.AssignmentStatus.ACTIVA)
+
+
+class AppointmentApiTests(APITestCase):
+    url = "/api/appointments/"
+
+    def setUp(self):
+        sync_acl()
+        self.admin = self._user("admin-citas", User.Role.ADMIN)
+        self.recepcion = self._user("recepcion-citas", User.Role.RECEPCION)
+        self.docente = self._user("docente-citas", User.Role.DOCENTE)
+        self.maria = self._user("maria-citas", User.Role.ESTUDIANTE)
+        self.jose = self._user("jose-citas", User.Role.ESTUDIANTE)
+        self.case_maria = self._assign("CITA-1", self.maria)
+        self.other_case_maria = self._assign("CITA-2", self.maria)
+        self.case_jose = self._assign("CITA-3", self.jose)
+        tomorrow = timezone.localtime() + timedelta(days=1)
+        self.ten = tomorrow.replace(hour=10, minute=0, second=0, microsecond=0)
+
+    def _user(self, username, role):
+        return User.objects.create_user(username=username, password="pass12345", role=role)
+
+    def _assign(self, dui, student):
+        patient = Patient.objects.create(first_name="Paciente", last_name=dui, dui=dui)
+        return Assignment.objects.create(patient=patient, student=student, reason="")
+
+    def _schedule(self, user, assignment, starts_at, duration=60):
+        self.client.force_authenticate(user=user)
+        return self.client.post(
+            self.url,
+            {
+                "assignment": assignment.id,
+                "starts_at": starts_at.isoformat(),
+                "duration_minutes": duration,
+            },
+            format="json",
+        )
+
+    def test_recepcion_schedules_an_appointment(self):
+        response = self._schedule(self.recepcion, self.case_maria, self.ten)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        body = response.json()
+        self.assertEqual(body["patient"]["name"], "Paciente CITA-1")
+        self.assertEqual(body["student"]["id"], self.maria.id)
+        self.assertEqual(body["status"], Appointment.Status.PROGRAMADA)
+
+    def test_student_cannot_have_two_overlapping_appointments(self):
+        self._schedule(self.recepcion, self.case_maria, self.ten)
+        response = self._schedule(
+            self.recepcion, self.other_case_maria, self.ten + timedelta(minutes=30)
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("ya tiene una cita", response.json()["starts_at"])
+
+    def test_back_to_back_appointments_are_allowed(self):
+        self._schedule(self.recepcion, self.case_maria, self.ten)
+        response = self._schedule(
+            self.recepcion, self.other_case_maria, self.ten + timedelta(hours=1)
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_cannot_schedule_in_the_past(self):
+        response = self._schedule(
+            self.recepcion, self.case_maria, timezone.now() - timedelta(hours=1)
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("starts_at", response.json())
+
+    def test_cannot_schedule_on_an_inactive_assignment(self):
+        self.case_maria.status = Assignment.AssignmentStatus.CANCELADA
+        self.case_maria.save(update_fields=["status"])
+        response = self._schedule(self.recepcion, self.case_maria, self.ten)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("assignment", response.json())
+
+    def test_view_permission_alone_cannot_schedule(self):
+        response = self._schedule(self.docente, self.case_maria, self.ten)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_student_sees_only_appointments_of_own_cases(self):
+        self._schedule(self.recepcion, self.case_maria, self.ten)
+        self._schedule(self.recepcion, self.case_jose, self.ten)
+        self.client.force_authenticate(user=self.maria)
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            [row["student"]["id"] for row in response.json()],
+            [self.maria.id],
+        )
+
+    def test_list_only_returns_the_visible_range(self):
+        self._schedule(self.recepcion, self.case_maria, self.ten)
+        self._schedule(self.recepcion, self.case_jose, self.ten + timedelta(days=10))
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.get(
+            self.url,
+            {
+                "start": (self.ten - timedelta(days=1)).isoformat(),
+                "end": (self.ten + timedelta(days=1)).isoformat(),
+            },
+        )
+        self.assertEqual(len(response.json()), 1)
+
+    def test_permission_decides_even_for_students(self):
+        # Con calendar.create, el estudiante agenda, pero solo en sus casos.
+        Role.objects.get(slug="estudiante").permissions.add(
+            *Role.objects.get(slug="admin").permissions.filter(name="calendar.create")
+        )
+        own = self._schedule(self.maria, self.case_maria, self.ten)
+        other = self._schedule(self.maria, self.case_jose, self.ten)
+        self.assertEqual(own.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(other.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_editing_requires_the_edit_permission(self):
+        appointment_id = self._schedule(self.recepcion, self.case_maria, self.ten).json()["id"]
+        response = self.client.patch(
+            f"{self.url}{appointment_id}/",
+            {"starts_at": (self.ten + timedelta(hours=2)).isoformat()},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_reschedule_then_cancel_frees_the_slot(self):
+        appointment_id = self._schedule(self.admin, self.case_maria, self.ten).json()["id"]
+        later = self.ten + timedelta(hours=2)
+        moved = self.client.patch(
+            f"{self.url}{appointment_id}/",
+            {"starts_at": later.isoformat(), "duration_minutes": 30},
+            format="json",
+        )
+        self.assertEqual(moved.status_code, status.HTTP_200_OK)
+        self.assertEqual(moved.json()["duration_minutes"], 30)
+
+        cancelled = self.client.post(
+            f"{self.url}{appointment_id}/status/", {"status": "cancelada"}, format="json"
+        )
+        self.assertEqual(cancelled.json()["status"], Appointment.Status.CANCELADA)
+        again = self.client.patch(
+            f"{self.url}{appointment_id}/", {"notes": "tarde"}, format="json"
+        )
+        self.assertEqual(again.status_code, status.HTTP_400_BAD_REQUEST)
+        reused = self._schedule(self.admin, self.other_case_maria, later)
+        self.assertEqual(reused.status_code, status.HTTP_201_CREATED)
+
+    def test_schedulable_lists_active_cases_with_search(self):
+        self.client.force_authenticate(user=self.recepcion)
+        everyone = self.client.get(f"{self.url}schedulable/")
+        self.assertEqual(len(everyone.json()), 3)
+        found = self.client.get(f"{self.url}schedulable/", {"search": "cita-3"})
+        self.assertEqual([row["id"] for row in found.json()], [self.case_jose.id])
