@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 import {
+  Bar,
+  BarChart,
   CartesianGrid,
   Cell,
   Line,
@@ -16,6 +18,7 @@ import { useTheme } from "../../hooks/useTheme";
 import {
   countByStatus,
   type CaseStatus,
+  type DashboardAreaStatus,
   type DashboardMonthPoint,
   type DashboardSeries,
   type DashboardSummary,
@@ -30,6 +33,7 @@ const TOKENS = {
     grid: "#eef2f7",
     axis: "#64748b",
     text: "#334155",
+    hover: "#f8fafc",
     tooltipBorder: "#e2e8f0",
     series1: "#0d9488",
     series2: "#7c3aed",
@@ -40,6 +44,7 @@ const TOKENS = {
     grid: "#1e293b",
     axis: "#94a3b8",
     text: "#e2e8f0",
+    hover: "#1e293b",
     tooltipBorder: "#334155",
     series1: "#0d9488",
     series2: "#8b5cf6",
@@ -109,7 +114,125 @@ export function DashboardCharts({
       >
         <StatusDonut summary={summary} tokens={tokens} />
       </ChartCard>
+
+      <ChartCard
+        title="Pacientes por área clínica"
+        description="Registrados en el período, por área y estado actual."
+        action={<StatusLegend tokens={tokens} />}
+        className="xl:col-span-3"
+      >
+        {/* Alto fijo: las áreas salen del catálogo, una lista corta. */}
+        <div className="h-64">
+          {series ? (
+            <AreaStatusChart rows={series.by_area} tokens={tokens} />
+          ) : (
+            <ChartPlaceholder />
+          )}
+        </div>
+      </ChartCard>
     </section>
+  );
+}
+
+function AreaStatusChart({
+  rows,
+  tokens,
+}: {
+  rows: DashboardAreaStatus[];
+  tokens: Tokens;
+}) {
+  const last = STATUS_SLICES.length - 1;
+
+  return (
+    <>
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart
+          data={rows}
+          layout="vertical"
+          barCategoryGap="28%"
+          margin={{ top: 0, right: 16, left: 0, bottom: 0 }}
+        >
+          <CartesianGrid stroke={tokens.grid} horizontal={false} />
+          <XAxis
+            type="number"
+            allowDecimals={false}
+            tickLine={false}
+            axisLine={false}
+            tick={{ fill: tokens.axis, fontSize: 11 }}
+          />
+          <YAxis
+            type="category"
+            dataKey="area"
+            width={140}
+            tickLine={false}
+            axisLine={{ stroke: tokens.grid }}
+            tick={{ fill: tokens.text, fontSize: 11 }}
+          />
+          <Tooltip
+            cursor={{ fill: tokens.hover }}
+            contentStyle={tooltipStyle(tokens)}
+            labelStyle={{ color: tokens.text, fontWeight: 600 }}
+          />
+          {STATUS_SLICES.map((slice, index) => (
+            <Bar
+              key={slice.status}
+              dataKey={slice.status}
+              name={slice.label}
+              stackId="estado"
+              fill={tokens[slice.color]}
+              // Borde del color de la tarjeta: separa los tramos sin dibujar líneas.
+              stroke={tokens.surface}
+              strokeWidth={2}
+              radius={index === last ? [0, 4, 4, 0] : 0}
+              maxBarSize={18}
+              isAnimationActive={false}
+            />
+          ))}
+        </BarChart>
+      </ResponsiveContainer>
+      <table className="sr-only">
+        <caption>Pacientes por área clínica</caption>
+        <thead>
+          <tr>
+            <th scope="col">Área</th>
+            {STATUS_SLICES.map((slice) => (
+              <th key={slice.status} scope="col">
+                {slice.label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.area}>
+              <th scope="row">{row.area}</th>
+              {STATUS_SLICES.map((slice) => (
+                <td key={slice.status}>{row[slice.status]}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </>
+  );
+}
+
+function StatusLegend({ tokens }: { tokens: Tokens }) {
+  return (
+    <ul className="flex flex-wrap items-center gap-x-4 gap-y-1" aria-label="Estados">
+      {STATUS_SLICES.map((slice) => (
+        <li
+          key={slice.status}
+          className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300"
+        >
+          <span
+            className="size-2.5 rounded-full"
+            style={{ backgroundColor: tokens[slice.color] }}
+          />
+          {slice.label}
+        </li>
+      ))}
+    </ul>
   );
 }
 

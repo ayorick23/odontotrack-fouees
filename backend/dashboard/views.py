@@ -11,7 +11,7 @@ from clinical_records.models import Diagnostico, EvolucionClinica, Tratamiento
 from patients.models import Patient
 
 from .serializers import DashboardSeriesSerializer, DashboardSummarySerializer
-from .services import build_dashboard_series
+from .services import average_wait_days, build_dashboard_series, in_period
 
 
 class DashboardSummaryView(APIView):
@@ -42,10 +42,11 @@ class DashboardSummaryView(APIView):
         responses=DashboardSummarySerializer,
     )
     def get(self, request):
-        patients = Patient.objects.in_period(request.query_params.get("period"))
+        period = request.query_params.get("period")
+        patients = Patient.objects.in_period(period)
         data = {
             "total_patients": patients.count(),
-            "total_assignments": Assignment.objects.count(),
+            "total_assignments": in_period(Assignment.objects.all(), period).count(),
             "total_clinical_records": (
                 Diagnostico.objects.count()
                 + Tratamiento.objects.count()
@@ -58,6 +59,7 @@ class DashboardSummaryView(APIView):
             "pending_validations": Diagnostico.objects.filter(
                 is_validated=False
             ).count(),
+            "average_wait_days": average_wait_days(patients),
         }
         return Response(data)
 

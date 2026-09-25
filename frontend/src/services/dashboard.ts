@@ -9,6 +9,8 @@ export type DashboardSummary = {
   patients_by_status: Partial<Record<CaseStatus, number>>;
   /** Diagnósticos sin validar hoy; no depende del período. */
   pending_validations: number;
+  /** Días promedio del registro a la primera asignación; null si no hay. */
+  average_wait_days: number | null;
 };
 
 export type SummaryPeriod = "1m" | "6m" | "1a";
@@ -20,8 +22,14 @@ export type DashboardMonthPoint = {
   assignments: number;
 };
 
+export type DashboardAreaStatus = {
+  area: string;
+} & Record<CaseStatus, number>;
+
 export type DashboardSeries = {
   months: DashboardMonthPoint[];
+  /** Todas las áreas activas del catálogo, de mayor a menor total. */
+  by_area: DashboardAreaStatus[];
 };
 
 export function getDashboardSummary(

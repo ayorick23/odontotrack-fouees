@@ -1,15 +1,8 @@
-import {
-  CircleCheckBig,
-  ClipboardCheck,
-  Clock3,
-  UserCheck,
-  Users,
-} from "lucide-react";
+import { ClipboardCheck, Clock3, UserCheck, Users } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 import {
-  countByStatus,
   getDashboardSeries,
   getDashboardSummary,
   type DashboardSeries,
@@ -103,26 +96,24 @@ export function Dashboard() {
         className={`space-y-6 transition-opacity ${loading ? "opacity-60" : ""}`}
         aria-busy={loading}
       >
-        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        {/* Los estados van en la dona; aquí solo lo que no se ve en otro lado. */}
+        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <KpiCard
             label="Pacientes registrados"
             value={summary.total_patients}
             icon={<Users className="size-5" />}
           />
           <KpiCard
-            label="Pendientes de asignación"
-            value={countByStatus(summary, "pendiente")}
-            icon={<Clock3 className="size-5" />}
-          />
-          <KpiCard
-            label="En proceso"
-            value={countByStatus(summary, "en_proceso")}
+            label="Asignaciones del período"
+            value={summary.total_assignments}
             icon={<UserCheck className="size-5" />}
           />
           <KpiCard
-            label="Finalizados"
-            value={countByStatus(summary, "finalizado")}
-            icon={<CircleCheckBig className="size-5" />}
+            label="Espera promedio"
+            hint="registro a asignación"
+            value={summary.average_wait_days}
+            unit="días"
+            icon={<Clock3 className="size-5" />}
           />
           <KpiCard
             label="Diagnósticos por validar"
@@ -176,11 +167,14 @@ function KpiCard({
   label,
   hint,
   value,
+  unit,
   icon,
 }: {
   label: string;
   hint?: string;
-  value: number;
+  /** null se muestra como "—" (p. ej. espera sin asignaciones). */
+  value: number | null;
+  unit?: string;
   icon: ReactNode;
 }) {
   return (
@@ -197,7 +191,12 @@ function KpiCard({
         </span>
       </div>
       <p className="mt-2 text-3xl font-semibold text-slate-800 dark:text-slate-100">
-        {value.toLocaleString("es-SV")}
+        {value === null ? "—" : value.toLocaleString("es-SV", { maximumFractionDigits: 1 })}
+        {unit && value !== null ? (
+          <span className="ml-1 text-sm font-medium text-slate-500 dark:text-slate-400">
+            {unit}
+          </span>
+        ) : null}
       </p>
     </article>
   );
@@ -231,8 +230,8 @@ function LoadError({ message, onRetry }: { message: string; onRetry: () => void 
 function DashboardSkeleton() {
   return (
     <>
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-        {["registrados", "pendientes", "proceso", "finalizados", "validar"].map((key) => (
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {["registrados", "asignaciones", "espera", "validar"].map((key) => (
           <div
             key={key}
             className="h-32 animate-pulse rounded-2xl bg-white shadow-sm dark:bg-slate-900"

@@ -1,10 +1,19 @@
 from datetime import date, datetime, timedelta
 
-from django.db.models import Count
+from django.db.models import (
+    Avg,
+    Count,
+    DurationField,
+    ExpressionWrapper,
+    F,
+    OuterRef,
+    Subquery,
+)
 from django.db.models.functions import TruncMonth
 from django.utils import timezone
 
 from assignments.models import Assignment
+from catalogs.models import ClinicalArea
 from patients.models import PERIOD_DAYS, Patient
 
 MONTH_LABELS = (
@@ -71,15 +80,69 @@ def _counts_by_month(queryset, field: str) -> dict[date, int]:
     return counts
 
 
+def in_period(queryset, period: str | None):
+    """Filtra por created_at desde el inicio del período ("todos" = sin filtro)."""
+    start = period_start(period)
+    if start is None:
+        return queryset
+    return queryset.filter(created_at__gte=start)
+
+
+def average_wait_days(patients) -> float | None:
+    """Días promedio entre el registro del paciente y su primera asignación.
+
+    Solo cuenta pacientes ya asignados alguna vez; None si no hay ninguno.
+    """
+    first_assignment = (
+        Assignment.objects.filter(patient=OuterRef("pk"))
+        .order_by("created_at")
+        .values("created_at")[:1]
+    )
+    average = (
+        patients.annotate(first_assignment=Subquery(first_assignment))
+        .exclude(first_assignment=None)
+        .aggregate(
+            average=Avg(
+                ExpressionWrapper(
+                    F("first_assignment") - F("created_at"),
+                    output_field=DurationField(),
+                )
+            )
+        )["average"]
+    )
+    if average is None:
+        return None
+    return round(average.total_seconds() / 86400, 1)
+
+
+def _patients_by_area(patients) -> list[dict]:
+    """Pacientes por área clínica y estado, de mayor a menor total.
+
+    Salen todas las áreas activas del catálogo (lista corta que maneja el
+    admin) aunque no tengan pacientes, así la gráfica no cambia de tamaño.
+    """
+    empty = {status: 0 for status in Patient.CaseStatus.values}
+    rows = {
+        area.name: dict(empty) for area in ClinicalArea.objects.filter(is_active=True)
+    }
+    counts = patients.values("clinical_area__name", "case_status").annotate(
+        total=Count("id")
+    )
+    for row in counts:
+        area = row["clinical_area__name"] or "Sin área"
+        rows.setdefault(area, dict(empty))[row["case_status"]] = row["total"]
+    return sorted(
+        ({"area": area, **statuses} for area, statuses in rows.items()),
+        key=lambda row: -sum(row[status] for status in Patient.CaseStatus.values),
+    )
+
+
 def build_dashboard_series(period: str | None) -> dict:
     start = period_start(period)
     today = timezone.localdate()
 
-    patients = Patient.objects.all()
-    assignments = Assignment.objects.all()
-    if start is not None:
-        patients = patients.filter(created_at__gte=start)
-        assignments = assignments.filter(created_at__gte=start)
+    patients = in_period(Patient.objects.all(), period)
+    assignments = in_period(Assignment.objects.all(), period)
 
     patient_counts = _counts_by_month(patients, "created_at")
     assignment_counts = _counts_by_month(assignments, "created_at")
@@ -97,4 +160,4 @@ def build_dashboard_series(period: str | None) -> dict:
         }
         for month in _iter_months(first_month, today)
     ]
-    return {"months": months}
+    return {"months": months, "by_area": _patients_by_area(patients)}

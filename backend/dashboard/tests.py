@@ -7,6 +7,7 @@ from rest_framework.test import APITestCase
 from accounts.models import User
 from accounts.services import sync_acl
 from assignments.models import Assignment
+from catalogs.models import ClinicalArea
 from clinical_records.models import Diagnostico
 from patients.models import Patient
 
@@ -92,6 +93,53 @@ class DashboardSummaryTests(APITestCase):
         response = self.client.get("/api/dashboard/summary/", {"period": "1m"})
         self.assertEqual(response.json()["pending_validations"], 1)
 
+    def _student(self):
+        return User.objects.create_user(
+            username="estudiante-espera",
+            password="pass12345",
+            role=User.Role.ESTUDIANTE,
+        )
+
+    def test_summary_average_wait_until_first_assignment(self):
+        student = self._student()
+        waited = Patient.objects.create(
+            first_name="Espera",
+            last_name="Diez",
+            dui="WAIT-001",
+        )
+        Patient.objects.filter(pk=waited.pk).update(
+            created_at=timezone.now() - timedelta(days=10),
+        )
+        Patient.objects.create(first_name="Sin", last_name="Asignar", dui="WAIT-002")
+        Assignment.objects.create(patient=waited, student=student, reason="")
+
+        response = self.client.get("/api/dashboard/summary/", {"period": "1m"})
+        self.assertEqual(response.json()["average_wait_days"], 10.0)
+
+    def test_summary_without_assignments_has_no_wait(self):
+        Patient.objects.create(first_name="Sin", last_name="Asignar", dui="WAIT-003")
+        response = self.client.get("/api/dashboard/summary/")
+        self.assertIsNone(response.json()["average_wait_days"])
+
+    def test_summary_counts_assignments_of_the_period(self):
+        student = self._student()
+        Assignment.objects.create(
+            patient=Patient.objects.create(first_name="A", last_name="B", dui="ASG-P-1"),
+            student=student,
+            reason="",
+        )
+        old = Assignment.objects.create(
+            patient=Patient.objects.create(first_name="C", last_name="D", dui="ASG-P-2"),
+            student=student,
+            reason="",
+        )
+        Assignment.objects.filter(pk=old.pk).update(
+            created_at=timezone.now() - timedelta(days=40),
+        )
+
+        response = self.client.get("/api/dashboard/summary/", {"period": "1m"})
+        self.assertEqual(response.json()["total_assignments"], 1)
+
 
 class DashboardSeriesTests(APITestCase):
     def setUp(self):
@@ -150,3 +198,21 @@ class DashboardSeriesTests(APITestCase):
     def test_series_without_data_has_only_current_month(self):
         response = self.client.get("/api/dashboard/series/")
         self.assertEqual(len(response.json()["months"]), 1)
+
+    def test_series_splits_patients_by_area_and_status(self):
+        endo = ClinicalArea.objects.get(name="Endodoncia")
+        for dui, case_status in (
+            ("AREA-1", Patient.CaseStatus.PENDIENTE),
+            ("AREA-2", Patient.CaseStatus.PENDIENTE),
+            ("AREA-3", Patient.CaseStatus.FINALIZADO),
+        ):
+            self._patient(dui, clinical_area=endo, case_status=case_status)
+
+        response = self.client.get("/api/dashboard/series/")
+        by_area = response.json()["by_area"]
+        self.assertEqual(
+            by_area[0],
+            {"area": "Endodoncia", "pendiente": 2, "en_proceso": 0, "finalizado": 1},
+        )
+        active_areas = ClinicalArea.objects.filter(is_active=True).count()
+        self.assertEqual(len(by_area), active_areas)
