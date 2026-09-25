@@ -45,14 +45,11 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
         permission: "patients.view",
       },
       {
-        to: "/patients/available",
-        label: "Pacientes disponibles",
-        permission: ["assignments.claim", "assignments.assign_student"],
-      },
-      {
+        // Pacientes disponibles: quien asigna elige estudiante; el
+        // estudiante se asigna a sí mismo.
         to: "/assignments",
-        label: "Asignación de paciente",
-        permission: "assignments.view",
+        label: "Asignaciones",
+        permission: ["assignments.claim", "assignments.assign_student"],
       },
     ],
   },
