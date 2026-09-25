@@ -118,7 +118,6 @@ export function DashboardCharts({
       <ChartCard
         title="Pacientes por área clínica"
         description="Registrados en el período, por área y estado actual."
-        action={<StatusLegend tokens={tokens} />}
         className="xl:col-span-3"
       >
         {/* Alto fijo: las áreas salen del catálogo, una lista corta. */}
@@ -129,6 +128,7 @@ export function DashboardCharts({
             <ChartPlaceholder />
           )}
         </div>
+        <StatusLegend tokens={tokens} className="mt-3" />
       </ChartCard>
     </section>
   );
@@ -141,50 +141,45 @@ function AreaStatusChart({
   rows: DashboardAreaStatus[];
   tokens: Tokens;
 }) {
-  const last = STATUS_SLICES.length - 1;
-
   return (
     <>
       <ResponsiveContainer width="100%" height="100%">
+        {/* Columnas finas agrupadas: una por estado dentro de cada área. */}
         <BarChart
           data={rows}
-          layout="vertical"
-          barCategoryGap="28%"
-          margin={{ top: 0, right: 16, left: 0, bottom: 0 }}
+          barCategoryGap="24%"
+          barGap={2}
+          margin={{ top: 8, right: 8, left: -16, bottom: 0 }}
         >
-          <CartesianGrid stroke={tokens.grid} horizontal={false} />
+          <CartesianGrid stroke={tokens.grid} vertical={false} />
           <XAxis
-            type="number"
+            dataKey="area"
+            interval={0}
+            height={36}
+            tickLine={false}
+            axisLine={{ stroke: tokens.grid }}
+            // width hace que los nombres largos pasen a dos líneas.
+            tick={{ fill: tokens.text, fontSize: 11, width: 96 }}
+          />
+          <YAxis
             allowDecimals={false}
             tickLine={false}
             axisLine={false}
             tick={{ fill: tokens.axis, fontSize: 11 }}
-          />
-          <YAxis
-            type="category"
-            dataKey="area"
-            width={140}
-            tickLine={false}
-            axisLine={{ stroke: tokens.grid }}
-            tick={{ fill: tokens.text, fontSize: 11 }}
           />
           <Tooltip
             cursor={{ fill: tokens.hover }}
             contentStyle={tooltipStyle(tokens)}
             labelStyle={{ color: tokens.text, fontWeight: 600 }}
           />
-          {STATUS_SLICES.map((slice, index) => (
+          {STATUS_SLICES.map((slice) => (
             <Bar
               key={slice.status}
               dataKey={slice.status}
               name={slice.label}
-              stackId="estado"
               fill={tokens[slice.color]}
-              // Borde del color de la tarjeta: separa los tramos sin dibujar líneas.
-              stroke={tokens.surface}
-              strokeWidth={2}
-              radius={index === last ? [0, 4, 4, 0] : 0}
-              maxBarSize={18}
+              radius={[4, 4, 0, 0]}
+              maxBarSize={12}
               isAnimationActive={false}
             />
           ))}
@@ -217,9 +212,12 @@ function AreaStatusChart({
   );
 }
 
-function StatusLegend({ tokens }: { tokens: Tokens }) {
+function StatusLegend({ tokens, className = "" }: { tokens: Tokens; className?: string }) {
   return (
-    <ul className="flex flex-wrap items-center gap-x-4 gap-y-1" aria-label="Estados">
+    <ul
+      className={`flex flex-wrap items-center gap-x-4 gap-y-1 ${className}`}
+      aria-label="Estados"
+    >
       {STATUS_SLICES.map((slice) => (
         <li
           key={slice.status}
