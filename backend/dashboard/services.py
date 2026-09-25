@@ -119,7 +119,7 @@ def _patients_by_area(patients) -> list[dict]:
     """Pacientes por área clínica y estado, de mayor a menor total.
 
     Salen todas las áreas activas del catálogo (lista corta que maneja el
-    admin) aunque no tengan pacientes, así la gráfica no cambia de tamaño.
+    admin), también las que no tienen pacientes; el frontend decide si mostrarlas.
     """
     empty = {status: 0 for status in Patient.CaseStatus.values}
     rows = {

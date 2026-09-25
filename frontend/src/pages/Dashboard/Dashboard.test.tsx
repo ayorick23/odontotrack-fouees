@@ -100,6 +100,7 @@ describe("Dashboard", () => {
       "1",
       "1",
     ]);
+    expect(within(table).queryByRole("row", { name: /Ortodoncia/ })).toBeNull();
   });
 
   it("muestra un guion si todavía no hay espera que calcular", async () => {

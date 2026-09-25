@@ -178,7 +178,7 @@ function KpiCard({
   icon: ReactNode;
 }) {
   return (
-    <article className="flex flex-col justify-between rounded-2xl bg-white p-4 shadow-[0_10px_30px_rgba(15,40,80,0.06)] dark:bg-slate-900 dark:shadow-none dark:ring-1 dark:ring-white/10">
+    <article className="flex flex-col justify-between rounded-2xl bg-white p-4 shadow-[0_10px_30px_rgba(15,40,80,0.06)] dark:bg-slate-900 dark:shadow-none dark:ring-1 dark:ring-white/15">
       <div className="flex items-start justify-between gap-3">
         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
           {label}
@@ -204,7 +204,7 @@ function KpiCard({
 
 function LoadError({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
-    <div className="rounded-2xl bg-white p-6 shadow-sm dark:bg-slate-900 dark:shadow-none dark:ring-1 dark:ring-white/10">
+    <div className="rounded-2xl bg-white p-6 shadow-sm dark:bg-slate-900 dark:shadow-none dark:ring-1 dark:ring-white/15">
       <p className="text-sm text-red-700 dark:text-red-400" role="alert">
         {message}
       </p>

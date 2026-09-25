@@ -83,6 +83,10 @@ export function DashboardCharts({
 }) {
   const { theme } = useTheme();
   const colors = theme === "dark" ? THEME.dark : THEME.light;
+  // Las áreas sin pacientes se ocultan para no dejar huecos en el eje.
+  const areaRows = (series?.by_area ?? []).filter((row) =>
+    STATUS_SLICES.some((slice) => row[slice.status] > 0),
+  );
 
   return (
     // 6 columnas: arriba dos mitades como en el diseño original y abajo la
@@ -102,15 +106,19 @@ export function DashboardCharts({
       </ChartCard>
 
       <ChartCard title="Pacientes por área clínica" className="xl:col-span-3">
-        {series ? (
+        {series === null ? (
+          <ChartPlaceholder />
+        ) : areaRows.length === 0 ? (
+          <p className="flex h-full items-center justify-center text-sm text-slate-400">
+            Sin pacientes en este período
+          </p>
+        ) : (
           <div className="flex h-full flex-col">
             <div className="min-h-0 flex-1">
-              <AreaStatusChart rows={series.by_area} colors={colors} />
+              <AreaStatusChart rows={areaRows} colors={colors} />
             </div>
             <ChartLegend items={STATUS_SLICES} />
           </div>
-        ) : (
-          <ChartPlaceholder />
         )}
       </ChartCard>
 
@@ -138,8 +146,8 @@ function MonthlyFlowChart({
           <defs>
             {AREA_SERIES.map((item) => (
               <linearGradient key={item.key} id={`fill-${item.key}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={COLORS[item.color]} stopOpacity={0.35} />
-                <stop offset="100%" stopColor={COLORS[item.color]} stopOpacity={0.04} />
+                <stop offset="0%" stopColor={COLORS[item.color]} stopOpacity={0.15} />
+                <stop offset="100%" stopColor={COLORS[item.color]} stopOpacity={0.02} />
               </linearGradient>
             ))}
           </defs>
@@ -402,7 +410,7 @@ function ChartCard({
 }) {
   return (
     <article
-      className={`rounded-2xl bg-white p-5 shadow-[0_10px_30px_rgba(15,40,80,0.06)] dark:bg-slate-900 dark:shadow-none dark:ring-1 dark:ring-white/10 ${className}`}
+      className={`rounded-2xl bg-white p-5 shadow-[0_10px_30px_rgba(15,40,80,0.06)] dark:bg-slate-900 dark:shadow-none dark:ring-1 dark:ring-white/15 ${className}`}
     >
       <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">{title}</h2>
       <div className="mt-3 h-72">{children}</div>
