@@ -116,9 +116,9 @@ describe("Dashboard", () => {
     const legend = await screen.findByRole("list", { name: "Pacientes por estado" });
     const rows = within(legend).getAllByRole("listitem");
     expect(rows.map((row) => row.textContent)).toEqual([
-      "Pendientes536%",
-      "En proceso643%",
-      "Finalizados321%",
+      "Pendiente de asignación536%",
+      "Asignado643%",
+      "Finalizado321%",
     ]);
   });
 
