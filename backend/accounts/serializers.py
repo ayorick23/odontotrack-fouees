@@ -165,13 +165,16 @@ class RoleSerializer(serializers.ModelSerializer):
             instance.sync_permissions(permission_names)
         return instance
 
+
 class StudentListSerializer(serializers.ModelSerializer):
+    """Vista reducida de un estudiante para quien no gestiona usuarios."""
+
     name = serializers.SerializerMethodField()
+
     class Meta:
-        model=  User
+        model = User
         fields = ["id", "name", "email"]
 
     @extend_schema_field(serializers.CharField())
-    def get_name (self, obj):
+    def get_name(self, obj):
         return obj.get_full_name() or obj.username
-

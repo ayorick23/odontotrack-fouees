@@ -14,9 +14,9 @@ from .serializers import (
     EmailOrUsernameTokenObtainPairSerializer,
     MeSerializer,
     RoleSerializer,
+    StudentListSerializer,
     UserCreateSerializer,
     UserSerializer,
-    StudentListSerializer,
 )
 
 User = get_user_model()
@@ -46,20 +46,25 @@ class UserViewSet(viewsets.ModelViewSet):
         "destroy": "users.delete",
     }
 
-    def _list_role(self):
-        if self.action != "list" or getattr(self, "swagger_fake_view", False):
-            return None
-
-        if not self.request.user.has_acl("users.view"):
-            return User.Role.ESTUDIANTE
-        role = self.request.query_params.get("role")
-        return role if role in User.Role.values else None
+    def _students_only(self):
+        """
+        Quien lee usuarios solo con `students.view` (docente, recepción) ve
+        estudiantes y nada más, en el listado y en el detalle (ODO-16). Se
+        decide por quién pregunta, no por el filtro ?role= que mande.
+        """
+        if self.action not in ("list", "retrieve"):
+            return False
+        if getattr(self, "swagger_fake_view", False):
+            return False
+        return not self.request.user.has_acl("users.view")
 
     def get_queryset(self):
         queryset = User.objects.all().order_by("id")
-        role = self._list_role()
-        if role:
-            queryset = queryset.filter(role= role)
+        if self._students_only():
+            return queryset.filter(role=User.Role.ESTUDIANTE)
+        role = self.request.query_params.get("role")
+        if self.action == "list" and role in User.Role.values:
+            queryset = queryset.filter(role=role)
         return queryset
 
     def get_serializer_class(self):
@@ -67,7 +72,7 @@ class UserViewSet(viewsets.ModelViewSet):
             return UserCreateSerializer
         if self.action == "me":
             return MeSerializer
-        if self._list_role() == User.Role.ESTUDIANTE:
+        if self._students_only():
             return StudentListSerializer
         return UserSerializer
 
@@ -75,8 +80,6 @@ class UserViewSet(viewsets.ModelViewSet):
     def me(self, request):
         serializer = MeSerializer(request.user)
         return Response(serializer.data)
-
-    
 
 
 @extend_schema(tags=["accounts"])
