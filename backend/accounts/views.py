@@ -16,6 +16,7 @@ from .serializers import (
     RoleSerializer,
     UserCreateSerializer,
     UserSerializer,
+    StudentListSerializer,
 )
 
 User = get_user_model()
@@ -45,17 +46,37 @@ class UserViewSet(viewsets.ModelViewSet):
         "destroy": "users.delete",
     }
 
+    def _list_role(self):
+        if self.action != "list" or getattr(self, "swagger_fake_view", False):
+            return None
+
+        if not self.request.user.has_acl("users.view"):
+            return User.Role.ESTUDIANTE
+        role = self.request.query_params.get("role")
+        return role if role in User.Role.values else None
+
+    def get_queryset(self):
+        queryset = User.objects.all().order_by("id")
+        role = self._list_role()
+        if role:
+            queryset = queryset.filter(role= role)
+        return queryset
+
     def get_serializer_class(self):
         if self.action == "create":
             return UserCreateSerializer
         if self.action == "me":
             return MeSerializer
+        if self._list_role() == User.Role.ESTUDIANTE:
+            return StudentListSerializer
         return UserSerializer
 
     @action(detail=False, methods=["get"])
     def me(self, request):
         serializer = MeSerializer(request.user)
         return Response(serializer.data)
+
+    
 
 
 @extend_schema(tags=["accounts"])

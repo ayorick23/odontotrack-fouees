@@ -164,3 +164,14 @@ class RoleSerializer(serializers.ModelSerializer):
         if permission_names is not None:
             instance.sync_permissions(permission_names)
         return instance
+
+class StudentListSerializer(serializers.ModelSerializer):
+    name = serializers.SerializerMethodField()
+    class Meta:
+        model=  User
+        fields = ["id", "name", "email"]
+
+    @extend_schema_field(serializers.CharField())
+    def get_name (self, obj):
+        return obj.get_full_name() or obj.username
+
