@@ -4,8 +4,9 @@ from django.db.models import Count
 from django.db.models.functions import TruncMonth
 from django.utils import timezone
 
-from assignments.models import Assignment
 from patients.models import PERIOD_DAYS, Patient
+
+from .scoping import DashboardScope
 
 DEFAULT_SERIES_DAYS = PERIOD_DAYS["1a"]
 MONTH_LABELS = (
@@ -87,13 +88,13 @@ def _status_counts_by_month(queryset) -> dict[date, dict[str, int]]:
     return counts
 
 
-def build_dashboard_series(period: str | None) -> dict:
+def build_dashboard_series(period: str | None, scope: DashboardScope) -> dict:
     start = _period_start(period)
     start_date = _as_local_date(start)
     today = timezone.localdate()
 
-    patients = Patient.objects.filter(created_at__gte=start)
-    assignments = Assignment.objects.filter(created_at__gte=start)
+    patients = scope.patients.filter(created_at__gte=start)
+    assignments = scope.assignments.filter(created_at__gte=start)
 
     assignment_counts = _counts_by_month(assignments, "created_at")
     status_by_month = _status_counts_by_month(patients)
