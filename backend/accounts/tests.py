@@ -402,3 +402,73 @@ class AclMatrixTests(APITestCase):
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class StudentListingTests(APITestCase):
+    """ODO-16: docente y recepción leen solo estudiantes, con datos reducidos."""
+
+    def setUp(self):
+        sync_acl()
+        self.admin = self._user("admin", User.Role.ADMIN)
+        self.docente = self._user("docente", User.Role.DOCENTE)
+        self.recepcion = self._user("recepcion", User.Role.RECEPCION)
+        self.est1 = self._user(
+            "est1", User.Role.ESTUDIANTE, first_name="Ana", last_name="Pérez"
+        )
+        self.est2 = self._user("est2", User.Role.ESTUDIANTE)
+        self.student_ids = {self.est1.id, self.est2.id}
+
+    def _user(self, username, role, **extra):
+        return User.objects.create_user(
+            username=username,
+            email=f"{username}@fouees.edu.sv",
+            password=VALID_PASSWORD,
+            role=role,
+            **extra,
+        )
+
+    def _ids(self, response):
+        return {row["id"] for row in response.data["results"]}
+
+    def test_docente_and_recepcion_list_only_students(self):
+        for user in (self.docente, self.recepcion):
+            with self.subTest(role=user.role):
+                self.client.force_authenticate(user=user)
+                response = self.client.get(USERS_URL)
+                self.assertEqual(response.status_code, status.HTTP_200_OK)
+                self.assertEqual(self._ids(response), self.student_ids)
+
+    def test_students_list_uses_light_fields(self):
+        self.client.force_authenticate(user=self.docente)
+        rows = self.client.get(USERS_URL).data["results"]
+        self.assertEqual(set(rows[0]), {"id", "name", "email"})
+        # Nombre completo, o el usuario si no tiene nombre.
+        self.assertEqual({row["name"] for row in rows}, {"Ana Pérez", "est2"})
+
+    def test_role_param_cannot_widen_the_list(self):
+        self.client.force_authenticate(user=self.docente)
+        response = self.client.get(USERS_URL, {"role": User.Role.ADMIN})
+        self.assertEqual(self._ids(response), self.student_ids)
+
+    def test_admin_lists_everyone_and_filters_by_role(self):
+        self.client.force_authenticate(user=self.admin)
+        self.assertEqual(self.client.get(USERS_URL).data["count"], 5)
+        response = self.client.get(USERS_URL, {"role": User.Role.ESTUDIANTE})
+        self.assertEqual(self._ids(response), self.student_ids)
+        # Quien gestiona usuarios conserva el serializer completo.
+        self.assertIn("username", response.data["results"][0])
+        self.assertEqual(self.client.get(USERS_URL, {"role": "x"}).data["count"], 5)
+
+    def test_docente_retrieves_student_but_not_other_roles(self):
+        self.client.force_authenticate(user=self.docente)
+        response = self.client.get(f"{USERS_URL}{self.est1.id}/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(set(response.data), {"id", "name", "email"})
+        response = self.client.get(f"{USERS_URL}{self.admin.id}/")
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_estudiante_cannot_list_users(self):
+        self.client.force_authenticate(user=self.est1)
+        self.assertEqual(
+            self.client.get(USERS_URL).status_code, status.HTTP_403_FORBIDDEN
+        )
