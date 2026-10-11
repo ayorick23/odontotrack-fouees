@@ -7,6 +7,7 @@ from rest_framework.test import APITestCase
 from accounts.models import User
 from accounts.services import sync_acl
 from assignments.models import Assignment
+from clinical_records.models import Diagnostico
 from patients.models import Patient
 
 
@@ -136,3 +137,84 @@ class DashboardSeriesTests(APITestCase):
             months[-1]["month"],
             timezone.localdate().replace(day=1).isoformat()[:7],
         )
+
+
+class DashboardRoleScopeTests(APITestCase):
+    """ODO-36: el mismo endpoint cuenta distinto según quién pregunta."""
+
+    def setUp(self):
+        sync_acl()
+        self.admin = self._user("admin", User.Role.ADMIN)
+        self.docente = self._user("docente", User.Role.DOCENTE)
+        self.recepcion = self._user("recepcion", User.Role.RECEPCION)
+        self.student = self._user("est1", User.Role.ESTUDIANTE)
+        other_student = self._user("est2", User.Role.ESTUDIANTE)
+
+        mine_active = self._patient("MINE-ACT")
+        mine_done = self._patient("MINE-FIN", Patient.CaseStatus.FINALIZADO)
+        others = self._patient("OTHER-ACT")
+        self._patient("FREE-001")  # disponible, sin asignación
+
+        Assignment.objects.create(patient=mine_active, student=self.student)
+        Assignment.objects.create(
+            patient=mine_done,
+            student=self.student,
+            status=Assignment.AssignmentStatus.FINALIZADA,
+        )
+        Assignment.objects.create(patient=others, student=other_student)
+
+        Diagnostico.objects.create(
+            patient=mine_active, student=self.student, content="Caries en 16."
+        )
+        Diagnostico.objects.create(
+            patient=others, student=other_student, content="Fractura en 21."
+        )
+
+    def _user(self, username, role):
+        return User.objects.create_user(
+            username=username, password="pass12345", role=role
+        )
+
+    def _patient(self, dui, case_status=Patient.CaseStatus.PENDIENTE):
+        return Patient.objects.create(
+            first_name="Paciente", last_name=dui, dui=dui, case_status=case_status
+        )
+
+    def _summary(self, user):
+        self.client.force_authenticate(user=user)
+        response = self.client.get("/api/dashboard/summary/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        return response.json()
+
+    def test_admin_and_docente_see_everything(self):
+        for user in (self.admin, self.docente):
+            with self.subTest(role=user.role):
+                body = self._summary(user)
+                self.assertEqual(body["total_patients"], 4)
+                self.assertEqual(body["total_assignments"], 3)
+                self.assertEqual(body["total_clinical_records"], 2)
+
+    def test_student_sees_only_own_cases(self):
+        body = self._summary(self.student)
+        self.assertEqual(body["total_patients"], 2)
+        self.assertEqual(body["total_assignments"], 2)
+        self.assertEqual(body["total_clinical_records"], 1)
+        # Los disponibles (pendientes sin asignar) no cuentan como suyos.
+        self.assertEqual(
+            body["patients_by_status"],
+            {Patient.CaseStatus.EN_PROCESO: 1, Patient.CaseStatus.FINALIZADO: 1},
+        )
+
+    def test_recepcion_sees_registration_volume_without_clinical(self):
+        body = self._summary(self.recepcion)
+        self.assertEqual(body["total_patients"], 4)
+        self.assertEqual(body["total_assignments"], 3)
+        self.assertEqual(body["total_clinical_records"], 0)
+
+    def test_series_are_scoped_for_student(self):
+        self.client.force_authenticate(user=self.student)
+        response = self.client.get("/api/dashboard/series/", {"period": "1m"})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        body = response.json()
+        self.assertEqual(sum(row["count"] for row in body["by_status"]), 2)
+        self.assertEqual(sum(month["assignments"] for month in body["months"]), 2)

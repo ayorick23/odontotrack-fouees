@@ -6,10 +6,7 @@ from accounts.permissions import HasRequiredAcl
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from assignments.models import Assignment
-from clinical_records.models import Diagnostico, EvolucionClinica, Tratamiento
-from patients.models import Patient
-
+from .scoping import dashboard_scope_for
 from .serializers import DashboardSeriesSerializer, DashboardSummarySerializer
 from .services import build_dashboard_series
 
@@ -42,14 +39,15 @@ class DashboardSummaryView(APIView):
         responses=DashboardSummarySerializer,
     )
     def get(self, request):
-        patients = Patient.objects.in_period(request.query_params.get("period"))
+        scope = dashboard_scope_for(request.user)
+        patients = scope.patients.in_period(request.query_params.get("period"))
         data = {
             "total_patients": patients.count(),
-            "total_assignments": Assignment.objects.count(),
+            "total_assignments": scope.assignments.count(),
             "total_clinical_records": (
-                Diagnostico.objects.count()
-                + Tratamiento.objects.count()
-                + EvolucionClinica.objects.count()
+                scope.diagnoses.count()
+                + scope.treatments.count()
+                + scope.evolutions.count()
             ),
             "patients_by_status": dict(
                 patients.values_list("case_status").annotate(count=Count("id"))
@@ -76,4 +74,9 @@ class DashboardSeriesView(APIView):
         responses=DashboardSeriesSerializer,
     )
     def get(self, request):
-        return Response(build_dashboard_series(request.query_params.get("period")))
+        return Response(
+            build_dashboard_series(
+                request.query_params.get("period"),
+                dashboard_scope_for(request.user),
+            )
+        )
