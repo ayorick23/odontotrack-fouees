@@ -4,7 +4,12 @@ from django.db.models import QuerySet
 
 from accounts.models import User
 from assignments.models import Assignment
-from clinical_records.models import Diagnostico, EvolucionClinica, Tratamiento
+from clinical_records.models import (
+    Diagnostico,
+    EvolucionClinica,
+    Odontogram,
+    Tratamiento,
+)
 from patients.models import Patient
 
 
@@ -17,6 +22,9 @@ class DashboardScope:
     diagnoses: QuerySet
     treatments: QuerySet
     evolutions: QuerySet
+    odontograms: QuerySet
+    # False si el usuario no ve el expediente: lo clínico no aplica para él.
+    clinical: bool
 
 
 def dashboard_scope_for(user: User) -> DashboardScope:
@@ -38,6 +46,7 @@ def dashboard_scope_for(user: User) -> DashboardScope:
     diagnoses = Diagnostico.objects.all()
     treatments = Tratamiento.objects.all()
     evolutions = EvolucionClinica.objects.all()
+    odontograms = Odontogram.objects.all()
 
     if user.role == User.Role.ESTUDIANTE:
         assignments = assignments.filter(student=user)
@@ -45,10 +54,21 @@ def dashboard_scope_for(user: User) -> DashboardScope:
         diagnoses = diagnoses.filter(patient__in=patients)
         treatments = treatments.filter(patient__in=patients)
         evolutions = evolutions.filter(patient__in=patients)
+        odontograms = odontograms.filter(patient__in=patients)
 
-    if not user.has_acl("clinical_records.view"):
+    clinical = user.has_acl("clinical_records.view")
+    if not clinical:
         diagnoses = diagnoses.none()
         treatments = treatments.none()
         evolutions = evolutions.none()
+        odontograms = odontograms.none()
 
-    return DashboardScope(patients, assignments, diagnoses, treatments, evolutions)
+    return DashboardScope(
+        patients=patients,
+        assignments=assignments,
+        diagnoses=diagnoses,
+        treatments=treatments,
+        evolutions=evolutions,
+        odontograms=odontograms,
+        clinical=clinical,
+    )

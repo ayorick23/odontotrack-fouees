@@ -6,8 +6,13 @@ from accounts.permissions import HasRequiredAcl
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from .indicators import build_indicators
 from .scoping import dashboard_scope_for
-from .serializers import DashboardSeriesSerializer, DashboardSummarySerializer
+from .serializers import (
+    DashboardIndicatorsSerializer,
+    DashboardSeriesSerializer,
+    DashboardSummarySerializer,
+)
 from .services import build_dashboard_series
 
 
@@ -80,3 +85,14 @@ class DashboardSeriesView(APIView):
                 dashboard_scope_for(request.user),
             )
         )
+
+
+class DashboardIndicatorsView(APIView):
+    """Indicadores en porcentaje (ODO-37), con el mismo alcance por rol."""
+
+    permission_classes = [IsAuthenticated, HasRequiredAcl]
+    acl_permission = "dashboard.view"
+
+    @extend_schema(tags=["dashboard"], responses=DashboardIndicatorsSerializer)
+    def get(self, request):
+        return Response(build_indicators(dashboard_scope_for(request.user)))
