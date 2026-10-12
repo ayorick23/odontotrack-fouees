@@ -94,3 +94,39 @@ class User(AbstractUser):
 
     def has_acl(self, name: str) -> bool:
         return name in self.acl_codenames
+
+
+class Notification(models.Model):
+    """
+    Aviso in-app para un usuario (ODO-68). Se crea desde los servicios de
+    cada app con accounts.services.notify; nunca desde una vista.
+    """
+
+    class Kind(models.TextChoices):
+        PATIENT_ASSIGNED = "patient_assigned", "Paciente asignado"
+        DIAGNOSIS_PENDING = "diagnosis_pending", "Diagnóstico por validar"
+        DIAGNOSIS_VALIDATED = "diagnosis_validated", "Diagnóstico validado"
+        CASE_FINALIZED = "case_finalized", "Caso finalizado"
+
+    recipient = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="notifications",
+    )
+    kind = models.CharField(max_length=30, choices=Kind.choices)
+    title = models.CharField(max_length=120)
+    body = models.TextField(blank=True)
+    link = models.CharField(
+        max_length=200,
+        blank=True,
+        help_text="Ruta del frontend a la que lleva el aviso (p. ej. /patients/5).",
+    )
+    read_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        indexes = [models.Index(fields=["recipient", "read_at"])]
+
+    def __str__(self):
+        return f"{self.get_kind_display()} → {self.recipient}"

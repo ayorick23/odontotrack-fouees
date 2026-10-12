@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 
-from .models import AclPermission, Role, User
+from .models import AclPermission, Notification, Role, User
 
 
 @admin.register(AclPermission)
@@ -18,6 +18,13 @@ class RoleAdmin(admin.ModelAdmin):
     search_fields = ("name", "slug")
     filter_horizontal = ("permissions",)
     readonly_fields = ("slug", "is_system")
+
+
+@admin.register(Notification)
+class NotificationAdmin(admin.ModelAdmin):
+    list_display = ("title", "recipient", "kind", "read_at", "created_at")
+    list_filter = ("kind",)
+    search_fields = ("title", "recipient__username")
 
 
 @admin.register(User)
