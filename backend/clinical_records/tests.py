@@ -2,7 +2,7 @@ from django.test import SimpleTestCase
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from accounts.models import AclPermission, Role, User
+from accounts.models import AclPermission, Notification, Role, User
 from accounts.services import sync_acl
 from assignments.models import Assignment
 from catalogs.models import ClinicalArea, ClinicalTreatment
@@ -701,3 +701,79 @@ class ClinicalEvolutionApiTests(APITestCase):
             },
         )
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class DiagnosisNotificationTests(APITestCase):
+    """ODO-69: avisos al registrar y al validar un diagnóstico."""
+
+    def setUp(self):
+        sync_acl()
+        self.student = User.objects.create_user(
+            username="est-dxn", password="pass12345", role=User.Role.ESTUDIANTE
+        )
+        self.docente = User.objects.create_user(
+            username="doc-1", password="pass12345", role=User.Role.DOCENTE
+        )
+        self.docente_2 = User.objects.create_user(
+            username="doc-2", password="pass12345", role=User.Role.DOCENTE
+        )
+        self.blocked_docente = User.objects.create_user(
+            username="doc-off",
+            password="pass12345",
+            role=User.Role.DOCENTE,
+            is_active=False,
+        )
+        self.recepcion = User.objects.create_user(
+            username="rec-dxn", password="pass12345", role=User.Role.RECEPCION
+        )
+        self.patient = Patient.objects.create(
+            first_name="Ana", last_name="Ruiz", dui="DXN-1"
+        )
+        Assignment.objects.create(patient=self.patient, student=self.student)
+        self.url = "/api/clinical-records/diagnoses/"
+
+    def _create_diagnosis(self):
+        self.client.force_authenticate(user=self.student)
+        response = self.client.post(
+            self.url, {"patient": self.patient.pk, "content": "Caries en 16."}
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        return response.data["id"]
+
+    def _recipients(self, kind):
+        return set(
+            Notification.objects.filter(kind=kind).values_list("recipient", flat=True)
+        )
+
+    def test_new_diagnosis_notifies_active_docentes_only(self):
+        self._create_diagnosis()
+        self.assertEqual(
+            self._recipients(Notification.Kind.DIAGNOSIS_PENDING),
+            {self.docente.pk, self.docente_2.pk},
+        )
+        notification = Notification.objects.filter(recipient=self.docente).get()
+        self.assertEqual(notification.link, "/supervision")
+
+    def test_editing_a_diagnosis_does_not_notify_again(self):
+        diagnosis_id = self._create_diagnosis()
+        self.client.patch(f"{self.url}{diagnosis_id}/", {"content": "Caries en 17."})
+        self.assertEqual(Notification.objects.filter(recipient=self.docente).count(), 1)
+
+    def test_validation_notifies_the_author(self):
+        diagnosis_id = self._create_diagnosis()
+        self.client.force_authenticate(user=self.docente)
+        response = self.client.post(f"{self.url}{diagnosis_id}/validate/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            self._recipients(Notification.Kind.DIAGNOSIS_VALIDATED),
+            {self.student.pk},
+        )
+        # Validar dos veces falla y no duplica el aviso.
+        self.client.post(f"{self.url}{diagnosis_id}/validate/")
+        self.assertEqual(
+            Notification.objects.filter(
+                kind=Notification.Kind.DIAGNOSIS_VALIDATED
+            ).count(),
+            1,
+        )
+

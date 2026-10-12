@@ -4,7 +4,8 @@ from django.db import transaction
 from django.db.models import Count, Q, QuerySet
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
-from accounts.models import User
+from accounts.models import Notification, User
+from accounts.services import notify
 from clinical_records.services import DiagnosisService
 from patients.models import Patient
 
@@ -60,7 +61,32 @@ def finalize_assignment(assignment: Assignment) -> Assignment:
     transition_case_status(patient, Patient.CaseStatus.FINALIZADO)
     assignment.status = Assignment.AssignmentStatus.FINALIZADA
     assignment.save(update_fields=["status", "updated_at"])
+    notify(
+        [assignment.student],
+        Notification.Kind.CASE_FINALIZED,
+        "Caso finalizado",
+        f"El caso de {_patient_name(patient)} quedó finalizado.",
+        link=f"/patients/{patient.pk}",
+    )
     return assignment
+
+
+def _patient_name(patient: Patient) -> str:
+    # Sin el DUI de __str__: el aviso no necesita el dato personal.
+    return f"{patient.first_name} {patient.last_name}"
+
+
+def _notify_assigned(student: User, patients: list[Patient]) -> None:
+    """Un solo aviso por asignación, aunque sean varios pacientes."""
+    if len(patients) == 1:
+        title = "Nuevo paciente asignado"
+        body = f"Se te asignó a {_patient_name(patients[0])}."
+        link = f"/patients/{patients[0].pk}"
+    else:
+        title = "Nuevos pacientes asignados"
+        body = f"Se te asignaron {len(patients)} pacientes."
+        link = "/patients"
+    notify([student], Notification.Kind.PATIENT_ASSIGNED, title, body, link)
 
 
 def assign_patients(
@@ -68,6 +94,7 @@ def assign_patients(
     patient_ids: Iterable[int],
     student: User,
     only_pending: bool = False,
+    notify_student: bool = True,
     **fields,
 ) -> list[Assignment]:
     """Abre una cita por paciente, todo o nada.
@@ -77,6 +104,7 @@ def assign_patients(
     estudiante asignan al mismo paciente a la vez, solo pasa el primero.
     Un paciente nunca queda con dos asignaciones activas.
     `fields` son los demás campos de Assignment (reason, notes, ...).
+    Avisa al estudiante salvo `notify_student=False` (cuando lo eligió él).
     """
     if student.role != User.Role.ESTUDIANTE:
         raise ValidationError({"student": "Solo se puede asignar a un estudiante."})
@@ -100,10 +128,13 @@ def assign_patients(
                 raise ValidationError(
                     {"patient": f"{name} ya tiene una asignación activa."}
                 )
-        return [
+        assignments = [
             Assignment.objects.create(patient=patient, student=student, **fields)
             for patient in patients
         ]
+        if notify_student:
+            _notify_assigned(student, patients)
+        return assignments
 
 
 def assign_patient(*, patient_id: int, **kwargs) -> Assignment:
@@ -124,6 +155,7 @@ def claim_available_patients(
         patient_ids=patient_ids,
         student=user,
         only_pending=True,
+        notify_student=False,
         reason=reason,
     )
 

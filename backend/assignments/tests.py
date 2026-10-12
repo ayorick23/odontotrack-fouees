@@ -2,7 +2,7 @@ from rest_framework import status
 from rest_framework.exceptions import ValidationError
 from rest_framework.test import APITestCase
 
-from accounts.models import User
+from accounts.models import Notification, User
 from accounts.services import sync_acl
 from clinical_records.models import Diagnostico
 from patients.models import Patient
@@ -512,3 +512,81 @@ class CaseTransitionTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assignment.refresh_from_db()
         self.assertEqual(self.assignment.status, Assignment.AssignmentStatus.ACTIVA)
+
+
+class AssignmentNotificationTests(APITestCase):
+    """ODO-69: avisos al asignar y al finalizar un caso."""
+
+    def setUp(self):
+        sync_acl()
+        self.recepcion = User.objects.create_user(
+            username="recepcion-n", password="pass12345", role=User.Role.RECEPCION
+        )
+        self.admin = User.objects.create_user(
+            username="admin-n", password="pass12345", role=User.Role.ADMIN
+        )
+        self.student = User.objects.create_user(
+            username="est-n", password="pass12345", role=User.Role.ESTUDIANTE
+        )
+        self.other_student = User.objects.create_user(
+            username="est-otro", password="pass12345", role=User.Role.ESTUDIANTE
+        )
+        self.ana = Patient.objects.create(first_name="Ana", last_name="Ruiz", dui="N-1")
+        self.beto = Patient.objects.create(first_name="Beto", last_name="Paz", dui="N-2")
+
+    def _kinds(self, user):
+        return list(Notification.objects.filter(recipient=user).values_list("kind", flat=True))
+
+    def test_assigning_one_patient_notifies_only_the_student(self):
+        self.client.force_authenticate(user=self.recepcion)
+        response = self.client.post(
+            "/api/assignments/assign/",
+            {"patients": [self.ana.pk], "student": self.student.pk},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        notification = Notification.objects.get(recipient=self.student)
+        self.assertEqual(notification.kind, Notification.Kind.PATIENT_ASSIGNED)
+        self.assertEqual(notification.link, f"/patients/{self.ana.pk}")
+        self.assertIn("Ana Ruiz", notification.body)
+        self.assertNotIn("N-1", notification.body)  # sin DUI
+        self.assertEqual(self._kinds(self.other_student), [])
+        self.assertEqual(self._kinds(self.recepcion), [])
+
+    def test_assigning_several_patients_sends_a_single_notice(self):
+        self.client.force_authenticate(user=self.recepcion)
+        self.client.post(
+            "/api/assignments/assign/",
+            {"patients": [self.ana.pk, self.beto.pk], "student": self.student.pk},
+            format="json",
+        )
+        notification = Notification.objects.get(recipient=self.student)
+        self.assertEqual(notification.body, "Se te asignaron 2 pacientes.")
+        self.assertEqual(notification.link, "/patients")
+
+    def test_claiming_a_patient_does_not_notify_the_student(self):
+        self.client.force_authenticate(user=self.student)
+        response = self.client.post(
+            "/api/assignments/claim/", {"patients": [self.ana.pk]}, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Notification.objects.count(), 0)
+
+    def test_finalizing_notifies_the_student_of_the_case(self):
+        assignment = Assignment.objects.create(patient=self.ana, student=self.student)
+        Diagnostico.objects.create(
+            patient=self.ana, student=self.student, content="Caries.", is_validated=True
+        )
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.post(f"/api/assignments/{assignment.pk}/finalize/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(self._kinds(self.student), [Notification.Kind.CASE_FINALIZED])
+        self.assertEqual(self._kinds(self.other_student), [])
+
+    def test_failed_finalization_does_not_notify(self):
+        assignment = Assignment.objects.create(patient=self.ana, student=self.student)
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.post(f"/api/assignments/{assignment.pk}/finalize/")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(Notification.objects.count(), 0)
+
