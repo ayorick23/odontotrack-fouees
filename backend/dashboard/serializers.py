@@ -1,6 +1,20 @@
 from rest_framework import serializers
 
 
+class IndicatorSerializer(serializers.Serializer):
+    percent = serializers.FloatField(allow_null=True)
+    count = serializers.IntegerField()
+    total = serializers.IntegerField()
+
+
+class DashboardIndicatorsSerializer(serializers.Serializer):
+    """Fórmulas documentadas en dashboard/indicators.py. None = no aplica."""
+
+    digitalization = IndicatorSerializer(allow_null=True)
+    validated_diagnoses = IndicatorSerializer(allow_null=True)
+    cases_with_validated_diagnosis = IndicatorSerializer(allow_null=True)
+
+
 class DashboardSummarySerializer(serializers.Serializer):
     total_patients = serializers.IntegerField()
     total_assignments = serializers.IntegerField()

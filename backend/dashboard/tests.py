@@ -7,7 +7,7 @@ from rest_framework.test import APITestCase
 from accounts.models import User
 from accounts.services import sync_acl
 from assignments.models import Assignment
-from clinical_records.models import Diagnostico
+from clinical_records.models import Diagnostico, EvolucionClinica, Odontogram
 from patients.models import Patient
 
 
@@ -218,3 +218,108 @@ class DashboardRoleScopeTests(APITestCase):
         body = response.json()
         self.assertEqual(sum(row["count"] for row in body["by_status"]), 2)
         self.assertEqual(sum(month["assignments"] for month in body["months"]), 2)
+
+
+class DashboardIndicatorsTests(APITestCase):
+    """ODO-37: fórmulas de los indicadores y su alcance por rol."""
+
+    URL = "/api/dashboard/indicators/"
+
+    def setUp(self):
+        sync_acl()
+        self.admin = self._user("admin", User.Role.ADMIN)
+        self.docente = self._user("docente", User.Role.DOCENTE)
+        self.recepcion = self._user("recepcion", User.Role.RECEPCION)
+        self.student = self._user("est1", User.Role.ESTUDIANTE)
+        other = self._user("est2", User.Role.ESTUDIANTE)
+        en_proceso = Patient.CaseStatus.EN_PROCESO
+
+        # A: caso del estudiante con diagnóstico validado.
+        a = self._patient("A", en_proceso)
+        Assignment.objects.create(patient=a, student=self.student)
+        Diagnostico.objects.create(
+            patient=a, student=self.student, content="Caries.", is_validated=True
+        )
+        # B: caso de otro estudiante con diagnóstico sin validar.
+        b = self._patient("B", en_proceso)
+        Assignment.objects.create(patient=b, student=other)
+        Diagnostico.objects.create(patient=b, student=other, content="Fractura.")
+        # C: caso finalizado del estudiante, solo con evolución.
+        c = self._patient("C", Patient.CaseStatus.FINALIZADO)
+        Assignment.objects.create(
+            patient=c,
+            student=self.student,
+            status=Assignment.AssignmentStatus.FINALIZADA,
+        )
+        EvolucionClinica.objects.create(
+            patient=c, student=self.student, date=timezone.localdate(), note="Ok."
+        )
+        # D: odontograma guardado. E: odontograma solo abierto. F: nada.
+        d = self._patient("D")
+        Odontogram.objects.create(patient=d, updated_by=self.docente)
+        e = self._patient("E")
+        Odontogram.objects.create(patient=e)
+        self._patient("F")
+
+    def _user(self, username, role):
+        return User.objects.create_user(
+            username=username, password="pass12345", role=role
+        )
+
+    def _patient(self, dui, case_status=Patient.CaseStatus.PENDIENTE):
+        return Patient.objects.create(
+            first_name="Paciente", last_name=dui, dui=dui, case_status=case_status
+        )
+
+    def _indicators(self, user):
+        self.client.force_authenticate(user=user)
+        response = self.client.get(self.URL)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        return response.json()
+
+    def test_formulas_for_admin(self):
+        body = self._indicators(self.admin)
+        # A, B, C y D tienen expediente; E solo abrió el odontograma.
+        self.assertEqual(
+            body["digitalization"], {"percent": 66.7, "count": 4, "total": 6}
+        )
+        self.assertEqual(
+            body["validated_diagnoses"], {"percent": 50.0, "count": 1, "total": 2}
+        )
+        # Casos en proceso o finalizados: A, B y C; solo A tiene validado.
+        self.assertEqual(
+            body["cases_with_validated_diagnosis"],
+            {"percent": 33.3, "count": 1, "total": 3},
+        )
+
+    def test_student_indicators_cover_only_own_cases(self):
+        body = self._indicators(self.student)
+        self.assertEqual(
+            body["digitalization"], {"percent": 100.0, "count": 2, "total": 2}
+        )
+        self.assertEqual(
+            body["validated_diagnoses"], {"percent": 100.0, "count": 1, "total": 1}
+        )
+        self.assertEqual(
+            body["cases_with_validated_diagnosis"],
+            {"percent": 50.0, "count": 1, "total": 2},
+        )
+
+    def test_recepcion_gets_no_clinical_indicators(self):
+        body = self._indicators(self.recepcion)
+        self.assertEqual(
+            body,
+            {
+                "digitalization": None,
+                "validated_diagnoses": None,
+                "cases_with_validated_diagnosis": None,
+            },
+        )
+
+    def test_percent_is_none_without_base(self):
+        newcomer = self._user("est3", User.Role.ESTUDIANTE)
+        body = self._indicators(newcomer)
+        self.assertEqual(
+            body["digitalization"], {"percent": None, "count": 0, "total": 0}
+        )
+
