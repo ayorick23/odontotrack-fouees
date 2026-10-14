@@ -138,6 +138,28 @@ corre dentro de contenedores.
    Luego entra a [http://localhost:8000/admin/](http://localhost:8000/admin/)
    con ese usuario.
 
+9. **Poblar la base de datos con usuarios de prueba:**
+Después de `migrate` y `acl_sync_permissions`, correr el siguiente comando:
+
+```bash
+docker compose exec backend python manage.py seed_users
+```
+Consideraciones:
+
+Se puede correr varias veces sin riesgo de duplicar usuarios.
+
+Contraseña de usuarios definidas en archivo varibles de entorno. 
+
+Solo se ejecuta si `DJANGO_DEBUG=True`.
+
+| Usuario | Rol |
+| --- | --- |
+| `valeriamz` | Administrador |
+| `mariahz` | Docente supervisor |
+| `luciazd` | Estudiante |
+| `samuelpr` | Soporte técnico |
+| `robertogr` | Recepción |
+
 ### Comandos útiles del día a día
 
 ```bash
