@@ -1,6 +1,7 @@
 import {
   CircleCheckBig,
   Clock3,
+  Download,
   Search,
   UserCheck,
   UserPlus,
@@ -26,7 +27,7 @@ import {
   SelectValue,
 } from "../../components/ui/select";
 import { useAuth } from "../../hooks/useAuth";
-import { primaryActionClass } from "../../lib/actions";
+import { primaryActionClass, secondaryActionClass } from "../../lib/actions";
 import {
   countByStatus,
   getDashboardSummary,
@@ -35,6 +36,7 @@ import {
 import {
   CASE_STATUS_LABELS,
   deletePatient,
+  exportPatients,
   listAssignees,
   listPatients,
   patientFullName,
@@ -134,6 +136,25 @@ export function PatientList() {
   const canView = can(user, "patients.view");
   const canEdit = can(user, "patients.edit");
   const canRemove = can(user, "patients.delete");
+  const canExport = can(user, "patients.export");
+  const [exporting, setExporting] = useState(false);
+
+  async function handleExport() {
+    setExporting(true);
+    try {
+      await exportPatients({
+        search: searchFromUrl || undefined,
+        period,
+        caseStatus,
+        clinicalArea,
+        assignedTo,
+      });
+    } catch {
+      toast.error("No se pudo exportar el directorio.");
+    } finally {
+      setExporting(false);
+    }
+  }
 
   useEffect(() => {
     setSearchInput(searchFromUrl);
@@ -475,17 +496,30 @@ export function PatientList() {
             );
           })}
         </div>
-        {canRegister ? (
-          <Link
-            to="/patients/new"
-            className={primaryActionClass}
-          >
-            <UserPlus className="size-4" />
-            Registrar Nuevo Paciente
-          </Link>
-        ) : (
-          <span className="hidden lg:block lg:w-[220px]" />
-        )}
+        <div className="flex flex-wrap justify-center gap-2">
+          {canExport && (
+            <button
+              type="button"
+              onClick={handleExport}
+              disabled={exporting}
+              className={secondaryActionClass}
+            >
+              <Download className="size-4" />
+              {exporting ? "Exportando…" : "Exportar CSV"}
+            </button>
+          )}
+          {canRegister ? (
+            <Link
+              to="/patients/new"
+              className={primaryActionClass}
+            >
+              <UserPlus className="size-4" />
+              Registrar Nuevo Paciente
+            </Link>
+          ) : (
+            !canExport && <span className="hidden lg:block lg:w-[220px]" />
+          )}
+        </div>
       </div>
 
       <DirectoryKpis

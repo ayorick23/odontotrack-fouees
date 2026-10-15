@@ -109,10 +109,38 @@ export type ListPatientsParams = {
 export function listPatients(
   params: ListPatientsParams = {},
 ): Promise<PaginatedResponse<PatientListItem>> {
-  const query: Record<string, string | number> = {};
+  const query = directoryQuery(params);
   if (params.page && params.page > 1) {
     query.page = params.page;
   }
+
+  return api
+    .get<PaginatedResponse<PatientListItem>>("/patients/", { params: query })
+    .then((response) => response.data);
+}
+
+/** Descarga el CSV del directorio con los mismos filtros que el listado. */
+export async function exportPatients(
+  params: Omit<ListPatientsParams, "page"> = {},
+): Promise<void> {
+  const response = await api.get<Blob>("/patients/export/", {
+    params: directoryQuery(params),
+    responseType: "blob",
+  });
+  const disposition = String(response.headers["content-disposition"] ?? "");
+  const filename = /filename="([^"]+)"/.exec(disposition)?.[1] ?? "pacientes.csv";
+  const url = URL.createObjectURL(response.data);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function directoryQuery(
+  params: ListPatientsParams,
+): Record<string, string | number> {
+  const query: Record<string, string | number> = {};
   if (params.search) {
     query.search = params.search;
   }
@@ -128,10 +156,7 @@ export function listPatients(
   if (params.period) {
     query.period = params.period;
   }
-
-  return api
-    .get<PaginatedResponse<PatientListItem>>("/patients/", { params: query })
-    .then((response) => response.data);
+  return query;
 }
 
 export function listAvailablePatients(params: {
