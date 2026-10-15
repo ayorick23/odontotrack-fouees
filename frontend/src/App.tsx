@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Navigate, Route, BrowserRouter, Routes } from "react-router-dom";
 
 import { AppLayout } from "./components/AppLayout";
@@ -5,7 +6,6 @@ import { Toaster } from "./components/ui/sonner";
 import { AuthProvider } from "./context/AuthContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import { AvailablePatients } from "./pages/Assignments/AvailablePatients";
-import { Calendar } from "./pages/Calendar/Calendar";
 import { Dashboard } from "./pages/Dashboard/Dashboard";
 import { Login } from "./pages/Login/Login";
 import { PatientDetail } from "./pages/Patients/PatientDetail";
@@ -17,6 +17,11 @@ import { CatalogList } from "./pages/Catalogs/CatalogList";
 import { Students } from "./pages/Students/Students";
 import { Supervision } from "./pages/Supervision/Supervision";
 import { Support } from "./pages/Support/Support";
+
+// FullCalendar es pesado: el calendario se descarga solo al abrirlo.
+const Calendar = lazy(() =>
+  import("./pages/Calendar/Calendar").then((module) => ({ default: module.Calendar })),
+);
 
 function App() {
   return (
@@ -39,7 +44,16 @@ function App() {
               <Route path="/patients/:id/edit" element={<PatientForm />} />
               <Route path="/patients/:id" element={<PatientDetail />} />
               <Route path="/assignments" element={<AvailablePatients />} />
-              <Route path="/calendar" element={<Calendar />} />
+              <Route
+                path="/calendar"
+                element={
+                  <Suspense
+                    fallback={<p className="text-sm text-slate-500">Cargando calendario…</p>}
+                  >
+                    <Calendar />
+                  </Suspense>
+                }
+              />
               <Route path="/supervision" element={<Supervision />} />
               <Route path="/students" element={<Students />} />
               <Route path="/roles" element={<RoleList />} />
