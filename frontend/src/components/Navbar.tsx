@@ -1,11 +1,13 @@
-import { Bell, LogOut, Search } from "lucide-react";
+import { LogOut, Search } from "lucide-react";
 import { useLocation } from "react-router-dom";
 
+import { can } from "../acl/can";
 import {
   displayName,
   ROLE_LABELS,
   type AuthUser,
 } from "../context/AuthContext";
+import { NotificationBell } from "./NotificationBell";
 import { ThemeToggle } from "./ThemeToggle";
 
 const PAGE_META: Record<string, { title: string; crumb: string }> = {
@@ -77,14 +79,7 @@ export function Navbar({
         </label>
         <div className="flex items-center">
           <ThemeToggle />
-          <button
-            type="button"
-            disabled
-            title="Próximamente"
-            className="rounded-full p-2 text-slate-400"
-          >
-            <Bell className="size-4" />
-          </button>
+          {can(user, "notifications.view") ? <NotificationBell /> : null}
         </div>
         {user ? (
           <p className="hidden text-right text-sm font-medium text-slate-700 sm:block dark:text-slate-200">

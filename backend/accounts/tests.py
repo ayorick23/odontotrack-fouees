@@ -1,7 +1,7 @@
 from rest_framework import status
 from rest_framework.test import APIRequestFactory, APITestCase
 
-from accounts.models import User
+from accounts.models import Notification, Role, User
 from accounts.permissions import (
     IsAdmin,
     IsAdminOrSoporte,
@@ -10,7 +10,7 @@ from accounts.permissions import (
     IsRecepcion,
     IsSoporte,
 )
-from accounts.services import sync_acl
+from accounts.services import notify, sync_acl
 
 TOKEN_URL = "/api/auth/token/"
 TOKEN_REFRESH_URL = "/api/auth/token/refresh/"
@@ -472,3 +472,69 @@ class StudentListingTests(APITestCase):
         self.assertEqual(
             self.client.get(USERS_URL).status_code, status.HTTP_403_FORBIDDEN
         )
+
+
+NOTIFICATIONS_URL = "/api/accounts/notifications/"
+
+
+class NotificationApiTests(APITestCase):
+    """ODO-68: cada usuario ve y marca solo sus avisos."""
+
+    def setUp(self):
+        sync_acl()
+        self.ana = User.objects.create_user(
+            username="ana", password=VALID_PASSWORD, role=User.Role.ESTUDIANTE
+        )
+        self.luis = User.objects.create_user(
+            username="luis", password=VALID_PASSWORD, role=User.Role.DOCENTE
+        )
+        kind = Notification.Kind.PATIENT_ASSIGNED
+        self.first, self.second = notify([self.ana, self.ana], kind, "Aviso")
+        (self.others,) = notify([self.luis], kind, "Aviso de Luis")
+        self.client.force_authenticate(user=self.ana)
+
+    def test_lists_only_own_notifications(self):
+        response = self.client.get(NOTIFICATIONS_URL)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        ids = {row["id"] for row in response.data["results"]}
+        self.assertEqual(ids, {self.first.id, self.second.id})
+        self.assertFalse(response.data["results"][0]["is_read"])
+
+    def test_cannot_read_or_mark_someone_elses(self):
+        url = f"{NOTIFICATIONS_URL}{self.others.id}/read/"
+        self.assertEqual(self.client.post(url).status_code, status.HTTP_404_NOT_FOUND)
+        self.others.refresh_from_db()
+        self.assertIsNone(self.others.read_at)
+
+    def test_mark_one_then_count_and_filter_unread(self):
+        response = self.client.post(f"{NOTIFICATIONS_URL}{self.first.id}/read/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data["is_read"])
+        count = self.client.get(f"{NOTIFICATIONS_URL}unread-count/").data
+        self.assertEqual(count, {"count": 1})
+        unread = self.client.get(NOTIFICATIONS_URL, {"unread": "true"}).data
+        self.assertEqual([row["id"] for row in unread["results"]], [self.second.id])
+
+    def test_read_all_only_touches_own(self):
+        response = self.client.post(f"{NOTIFICATIONS_URL}read-all/")
+        self.assertEqual(response.data, {"updated": 2})
+        self.others.refresh_from_db()
+        self.assertIsNone(self.others.read_at)
+        count = self.client.get(f"{NOTIFICATIONS_URL}unread-count/").data
+        self.assertEqual(count, {"count": 0})
+
+    def test_requires_notifications_view(self):
+        role = Role.objects.get(slug=User.Role.ESTUDIANTE)
+        role.permissions.remove(*role.permissions.filter(name="notifications.view"))
+        ana = User.objects.get(pk=self.ana.pk)  # sin la caché de permisos
+        self.client.force_authenticate(user=ana)
+        for url in (NOTIFICATIONS_URL, f"{NOTIFICATIONS_URL}unread-count/"):
+            with self.subTest(url=url):
+                self.assertEqual(
+                    self.client.get(url).status_code, status.HTTP_403_FORBIDDEN
+                )
+        self.assertEqual(
+            self.client.post(f"{NOTIFICATIONS_URL}read-all/").status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
+

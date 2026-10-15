@@ -1,6 +1,8 @@
+from collections.abc import Iterable
+
 from django.utils.text import slugify
 
-from .models import AclPermission, Role
+from .models import AclPermission, Notification, Role, User
 from .permissions_catalog import SYSTEM_ROLES, all_permission_names, iter_catalog_permissions
 
 
@@ -72,3 +74,19 @@ def sync_acl(*, reset_role_defaults: bool = False) -> dict[str, int]:
         "role_defaults_applied": synced_defaults,
         "permissions_total": AclPermission.objects.count(),
     }
+
+
+def notify(
+    recipients: Iterable[User],
+    kind: str,
+    title: str,
+    body: str = "",
+    link: str = "",
+) -> list[Notification]:
+    """Crea el mismo aviso para cada destinatario (ODO-68)."""
+    return Notification.objects.bulk_create(
+        Notification(
+            recipient=recipient, kind=kind, title=title, body=body, link=link
+        )
+        for recipient in recipients
+    )

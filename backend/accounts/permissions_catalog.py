@@ -63,6 +63,12 @@ PERMISSION_CATALOG: Final[tuple[SectionSpec, ...]] = (
                 description="Indicadores y resumen del banco de pacientes.",
                 actions=(VIEW,),
             ),
+            ModuleSpec(
+                key="notifications",
+                label="Notificaciones",
+                description="Avisos in-app del propio usuario (campana).",
+                actions=(VIEW,),
+            ),
         ),
     ),
     SectionSpec(
@@ -246,6 +252,7 @@ SYSTEM_ROLES: Final[tuple[SystemRoleSpec, ...]] = (
         description="Supervisa casos, valida diagnósticos y consulta el directorio.",
         permissions=_names(
             "dashboard.view",
+            "notifications.view",
             "patients.view",
             "assignments.view",
             "calendar.view",
@@ -265,6 +272,7 @@ SYSTEM_ROLES: Final[tuple[SystemRoleSpec, ...]] = (
         description="Elige pacientes disponibles y carga diagnóstico, tratamiento, evolución y odontograma.",
         permissions=_names(
             "dashboard.view",
+            "notifications.view",
             "patients.view",
             "assignments.claim",
             "calendar.view",
@@ -290,6 +298,7 @@ SYSTEM_ROLES: Final[tuple[SystemRoleSpec, ...]] = (
         description="Registra pacientes no asignados, apoya citas y asignaciones. Sin escritura clínica.",
         permissions=_names(
             "dashboard.view",
+            "notifications.view",
             "patients.view",
             "patients.create",
             "patients.edit",
@@ -307,6 +316,7 @@ SYSTEM_ROLES: Final[tuple[SystemRoleSpec, ...]] = (
         description="Mantiene cuentas y el sistema. Sin acceso de escritura al expediente clínico.",
         permissions=_names(
             "dashboard.view",
+            "notifications.view",
             "users.view",
             "users.create",
             "users.edit",

@@ -76,11 +76,12 @@ class DiagnosisViewSet(ClinicalScopeMixin, ModelViewSet):
     def perform_create(self, serializer):
         patient = serializer.validated_data["patient"]
         assert_can_write_clinical(self.request.user, patient)
-        serializer.save(
+        serializer.instance = DiagnosisService.create(
             student=resolve_clinical_student(
                 user=self.request.user,
                 patient=patient,
-            )
+            ),
+            **serializer.validated_data,
         )
 
     @action(detail=True, methods=["post"], url_path="validate")

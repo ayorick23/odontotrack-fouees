@@ -1,7 +1,8 @@
 from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
-from accounts.models import User
+from accounts.models import Notification, User
+from accounts.services import notify
 from assignments.models import Assignment
 from patients.models import Patient
 
@@ -68,7 +69,31 @@ def resolve_clinical_student(*, user: User, patient: Patient) -> User:
     return assignment.student
 
 
+def _patient_name(patient: Patient) -> str:
+    # Sin el DUI de __str__: el aviso no necesita el dato personal.
+    return f"{patient.first_name} {patient.last_name}"
+
+
 class DiagnosisService:
+    @staticmethod
+    def create(*, student: User, **fields) -> Diagnostico:
+        """Registra el diagnóstico y avisa a los docentes que hay uno por validar.
+
+        No hay relación docente-estudiante, así que avisa a todos los
+        docentes activos. Editarlo después no vuelve a avisar.
+        """
+        diagnosis = Diagnostico.objects.create(student=student, **fields)
+        docentes = User.objects.filter(role=User.Role.DOCENTE, is_active=True)
+        notify(
+            docentes,
+            Notification.Kind.DIAGNOSIS_PENDING,
+            "Diagnóstico por validar",
+            f"{_patient_name(diagnosis.patient)}: registrado por "
+            f"{user_display_name(student)}.",
+            link="/supervision",
+        )
+        return diagnosis
+
     @staticmethod
     def validate(diagnosis: Diagnostico, user: User) -> Diagnostico:
         if diagnosis.is_validated:
@@ -78,6 +103,13 @@ class DiagnosisService:
         diagnosis.validated_at = timezone.now()
         diagnosis.save(
             update_fields=["is_validated", "validated_by", "validated_at", "updated_at"]
+        )
+        notify(
+            [diagnosis.student],
+            Notification.Kind.DIAGNOSIS_VALIDATED,
+            "Diagnóstico validado",
+            f"Se validó tu diagnóstico de {_patient_name(diagnosis.patient)}.",
+            link=f"/patients/{diagnosis.patient_id}",
         )
         return diagnosis
 

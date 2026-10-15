@@ -6,7 +6,7 @@ from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
-from .models import Role
+from .models import Notification, Role
 from .permissions_catalog import all_permission_names
 from .services import unique_role_slug
 
@@ -178,3 +178,16 @@ class StudentListSerializer(serializers.ModelSerializer):
     @extend_schema_field(serializers.CharField())
     def get_name(self, obj):
         return obj.get_full_name() or obj.username
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    is_read = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Notification
+        fields = ["id", "kind", "title", "body", "link", "is_read", "read_at", "created_at"]
+        read_only_fields = fields
+
+    @extend_schema_field(serializers.BooleanField())
+    def get_is_read(self, obj):
+        return obj.read_at is not None

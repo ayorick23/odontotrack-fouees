@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 from drf_spectacular.utils import extend_schema
 from rest_framework import mixins, viewsets
 from rest_framework.decorators import action
@@ -7,12 +8,13 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.views import TokenObtainPairView
 
-from .models import Role
+from .models import Notification, Role
 from .permissions import HasRequiredAcl
 from .permissions_catalog import catalog_payload
 from .serializers import (
     EmailOrUsernameTokenObtainPairSerializer,
     MeSerializer,
+    NotificationSerializer,
     RoleSerializer,
     StudentListSerializer,
     UserCreateSerializer,
@@ -121,3 +123,48 @@ class RoleViewSet(
     @action(detail=False, methods=["get"])
     def catalog(self, request):
         return Response({"catalog": catalog_payload()})
+
+
+@extend_schema(tags=["accounts"])
+class NotificationViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
+    """
+    Avisos in-app del usuario autenticado (ODO-68). Cada quien ve solo los
+    suyos; no hay alta por API: los crean los servicios de cada app.
+    `?unread=true` deja solo los no leídos.
+    """
+
+    serializer_class = NotificationSerializer
+    permission_classes = [IsAuthenticated, HasRequiredAcl]
+    # Singular a propósito: cubre también las @action de abajo.
+    acl_permission = "notifications.view"
+
+    def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            return Notification.objects.none()
+        queryset = Notification.objects.filter(recipient=self.request.user)
+        if self.request.query_params.get("unread") == "true":
+            queryset = queryset.filter(read_at__isnull=True)
+        return queryset
+
+    @action(detail=False, methods=["get"], url_path="unread-count")
+    def unread_count(self, request):
+        count = self.get_queryset().filter(read_at__isnull=True).count()
+        return Response({"count": count})
+
+    @action(detail=True, methods=["post"])
+    def read(self, request, pk=None):
+        notification = self.get_object()
+        if notification.read_at is None:
+            notification.read_at = timezone.now()
+            notification.save(update_fields=["read_at"])
+        return Response(self.get_serializer(notification).data)
+
+    @action(detail=False, methods=["post"], url_path="read-all")
+    def read_all(self, request):
+        updated = (
+            self.get_queryset()
+            .filter(read_at__isnull=True)
+            .update(read_at=timezone.now())
+        )
+        return Response({"updated": updated})
+
