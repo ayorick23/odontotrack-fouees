@@ -7,6 +7,7 @@ from rest_framework.response import Response
 from accounts.permissions import HasRequiredAcl, RecepcionCannotEditAssignedPatient
 from assignments.models import Assignment
 
+from .exports import patients_csv_response
 from .models import Patient
 from .serializers import PatientListSerializer, PatientSerializer
 
@@ -24,6 +25,7 @@ class PatientViewSet(viewsets.ModelViewSet):
         "partial_update": "patients.edit",
         "destroy": "patients.delete",
         "assignees": "patients.view",
+        "export": "patients.export",
         "available": ("assignments.claim", "assignments.assign_student"),
     }
     filter_backends = [filters.SearchFilter]
@@ -67,6 +69,11 @@ class PatientViewSet(viewsets.ModelViewSet):
         if page is not None:
             return self.get_paginated_response(serializer.data)
         return Response(serializer.data)
+
+    @action(detail=False, methods=["get"])
+    def export(self, request):
+        """CSV del directorio con los mismos filtros y alcance que el listado."""
+        return patients_csv_response(self.filter_queryset(self.get_queryset()))
 
     @action(detail=False, methods=["get"])
     def assignees(self, request):

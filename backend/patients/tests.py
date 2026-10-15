@@ -1,3 +1,4 @@
+import csv
 from datetime import timedelta
 from io import BytesIO
 
@@ -10,7 +11,7 @@ from PIL import Image
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from accounts.models import User
+from accounts.models import AclPermission, Role, User
 from accounts.services import sync_acl
 from assignments.models import Assignment
 from catalogs.models import ClinicalArea, ClinicalTreatment
@@ -873,3 +874,110 @@ class StudentPatientScopingTests(APITestCase):
         self.client.force_authenticate(user=recepcion)
         response = self.client.get(self.url)
         self.assertEqual(len(self._ids(response)), 4)
+
+
+class PatientExportTests(APITestCase):
+    """ODO-67: CSV del directorio con el mismo alcance que el listado."""
+
+    url = "/api/patients/export/"
+
+    def setUp(self):
+        sync_acl()
+        self.admin = User.objects.create_user(
+            username="admin-export", password="pass12345", role=User.Role.ADMIN
+        )
+
+    def _rows(self, response):
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        content = response.content.decode("utf-8")
+        self.assertTrue(content.startswith("﻿"))
+        return list(csv.reader(content.lstrip("﻿").splitlines()))
+
+    def test_admin_downloads_basic_fields_with_readable_names(self):
+        area = ClinicalArea.objects.filter(treatments__isnull=False).first()
+        treatment = area.treatments.first()
+        student = User.objects.create_user(
+            username="est-export",
+            password="pass12345",
+            role=User.Role.ESTUDIANTE,
+            first_name="Elena",
+            last_name="Ruiz",
+        )
+        patient = Patient.objects.create(
+            first_name="José",
+            last_name="Peña",
+            dui="EXP-001",
+            phone_number="7777-0000",
+            clinical_area=area,
+            clinical_treatment=treatment,
+        )
+        Assignment.objects.create(patient=patient, student=student)
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.get(self.url)
+        self.assertIn("attachment;", response["Content-Disposition"])
+        header, row = self._rows(response)
+        self.assertEqual(header[0], "Nombre")
+        self.assertEqual(
+            row,
+            [
+                "José",
+                "Peña",
+                "EXP-001",
+                "7777-0000",
+                area.name,
+                treatment.name,
+                "En proceso",
+                "Elena Ruiz",
+                timezone.localdate().isoformat(),
+            ],
+        )
+
+    def test_requires_export_permission(self):
+        recepcion = User.objects.create_user(
+            username="recepcion-export", password="pass12345", role=User.Role.RECEPCION
+        )
+        self.client.force_authenticate(user=recepcion)
+        self.assertEqual(
+            self.client.get(self.url).status_code, status.HTTP_403_FORBIDDEN
+        )
+
+    def test_applies_directory_filters(self):
+        Patient.objects.create(first_name="Ana", last_name="Lopez", dui="EXP-010")
+        Patient.objects.create(
+            first_name="Ana",
+            last_name="Mena",
+            dui="EXP-011",
+            case_status=Patient.CaseStatus.FINALIZADO,
+        )
+        Patient.objects.create(first_name="Luis", last_name="Lopez", dui="EXP-012")
+        self.client.force_authenticate(user=self.admin)
+        rows = self._rows(
+            self.client.get(self.url, {"search": "ana", "case_status": "pendiente"})
+        )
+        self.assertEqual([row[2] for row in rows[1:]], ["EXP-010"])
+
+    def test_estudiante_only_exports_what_the_directory_shows(self):
+        role = Role.objects.get(slug=User.Role.ESTUDIANTE)
+        role.permissions.add(AclPermission.objects.get(name="patients.export"))
+        student = User.objects.create_user(
+            username="est-alcance", password="pass12345", role=User.Role.ESTUDIANTE
+        )
+        other = User.objects.create_user(
+            username="est-ajeno", password="pass12345", role=User.Role.ESTUDIANTE
+        )
+        mine = Patient.objects.create(first_name="Mio", last_name="A", dui="EXP-020")
+        theirs = Patient.objects.create(first_name="Ajeno", last_name="B", dui="EXP-021")
+        Assignment.objects.create(patient=mine, student=student)
+        Assignment.objects.create(patient=theirs, student=other)
+        self.client.force_authenticate(user=student)
+        rows = self._rows(self.client.get(self.url))
+        self.assertEqual([row[2] for row in rows[1:]], ["EXP-020"])
+
+    def test_neutralizes_formulas_in_names(self):
+        Patient.objects.create(
+            first_name="=HYPERLINK(\"http://x\")", last_name="-1+1", dui="EXP-030"
+        )
+        self.client.force_authenticate(user=self.admin)
+        _header, row = self._rows(self.client.get(self.url))
+        self.assertEqual(row[0], "'=HYPERLINK(\"http://x\")")
+        self.assertEqual(row[1], "'-1+1")
