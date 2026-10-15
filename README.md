@@ -61,12 +61,20 @@ corre dentro de contenedores.
 3. **Levanta todo con Docker Compose:**
 
    ```bash
-   docker compose up --build
+   docker compose up --build -V
    ```
 
    La primera vez tardará varios minutos porque descarga las imágenes
    base e instala las dependencias. Las siguientes veces será mucho
    más rápido.
+
+   **¿Por qué `-V`?** El frontend guarda `node_modules` en un volumen
+   anónimo de Docker (`/app/node_modules` en `docker-compose.yml`), y
+   Docker lo reutiliza entre arranques aunque reconstruyas la imagen.
+   Si alguien agregó una dependencia al `package.json`, sin `-V` el
+   contenedor sigue usando el `node_modules` viejo y Vite falla con
+   "Failed to resolve import". `-V` (`--renew-anon-volumes`) lo
+   recrea desde la imagen nueva. Úsalo siempre después de un `git pull`.
 
    Esto levanta 3 servicios:
    - `db` → PostgreSQL en el puerto `5432`
@@ -104,8 +112,12 @@ corre dentro de contenedores.
    `docente`, `estudiante`, `recepcion`, `soporte`). Es seed de
    prueba. **No** lo corras en producción.
 
-   Si cambias la matriz por defecto de un rol de sistema y quieres
-   volver a aplicarla (pisa permisos de esos 5 roles):
+   Si cambias la matriz por defecto de un rol de sistema, **o si un
+   `git pull` trae un permiso nuevo en `accounts/permissions_catalog.py`**
+   (p. ej. `notifications.view`), hay que volver a aplicarla. Sin el
+   flag, el comando crea el permiso en la base pero **no** se lo da a
+   roles que ya existían, y la pantalla nueva responde 403. Ojo: pisa
+   cualquier cambio manual a los permisos de esos 5 roles:
 
    ```bash
    docker compose exec backend python manage.py acl_sync_permissions --reset-defaults
@@ -164,7 +176,7 @@ Solo se ejecuta si `DJANGO_DEBUG=True`.
 
 ```bash
 docker compose up            # levantar todo (sin reconstruir imágenes)
-docker compose up --build    # levantar todo, reconstruyendo si cambiaron dependencias
+docker compose up --build -V # levantar todo, reconstruyendo si cambiaron dependencias
 docker compose down          # apagar todo
 docker compose logs -f backend    # ver logs del backend en tiempo real
 docker compose logs -f frontend   # ver logs del frontend en tiempo real
@@ -172,6 +184,8 @@ docker compose exec backend python manage.py <comando>   # correr un comando de 
 docker compose exec backend python manage.py makemigrations
 docker compose exec backend python manage.py migrate
 docker compose exec backend python manage.py acl_sync_permissions
+docker compose exec backend python manage.py test   # tests del backend
+docker compose exec frontend npm test               # tests del frontend (vitest)
 ```
 
 ### Migraciones y seeds: solo a mano (no producción automática)
@@ -196,7 +210,7 @@ evalúa un proceso aparte).
 ### Si agregas una dependencia nueva
 
 - **Backend:** agrégala a `backend/requirements.txt` y corre `docker compose up --build backend`.
-- **Frontend:** instálala normalmente con `npm install <paquete>` dentro de `frontend/` (o vía `docker compose exec frontend npm install <paquete>`) y confirma que `package.json`/`package-lock.json` quedaron actualizados antes de hacer commit.
+- **Frontend:** instálala normalmente con `npm install <paquete>` dentro de `frontend/` (o vía `docker compose exec frontend npm install <paquete>`) y confirma que `package.json`/`package-lock.json` quedaron actualizados antes de hacer commit. Tus compañeros, al hacer `pull`, levantan con `docker compose up --build -V` para que la dependencia llegue a su contenedor.
 
 ## Flujo de trabajo con Git
 
