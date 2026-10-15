@@ -113,3 +113,79 @@ html.dark body {
   background-color: #020617;
   color: #f1f5f9;
 }
+
+/* FullCalendar (pantalla de calendario): colores del proyecto en claro y
+   oscuro. FullCalendar 6 trae su propio CSS; aquí solo se ajustan sus
+   variables y algunos tamaños. */
+.fouees-calendar .fc {
+  --fc-border-color: #e2e8f0;
+  --fc-page-bg-color: #ffffff;
+  --fc-neutral-bg-color: #f8fafc;
+  --fc-today-bg-color: rgb(42 212 197 / 0.08);
+  --fc-now-indicator-color: #ef4444;
+  --fc-highlight-color: rgb(42 212 197 / 0.18);
+  --fc-button-text-color: #475569;
+  --fc-button-bg-color: #ffffff;
+  --fc-button-border-color: #e2e8f0;
+  --fc-button-hover-bg-color: #f1f5f9;
+  --fc-button-hover-border-color: #e2e8f0;
+  --fc-button-active-bg-color: #2ad4c5;
+  --fc-button-active-border-color: #2ad4c5;
+  color: #334155;
+  font-size: 0.8125rem;
+}
+
+.dark .fouees-calendar .fc {
+  --fc-border-color: #1e293b;
+  --fc-page-bg-color: #0f172a;
+  --fc-neutral-bg-color: #1e293b;
+  --fc-today-bg-color: rgb(42 212 197 / 0.1);
+  --fc-button-text-color: #cbd5e1;
+  --fc-button-bg-color: #0f172a;
+  --fc-button-border-color: #334155;
+  --fc-button-hover-bg-color: #1e293b;
+  --fc-button-hover-border-color: #334155;
+  color: #cbd5e1;
+}
+
+.fouees-calendar .fc .fc-toolbar-title {
+  font-size: 1rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.fouees-calendar .fc .fc-button {
+  border-radius: 9999px;
+  padding: 0.3rem 0.85rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: capitalize;
+  box-shadow: none;
+}
+
+.fouees-calendar .fc .fc-button-group > .fc-button {
+  border-radius: 9999px;
+  margin-left: 0.25rem;
+}
+
+.fouees-calendar .fc .fc-button-primary:not(:disabled).fc-button-active,
+.fouees-calendar .fc .fc-button-primary:not(:disabled):active {
+  color: #ffffff;
+}
+
+.fouees-calendar .fc .fc-col-header-cell-cushion,
+.fouees-calendar .fc .fc-daygrid-day-number {
+  color: inherit;
+  text-decoration: none;
+  text-transform: capitalize;
+}
+
+.fouees-calendar .fc .fc-timegrid-slot-label,
+.fouees-calendar .fc .fc-timegrid-axis {
+  color: #94a3b8;
+}
+
+.fouees-calendar .fc .fc-event {
+  border-radius: 6px;
+  cursor: pointer;
+}

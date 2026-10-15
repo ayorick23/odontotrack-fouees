@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.conf import settings
 from django.db import models
 
@@ -63,3 +65,75 @@ class Assignment(models.Model):
             from .services import start_case
 
             start_case(self)
+
+
+class AppointmentQuerySet(models.QuerySet):
+    def visible_to(self, user):
+        """
+        Qué citas ve cada usuario. Las acciones (ver, agendar, editar) las
+        decide el permiso calendar.*; aquí solo se filtran filas: el
+        estudiante ve las citas de sus propios casos, igual que en el resto
+        del sistema.
+        """
+        if user.role == user.Role.ESTUDIANTE:
+            return self.filter(assignment__student=user)
+        return self
+
+    def in_range(self, start, end):
+        """Citas que empiezan dentro del rango que muestra el calendario."""
+        queryset = self
+        if start is not None:
+            queryset = queryset.filter(starts_at__gte=start)
+        if end is not None:
+            queryset = queryset.filter(starts_at__lt=end)
+        return queryset
+
+
+class Appointment(models.Model):
+    """
+    Cita agendada en el calendario para un caso (asignación activa). El
+    paciente y el estudiante salen de la asignación.
+    """
+
+    class Status(models.TextChoices):
+        PROGRAMADA = "programada", "Programada"
+        ATENDIDA = "atendida", "Atendida"
+        CANCELADA = "cancelada", "Cancelada"
+
+    class Duration(models.IntegerChoices):
+        MEDIA_HORA = 30, "30 minutos"
+        UNA_HORA = 60, "1 hora"
+        HORA_Y_MEDIA = 90, "1 hora 30 minutos"
+        DOS_HORAS = 120, "2 horas"
+
+    assignment = models.ForeignKey(
+        Assignment,
+        on_delete=models.CASCADE,
+        related_name="appointments",
+    )
+    starts_at = models.DateTimeField(help_text="Fecha y hora de inicio.")
+    duration_minutes = models.PositiveSmallIntegerField(
+        choices=Duration.choices,
+        default=Duration.UNA_HORA,
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.PROGRAMADA,
+    )
+    notes = models.TextField(blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    objects = AppointmentQuerySet.as_manager()
+
+    class Meta:
+        ordering = ["starts_at"]
+
+    def __str__(self):
+        return f"{self.assignment.patient} · {self.starts_at:%Y-%m-%d %H:%M}"
+
+    @property
+    def ends_at(self):
+        return self.starts_at + timedelta(minutes=self.duration_minutes)
