@@ -4,7 +4,8 @@ export type NotificationKind =
   | "patient_assigned"
   | "diagnosis_pending"
   | "diagnosis_validated"
-  | "case_finalized";
+  | "case_finalized"
+  | "appointment_reminder";
 
 export type AppNotification = {
   id: number;

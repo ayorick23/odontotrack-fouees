@@ -193,6 +193,27 @@ momento (no en cada restart del contenedor). El seed ACL no se usa
 en producción: los roles se crean desde la pantalla de Roles (o se
 evalúa un proceso aparte).
 
+### Recordatorios de citas (tarea diaria)
+
+`send_appointment_reminders` avisa in-app (campana) a cada estudiante
+de sus citas **programadas para mañana**. Solo al estudiante, no a
+recepción. Hay que correrlo **una vez al día**: nadie lo dispara al
+abrir la app.
+
+```bash
+docker compose exec backend python manage.py send_appointment_reminders
+docker compose exec backend python manage.py send_appointment_reminders --date 2026-10-20   # un día puntual
+```
+
+Correrlo dos veces el mismo día no duplica avisos: cada cita guarda
+cuándo se recordó (`reminder_sent_at`). Si la cita se reprograma a otra
+fecha u hora, se vuelve a recordar. En un servidor se agenda con cron
+(por ejemplo, todos los días a las 7:00):
+
+```cron
+0 7 * * * cd /ruta/odontotrack-fouees && docker compose exec -T backend python manage.py send_appointment_reminders
+```
+
 ### Si agregas una dependencia nueva
 
 - **Backend:** agrégala a `backend/requirements.txt` y corre `docker compose up --build backend`.
