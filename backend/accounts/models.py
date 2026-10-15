@@ -107,6 +107,7 @@ class Notification(models.Model):
         DIAGNOSIS_PENDING = "diagnosis_pending", "Diagnóstico por validar"
         DIAGNOSIS_VALIDATED = "diagnosis_validated", "Diagnóstico validado"
         CASE_FINALIZED = "case_finalized", "Caso finalizado"
+        APPOINTMENT_REMINDER = "appointment_reminder", "Recordatorio de cita"
 
     recipient = models.ForeignKey(
         User,

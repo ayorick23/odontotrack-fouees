@@ -122,6 +122,11 @@ class Appointment(models.Model):
         default=Status.PROGRAMADA,
     )
     notes = models.TextField(blank=True)
+    reminder_sent_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Cuándo se avisó al estudiante (ODO-71). Se vacía al reprogramar.",
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

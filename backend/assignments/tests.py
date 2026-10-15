@@ -1,5 +1,6 @@
-from datetime import timedelta
+from datetime import datetime, time, timedelta
 
+from django.core.management import CommandError, call_command
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
@@ -11,7 +12,12 @@ from clinical_records.models import Diagnostico
 from patients.models import Patient
 
 from .models import Appointment, Assignment
-from .services import can_transition, transition_case_status
+from .services import (
+    can_transition,
+    reschedule_appointment,
+    send_appointment_reminders,
+    transition_case_status,
+)
 
 
 class AssignmentModelTests(APITestCase):
@@ -741,3 +747,80 @@ class AppointmentApiTests(APITestCase):
         self.assertEqual(len(everyone.json()), 3)
         found = self.client.get(f"{self.url}schedulable/", {"search": "cita-3"})
         self.assertEqual([row["id"] for row in found.json()], [self.case_jose.id])
+
+
+class AppointmentReminderTests(APITestCase):
+    """ODO-71: recordatorio in-app el día anterior, solo al estudiante."""
+
+    def setUp(self):
+        self.tomorrow = timezone.localdate() + timedelta(days=1)
+        self.student = User.objects.create_user(
+            username="est-recordatorio", password="pass12345", role=User.Role.ESTUDIANTE
+        )
+        self.recepcion = User.objects.create_user(
+            username="rec-recordatorio", password="pass12345", role=User.Role.RECEPCION
+        )
+        patient = Patient.objects.create(first_name="Rosa", last_name="Diaz", dui="REC-1")
+        self.assignment = Assignment.objects.create(patient=patient, student=self.student)
+
+    def _at(self, day, hour, minute=0):
+        return timezone.make_aware(datetime.combine(day, time(hour, minute)))
+
+    def _appointment(self, starts_at, **fields):
+        return Appointment.objects.create(
+            assignment=self.assignment, starts_at=starts_at, **fields
+        )
+
+    def _reminders(self):
+        return Notification.objects.filter(
+            kind=Notification.Kind.APPOINTMENT_REMINDER
+        )
+
+    def test_reminds_student_of_tomorrows_appointments_in_local_time(self):
+        early = self._appointment(self._at(self.tomorrow, 0, 30))
+        # 23:30 en El Salvador ya es pasado mañana en UTC: igual cuenta.
+        late = self._appointment(self._at(self.tomorrow, 23, 30))
+        self._appointment(self._at(self.tomorrow + timedelta(days=1), 0, 30))
+        self._appointment(self._at(self.tomorrow, 10), status=Appointment.Status.CANCELADA)
+
+        self.assertEqual(send_appointment_reminders(), 2)
+
+        reminders = self._reminders()
+        self.assertEqual({n.recipient for n in reminders}, {self.student})
+        self.assertEqual({n.link for n in reminders}, {"/calendar"})
+        self.assertIn("23:30", " ".join(n.body for n in reminders))
+        self.assertIn("Rosa Diaz", reminders.first().body)
+        early.refresh_from_db()
+        late.refresh_from_db()
+        self.assertIsNotNone(early.reminder_sent_at)
+        self.assertIsNotNone(late.reminder_sent_at)
+
+    def test_running_twice_does_not_duplicate(self):
+        self._appointment(self._at(self.tomorrow, 9))
+        send_appointment_reminders()
+        self.assertEqual(send_appointment_reminders(), 0)
+        self.assertEqual(self._reminders().count(), 1)
+
+    def test_rescheduling_to_another_day_reminds_again(self):
+        appointment = self._appointment(self._at(self.tomorrow, 9))
+        send_appointment_reminders()
+        moved = self._at(self.tomorrow + timedelta(days=2), 9)
+        reschedule_appointment(appointment, starts_at=moved)
+        appointment.refresh_from_db()
+        self.assertIsNone(appointment.reminder_sent_at)
+        self.assertEqual(send_appointment_reminders(moved.date()), 1)
+        self.assertEqual(self._reminders().count(), 2)
+
+    def test_skips_finalized_cases(self):
+        self._appointment(self._at(self.tomorrow, 9))
+        self.assignment.status = Assignment.AssignmentStatus.FINALIZADA
+        self.assignment.save(update_fields=["status"])
+        self.assertEqual(send_appointment_reminders(), 0)
+
+    def test_command_accepts_a_date(self):
+        day = self.tomorrow + timedelta(days=3)
+        self._appointment(self._at(day, 9))
+        call_command("send_appointment_reminders", "--date", day.isoformat())
+        self.assertEqual(self._reminders().count(), 1)
+        with self.assertRaises(CommandError):
+            call_command("send_appointment_reminders", "--date", "15/10/2026")

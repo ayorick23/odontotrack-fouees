@@ -1,5 +1,5 @@
 from collections.abc import Iterable
-from datetime import datetime, timedelta
+from datetime import date, datetime, time, timedelta
 
 from django.db import transaction
 from django.db.models import Count, Q, QuerySet
@@ -299,11 +299,22 @@ def reschedule_appointment(
         _check_student_is_free(
             appointment.assignment, new_start, new_duration, exclude_id=appointment.pk
         )
+    if new_start != appointment.starts_at:
+        # La nueva fecha merece su propio recordatorio (ODO-71).
+        appointment.reminder_sent_at = None
     appointment.starts_at = new_start
     appointment.duration_minutes = new_duration
     if notes is not None:
         appointment.notes = notes
-    appointment.save(update_fields=["starts_at", "duration_minutes", "notes", "updated_at"])
+    appointment.save(
+        update_fields=[
+            "starts_at",
+            "duration_minutes",
+            "notes",
+            "reminder_sent_at",
+            "updated_at",
+        ]
+    )
     return appointment
 
 
@@ -313,3 +324,42 @@ def change_appointment_status(appointment: Appointment, status: str) -> Appointm
     appointment.status = status
     appointment.save(update_fields=["status", "updated_at"])
     return appointment
+
+
+@transaction.atomic
+def send_appointment_reminders(day: date | None = None) -> int:
+    """Avisa al estudiante de cada cita programada para `day` (ODO-71).
+
+    Por defecto `day` es mañana (hora de El Salvador): el comando corre una
+    vez al día y avisa con un día de antelación. Cada cita se recuerda una
+    sola vez (`reminder_sent_at`), así que correrlo de nuevo no duplica.
+    Solo avisa al estudiante; recepción no recibe recordatorios.
+    """
+    day = day or timezone.localdate() + timedelta(days=1)
+    start = timezone.make_aware(datetime.combine(day, time.min))
+    end = start + timedelta(days=1)
+    appointments = (
+        Appointment.objects.select_for_update()
+        .filter(
+            status=Appointment.Status.PROGRAMADA,
+            assignment__status=Assignment.AssignmentStatus.ACTIVA,
+            reminder_sent_at__isnull=True,
+            starts_at__gte=start,
+            starts_at__lt=end,
+        )
+        .select_related("assignment__patient", "assignment__student")
+    )
+    reminded = []
+    for appointment in appointments:
+        hour = timezone.localtime(appointment.starts_at).strftime("%H:%M")
+        notify(
+            [appointment.assignment.student],
+            Notification.Kind.APPOINTMENT_REMINDER,
+            "Recordatorio de cita",
+            f"El {day:%d/%m} a las {hour} atiendes a "
+            f"{_patient_name(appointment.assignment.patient)}.",
+            link="/calendar",
+        )
+        reminded.append(appointment.pk)
+    Appointment.objects.filter(pk__in=reminded).update(reminder_sent_at=timezone.now())
+    return len(reminded)
