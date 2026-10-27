@@ -1,6 +1,7 @@
 from collections.abc import Iterable
 
 from django.utils.text import slugify
+from rest_framework.exceptions import PermissionDenied, ValidationError
 
 from .models import AclPermission, Notification, Role, User
 from .permissions_catalog import SYSTEM_ROLES, all_permission_names, iter_catalog_permissions
@@ -90,3 +91,64 @@ def notify(
         )
         for recipient in recipients
     )
+
+
+# Relaciones que dejan rastro clínico. Las CASCADE borrarían expediente
+# (diagnósticos, evoluciones, asignaciones) y las SET_NULL, la autoría.
+_HISTORY_RELATIONS = (
+    "patient_assignments",
+    "authored_diagnoses",
+    "authored_clinical_evolutions",
+    "validated_diagnoses",
+    "updated_odontograms",
+    "odontogram_revisions",
+)
+
+
+def user_has_history(user: User) -> bool:
+    return any(getattr(user, name).exists() for name in _HISTORY_RELATIONS)
+
+
+def _is_admin(user: User) -> bool:
+    return user.is_superuser or user.role == User.Role.ADMIN
+
+
+def assert_can_manage_user(
+    actor: User,
+    target: User | None,
+    *,
+    new_role: str | None = None,
+    new_is_active: bool | None = None,
+) -> None:
+    """Reglas de gestión de cuentas que el ACL solo no cubre (ODO-64).
+
+    - Solo un admin crea, edita o asigna cuentas admin: soporte tiene
+      users.edit y si no podría ascenderse a sí mismo.
+    - Nadie se desactiva ni se cambia el rol a sí mismo (se quedaría fuera).
+    `target` es None al crear.
+    """
+    touches_admin = new_role == User.Role.ADMIN or (
+        target is not None and _is_admin(target)
+    )
+    if touches_admin and not _is_admin(actor):
+        raise PermissionDenied("Solo un administrador puede gestionar cuentas de administrador.")
+    if target is not None and target.pk == actor.pk:
+        if new_is_active is False:
+            raise ValidationError({"is_active": "No puedes desactivar tu propia cuenta."})
+        if new_role is not None and new_role != actor.role:
+            raise ValidationError({"role": "No puedes cambiar tu propio rol."})
+
+
+def assert_can_delete_user(actor: User, target: User) -> None:
+    assert_can_manage_user(actor, target)
+    if target.pk == actor.pk:
+        raise ValidationError({"detail": "No puedes eliminar tu propia cuenta."})
+    if user_has_history(target):
+        raise ValidationError(
+            {
+                "detail": (
+                    "Esta cuenta tiene historial clínico y no se puede eliminar. "
+                    "Desactívala para bloquear el acceso."
+                )
+            }
+        )

@@ -17,6 +17,7 @@ import { CatalogList } from "./pages/Catalogs/CatalogList";
 import { Students } from "./pages/Students/Students";
 import { Supervision } from "./pages/Supervision/Supervision";
 import { Support } from "./pages/Support/Support";
+import { UserList } from "./pages/Users/UserList";
 
 // FullCalendar es pesado: el calendario se descarga solo al abrirlo.
 const Calendar = lazy(() =>
@@ -56,6 +57,7 @@ function App() {
               />
               <Route path="/supervision" element={<Supervision />} />
               <Route path="/students" element={<Students />} />
+              <Route path="/users" element={<UserList />} />
               <Route path="/roles" element={<RoleList />} />
               <Route path="/catalogs" element={<CatalogList />} />
               <Route path="/roles/:id/edit" element={<RoleForm />} />

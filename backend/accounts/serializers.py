@@ -42,12 +42,66 @@ class EmailOrUsernameTokenObtainPairSerializer(TokenObtainPairSerializer):
 
 
 class UserSerializer(serializers.ModelSerializer):
-    """Listado y detalle. El password no se lee ni se escribe aquí."""
+    """Listado y detalle. El password no se lee ni se escribe aquí.
+
+    `is_active` es el bloqueo de la cuenta (ODO-64): desactivada, no inicia
+    sesión y sus tokens dejan de servir.
+    """
+
+    email = serializers.EmailField(
+        validators=[
+            UniqueValidator(
+                queryset=User.objects.all(),
+                message="Ya existe un usuario con este correo.",
+            )
+        ],
+    )
+    role = serializers.ChoiceField(choices=User.Role.choices)
 
     class Meta:
         model = User
-        fields = ["id", "username", "email", "first_name", "last_name", "role"]
-        read_only_fields = ["id"]
+        fields = [
+            "id",
+            "username",
+            "email",
+            "first_name",
+            "last_name",
+            "role",
+            "is_active",
+            "last_login",
+            "date_joined",
+        ]
+        read_only_fields = ["id", "last_login", "date_joined"]
+
+
+def _validated_new_password(value: str, user) -> str:
+    try:
+        validate_password(value, user=user)
+    except DjangoValidationError as exc:
+        raise serializers.ValidationError(list(exc.messages)) from exc
+    return value
+
+
+class SetPasswordSerializer(serializers.Serializer):
+    """Restablecer la contraseña de otra cuenta (quien tiene users.edit)."""
+
+    password = serializers.CharField(write_only=True, trim_whitespace=False)
+
+    def validate_password(self, value):
+        return _validated_new_password(value, self.context["user"])
+
+
+class ChangeOwnPasswordSerializer(serializers.Serializer):
+    current_password = serializers.CharField(write_only=True, trim_whitespace=False)
+    new_password = serializers.CharField(write_only=True, trim_whitespace=False)
+
+    def validate_current_password(self, value):
+        if not self.context["user"].check_password(value):
+            raise serializers.ValidationError("La contraseña actual no es correcta.")
+        return value
+
+    def validate_new_password(self, value):
+        return _validated_new_password(value, self.context["user"])
 
 
 class UserCreateSerializer(serializers.ModelSerializer):

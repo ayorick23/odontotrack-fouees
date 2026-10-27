@@ -1,7 +1,8 @@
 from django.contrib.auth import get_user_model
+from django.db.models import Q
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema
-from rest_framework import mixins, viewsets
+from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
@@ -12,14 +13,17 @@ from .models import Notification, Role
 from .permissions import HasRequiredAcl
 from .permissions_catalog import catalog_payload
 from .serializers import (
+    ChangeOwnPasswordSerializer,
     EmailOrUsernameTokenObtainPairSerializer,
     MeSerializer,
     NotificationSerializer,
     RoleSerializer,
+    SetPasswordSerializer,
     StudentListSerializer,
     UserCreateSerializer,
     UserSerializer,
 )
+from .services import assert_can_delete_user, assert_can_manage_user
 
 User = get_user_model()
 
@@ -33,7 +37,10 @@ class EmailOrUsernameTokenObtainPairView(TokenObtainPairView):
 class UserViewSet(viewsets.ModelViewSet):
     """
     Listado de usuarios. Alta y edición según `users.create` / `users.edit`.
-    GET /me no exige users.view: cualquier autenticado lee su perfil y ACL.
+    GET /me y POST /me/password no exigen permiso: cualquier autenticado
+    lee su perfil y cambia su propia contraseña. Las reglas que el ACL no
+    cubre (cuentas admin, auto-bloqueo, borrar con historial) están en
+    accounts/services.py.
     """
 
     queryset = User.objects.all().order_by("id")
@@ -46,6 +53,7 @@ class UserViewSet(viewsets.ModelViewSet):
         "update": "users.edit",
         "partial_update": "users.edit",
         "destroy": "users.delete",
+        "set_password": "users.edit",
     }
 
     def _students_only(self):
@@ -64,9 +72,22 @@ class UserViewSet(viewsets.ModelViewSet):
         queryset = User.objects.all().order_by("id")
         if self._students_only():
             return queryset.filter(role=User.Role.ESTUDIANTE)
-        role = self.request.query_params.get("role")
-        if self.action == "list" and role in User.Role.values:
+        if self.action != "list":
+            return queryset
+        params = self.request.query_params
+        role = params.get("role")
+        if role in User.Role.values:
             queryset = queryset.filter(role=role)
+        is_active = params.get("is_active")
+        if is_active in ("true", "false"):
+            queryset = queryset.filter(is_active=is_active == "true")
+        for term in params.get("search", "").split():
+            queryset = queryset.filter(
+                Q(username__icontains=term)
+                | Q(email__icontains=term)
+                | Q(first_name__icontains=term)
+                | Q(last_name__icontains=term)
+            )
         return queryset
 
     def get_serializer_class(self):
@@ -78,10 +99,51 @@ class UserViewSet(viewsets.ModelViewSet):
             return StudentListSerializer
         return UserSerializer
 
+    def perform_create(self, serializer):
+        assert_can_manage_user(
+            self.request.user, None, new_role=serializer.validated_data.get("role")
+        )
+        serializer.save()
+
+    def perform_update(self, serializer):
+        data = serializer.validated_data
+        assert_can_manage_user(
+            self.request.user,
+            serializer.instance,
+            new_role=data.get("role"),
+            new_is_active=data.get("is_active"),
+        )
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        assert_can_delete_user(self.request.user, instance)
+        instance.delete()
+
     @action(detail=False, methods=["get"])
     def me(self, request):
         serializer = MeSerializer(request.user)
         return Response(serializer.data)
+
+    @extend_schema(request=ChangeOwnPasswordSerializer, responses={204: None})
+    @action(detail=False, methods=["post"], url_path="me/password")
+    def change_own_password(self, request):
+        user = request.user
+        payload = ChangeOwnPasswordSerializer(data=request.data, context={"user": user})
+        payload.is_valid(raise_exception=True)
+        user.set_password(payload.validated_data["new_password"])
+        user.save(update_fields=["password"])
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @extend_schema(request=SetPasswordSerializer, responses={204: None})
+    @action(detail=True, methods=["post"], url_path="set-password")
+    def set_password(self, request, pk=None):
+        target = self.get_object()
+        assert_can_manage_user(request.user, target)
+        payload = SetPasswordSerializer(data=request.data, context={"user": target})
+        payload.is_valid(raise_exception=True)
+        target.set_password(payload.validated_data["password"])
+        target.save(update_fields=["password"])
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 @extend_schema(tags=["accounts"])
