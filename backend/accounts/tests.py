@@ -11,6 +11,8 @@ from accounts.permissions import (
     IsSoporte,
 )
 from accounts.services import notify, sync_acl
+from assignments.models import Assignment
+from patients.models import Patient
 
 TOKEN_URL = "/api/auth/token/"
 TOKEN_REFRESH_URL = "/api/auth/token/refresh/"
@@ -169,6 +171,244 @@ class UserCreateTests(APITestCase):
         response = self.client.post(USERS_URL, payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("email", response.data)
+
+    def test_soporte_cannot_create_admin(self):
+        self.client.force_authenticate(user=self.soporte)
+        payload = {**self.payload, "role": User.Role.ADMIN}
+        response = self.client.post(USERS_URL, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertFalse(User.objects.filter(username="nlopez").exists())
+
+    def test_admin_can_create_admin(self):
+        self.client.force_authenticate(user=self.admin)
+        payload = {**self.payload, "role": User.Role.ADMIN}
+        response = self.client.post(USERS_URL, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+
+class UserManagementTests(APITestCase):
+    """ODO-64: edición, bloqueo, borrado y contraseña de cuentas ajenas."""
+
+    def setUp(self):
+        sync_acl()
+        self.admin = self._user("admin-um", User.Role.ADMIN)
+        self.soporte = self._user("soporte-um", User.Role.SOPORTE)
+        self.docente = self._user("docente-um", User.Role.DOCENTE)
+        self.student = self._user("est-um", User.Role.ESTUDIANTE, first_name="Nadia")
+
+    def _user(self, username, role, **extra):
+        return User.objects.create_user(
+            username=username,
+            email=f"{username}@fouees.edu.sv",
+            password=VALID_PASSWORD,
+            role=role,
+            **extra,
+        )
+
+    def _url(self, user, suffix=""):
+        return f"{USERS_URL}{user.pk}/{suffix}"
+
+    def test_list_exposes_is_active_and_filters(self):
+        self.student.is_active = False
+        self.student.save()
+        self.client.force_authenticate(user=self.soporte)
+        response = self.client.get(USERS_URL, {"is_active": "false"})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            [row["username"] for row in response.data["results"]], ["est-um"]
+        )
+        self.assertFalse(response.data["results"][0]["is_active"])
+
+        response = self.client.get(USERS_URL, {"search": "nadia"})
+        self.assertEqual(
+            [row["username"] for row in response.data["results"]], ["est-um"]
+        )
+
+    def test_soporte_deactivates_a_student_who_then_cannot_use_the_api(self):
+        self.client.force_authenticate(user=self.soporte)
+        response = self.client.patch(
+            self._url(self.student), {"is_active": False}, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.client.force_authenticate(user=None)
+
+        login = self.client.post(
+            TOKEN_URL,
+            {"username": "est-um", "password": VALID_PASSWORD},
+            format="json",
+        )
+        self.assertEqual(login.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_token_stops_working_after_deactivation(self):
+        access = self.client.post(
+            TOKEN_URL,
+            {"username": "est-um", "password": VALID_PASSWORD},
+            format="json",
+        ).data["access"]
+        self.student.is_active = False
+        self.student.save()
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {access}")
+        self.assertEqual(
+            self.client.get(ME_URL).status_code, status.HTTP_401_UNAUTHORIZED
+        )
+
+    def test_edit_rejects_email_of_another_user(self):
+        self.client.force_authenticate(user=self.soporte)
+        response = self.client.patch(
+            self._url(self.student), {"email": self.docente.email}, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("email", response.data)
+
+    def test_edit_keeps_own_email(self):
+        self.client.force_authenticate(user=self.soporte)
+        response = self.client.patch(
+            self._url(self.student),
+            {"email": self.student.email, "first_name": "Nadia María"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_soporte_cannot_promote_to_admin_or_touch_an_admin(self):
+        self.client.force_authenticate(user=self.soporte)
+        promote_self = self.client.patch(
+            self._url(self.soporte), {"role": User.Role.ADMIN}, format="json"
+        )
+        self.assertEqual(promote_self.status_code, status.HTTP_403_FORBIDDEN)
+        promote_other = self.client.patch(
+            self._url(self.student), {"role": User.Role.ADMIN}, format="json"
+        )
+        self.assertEqual(promote_other.status_code, status.HTTP_403_FORBIDDEN)
+        block_admin = self.client.patch(
+            self._url(self.admin), {"is_active": False}, format="json"
+        )
+        self.assertEqual(block_admin.status_code, status.HTTP_403_FORBIDDEN)
+        self.admin.refresh_from_db()
+        self.assertTrue(self.admin.is_active)
+        reset_admin = self.client.post(
+            self._url(self.admin, "set-password/"),
+            {"password": "OtraClave2026!"},
+            format="json",
+        )
+        self.assertEqual(reset_admin.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_soporte_changes_role_between_non_admin_roles(self):
+        self.client.force_authenticate(user=self.soporte)
+        response = self.client.patch(
+            self._url(self.student), {"role": User.Role.DOCENTE}, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["role"], User.Role.DOCENTE)
+
+    def test_nobody_deactivates_or_demotes_themselves(self):
+        self.client.force_authenticate(user=self.admin)
+        deactivate = self.client.patch(
+            self._url(self.admin), {"is_active": False}, format="json"
+        )
+        self.assertEqual(deactivate.status_code, status.HTTP_400_BAD_REQUEST)
+        demote = self.client.patch(
+            self._url(self.admin), {"role": User.Role.DOCENTE}, format="json"
+        )
+        self.assertEqual(demote.status_code, status.HTTP_400_BAD_REQUEST)
+        rename = self.client.patch(
+            self._url(self.admin), {"first_name": "Ana"}, format="json"
+        )
+        self.assertEqual(rename.status_code, status.HTTP_200_OK)
+
+    def test_role_without_users_edit_cannot_edit(self):
+        self.client.force_authenticate(user=self.docente)
+        response = self.client.patch(
+            self._url(self.student), {"is_active": False}, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_delete_only_without_clinical_history(self):
+        self.client.force_authenticate(user=self.soporte)
+        patient = Patient.objects.create(first_name="Rosa", last_name="Ruiz", dui="UM-1")
+        Assignment.objects.create(patient=patient, student=self.student)
+        with_history = self.client.delete(self._url(self.student))
+        self.assertEqual(with_history.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertTrue(User.objects.filter(pk=self.student.pk).exists())
+        self.assertTrue(Assignment.objects.filter(student=self.student).exists())
+
+        unused = self._user("creada-por-error", User.Role.ESTUDIANTE)
+        response = self.client.delete(self._url(unused))
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+
+    def test_cannot_delete_yourself(self):
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.delete(self._url(self.admin))
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_soporte_resets_a_student_password(self):
+        self.client.force_authenticate(user=self.soporte)
+        response = self.client.post(
+            self._url(self.student, "set-password/"),
+            {"password": "NuevaClave2026!"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.student.refresh_from_db()
+        self.assertTrue(self.student.check_password("NuevaClave2026!"))
+
+    def test_reset_password_applies_validators(self):
+        self.client.force_authenticate(user=self.soporte)
+        response = self.client.post(
+            self._url(self.student, "set-password/"),
+            {"password": "123"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("password", response.data)
+
+
+class OwnPasswordTests(APITestCase):
+    url = f"{ME_URL}password/"
+
+    def setUp(self):
+        sync_acl()
+        self.user = User.objects.create_user(
+            username="docente-pw",
+            email="docente-pw@fouees.edu.sv",
+            password=VALID_PASSWORD,
+            role=User.Role.DOCENTE,
+        )
+        self.client.force_authenticate(user=self.user)
+
+    def test_changes_own_password(self):
+        response = self.client.post(
+            self.url,
+            {"current_password": VALID_PASSWORD, "new_password": "NuevaClave2026!"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password("NuevaClave2026!"))
+
+    def test_rejects_wrong_current_password(self):
+        response = self.client.post(
+            self.url,
+            {"current_password": "no-es", "new_password": "NuevaClave2026!"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("current_password", response.data)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password(VALID_PASSWORD))
+
+    def test_rejects_weak_or_similar_password(self):
+        response = self.client.post(
+            self.url,
+            {"current_password": VALID_PASSWORD, "new_password": "docente-pw"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("new_password", response.data)
+
+    def test_requires_authentication(self):
+        self.client.force_authenticate(user=None)
+        response = self.client.post(self.url, {}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
 
 class CurrentUserTests(APITestCase):

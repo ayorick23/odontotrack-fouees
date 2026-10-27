@@ -7,6 +7,7 @@ import {
   Headset,
   LayoutDashboard,
   Shield,
+  UserCog,
   UserPlus,
   Users,
 } from "lucide-react";
@@ -173,6 +174,8 @@ function navIcon(icon: Exclude<NavEntry["icon"], "patients">): ReactNode {
       return <ClipboardCheck className={className} />;
     case "students":
       return <GraduationCap className={className} />;
+    case "users":
+      return <UserCog className={className} />;
     case "roles":
       return <Shield className={className} />;
     case "catalogs":

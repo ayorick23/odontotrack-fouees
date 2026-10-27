@@ -1,4 +1,5 @@
-import { LogOut, Search } from "lucide-react";
+import { KeyRound, LogOut, Search } from "lucide-react";
+import { useState } from "react";
 import { useLocation } from "react-router-dom";
 
 import { can } from "../acl/can";
@@ -7,6 +8,7 @@ import {
   ROLE_LABELS,
   type AuthUser,
 } from "../context/AuthContext";
+import { ChangePasswordModal } from "./ChangePasswordModal";
 import { NotificationBell } from "./NotificationBell";
 import { ThemeToggle } from "./ThemeToggle";
 
@@ -24,6 +26,7 @@ const PAGE_META: Record<string, { title: string; crumb: string }> = {
   "/calendar": { title: "Calendario de citas", crumb: "Dashboard › Calendario" },
   "/supervision": { title: "Supervisión", crumb: "Dashboard › Supervisión" },
   "/students": { title: "Base de estudiantes", crumb: "Dashboard › Estudiantes" },
+  "/users": { title: "Usuarios", crumb: "Personas › Usuarios" },
   "/roles": { title: "Roles y permisos", crumb: "Sistema › Roles" },
   "/catalogs": { title: "Catálogos clínicos", crumb: "Sistema › Catálogos" },
   "/support": { title: "Soporte técnico", crumb: "Dashboard › Soporte" },
@@ -58,6 +61,7 @@ export function Navbar({
 }) {
   const location = useLocation();
   const meta = pageMeta(location.pathname);
+  const [passwordOpen, setPasswordOpen] = useState(false);
 
   return (
     <header className="flex items-center justify-between rounded-2xl bg-white px-5 py-3 shadow-sm dark:bg-slate-900 dark:shadow-none dark:ring-1 dark:ring-white/10">
@@ -89,6 +93,18 @@ export function Navbar({
             </span>
           </p>
         ) : null}
+        {user ? (
+          <button
+            type="button"
+            onClick={() => setPasswordOpen(true)}
+            title="Cambiar contraseña"
+            aria-label="Cambiar contraseña"
+            className="flex size-9 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+          >
+            <KeyRound className="size-4" />
+          </button>
+        ) : null}
+        <ChangePasswordModal isOpen={passwordOpen} onClose={() => setPasswordOpen(false)} />
         <button
           type="button"
           onClick={onLogout}

@@ -14,7 +14,7 @@ export type NavGroup = {
 };
 
 export type NavEntry =
-  | (NavLeaf & { icon: "dashboard" | "calendar" | "supervision" | "students" | "support" | "roles" | "catalogs" })
+  | (NavLeaf & { icon: "dashboard" | "calendar" | "supervision" | "students" | "users" | "support" | "roles" | "catalogs" })
   | (NavGroup & { icon: "patients" });
 
 export const NAV_ENTRIES: readonly NavEntry[] = [
@@ -64,6 +64,12 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
     label: "Base de estudiantes",
     icon: "students",
     permission: "students.view",
+  },
+  {
+    to: "/users",
+    label: "Usuarios",
+    icon: "users",
+    permission: "users.view",
   },
   {
     to: "/roles",
