@@ -933,10 +933,11 @@ class PatientExportTests(APITestCase):
         )
 
     def test_requires_export_permission(self):
-        recepcion = User.objects.create_user(
-            username="recepcion-export", password="pass12345", role=User.Role.RECEPCION
+        # El docente consulta el directorio pero no tiene patients.export.
+        docente = User.objects.create_user(
+            username="docente-export", password="pass12345", role=User.Role.DOCENTE
         )
-        self.client.force_authenticate(user=recepcion)
+        self.client.force_authenticate(user=docente)
         self.assertEqual(
             self.client.get(self.url).status_code, status.HTTP_403_FORBIDDEN
         )

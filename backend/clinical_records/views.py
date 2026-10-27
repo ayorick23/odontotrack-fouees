@@ -60,7 +60,7 @@ class DiagnosisViewSet(ClinicalScopeMixin, ModelViewSet):
     serializer.
     """
 
-    queryset = Diagnostico.objects.select_related("student", "validated_by")
+    queryset = Diagnostico.objects.select_related("patient", "student", "validated_by")
     serializer_class = DiagnosticoSerializer
     permission_classes = [IsAuthenticated, HasRequiredAcl]
     acl_permissions = {
@@ -72,6 +72,23 @@ class DiagnosisViewSet(ClinicalScopeMixin, ModelViewSet):
         "destroy": "diagnoses.edit",
         "validate_diagnosis": "diagnoses.validate",
     }
+
+    def get_queryset(self):
+        # ?is_validated=false arma la cola de Supervisión.
+        queryset = super().get_queryset()
+        is_validated = self.request.query_params.get("is_validated")
+        if is_validated in ("true", "false"):
+            queryset = queryset.filter(is_validated=is_validated == "true")
+        return queryset
+
+    def perform_update(self, serializer):
+        assert_can_write_clinical(self.request.user, serializer.instance.patient)
+        new_patient = serializer.validated_data.get("patient")
+        if new_patient is not None:
+            assert_can_write_clinical(self.request.user, new_patient)
+        serializer.instance = DiagnosisService.update(
+            serializer.instance, **serializer.validated_data
+        )
 
     def perform_create(self, serializer):
         patient = serializer.validated_data["patient"]

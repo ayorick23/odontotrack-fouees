@@ -1,4 +1,5 @@
 from django.test import SimpleTestCase
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -504,6 +505,55 @@ class DiagnosisApiTests(APITestCase):
         response = self.client.post(f"{self.url}{diagnosis.id}/validate/")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_supervision_queue_lists_only_pending_with_patient_name(self):
+        Diagnostico.objects.create(
+            patient=self.patient, student=self.student, content="Pendiente."
+        )
+        Diagnostico.objects.create(
+            patient=self.patient,
+            student=self.student,
+            content="Ya validado.",
+            is_validated=True,
+            validated_by=self.docente,
+        )
+        self.client.force_authenticate(user=self.docente)
+        response = self.client.get(self.url, {"is_validated": "false"})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        results = response.json()["results"]
+        self.assertEqual([item["content"] for item in results], ["Pendiente."])
+        self.assertEqual(results[0]["patient_name"], "Ana Diagnostico")
+
+    def _validated_diagnosis(self):
+        return Diagnostico.objects.create(
+            patient=self.patient,
+            student=self.student,
+            content="Caries en 16.",
+            is_validated=True,
+            validated_by=self.docente,
+            validated_at=timezone.now(),
+        )
+
+    def test_editing_content_of_validated_diagnosis_voids_validation(self):
+        diagnosis = self._validated_diagnosis()
+        self.client.force_authenticate(user=self.student)
+        response = self.client.patch(
+            f"{self.url}{diagnosis.id}/", {"content": "Caries en 16 y 17."}
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        body = response.json()
+        self.assertFalse(body["is_validated"])
+        self.assertIsNone(body["validated_by"])
+        self.assertIsNone(body["validated_at"])
+
+    def test_saving_same_content_keeps_validation(self):
+        diagnosis = self._validated_diagnosis()
+        self.client.force_authenticate(user=self.student)
+        response = self.client.patch(
+            f"{self.url}{diagnosis.id}/", {"content": "Caries en 16."}
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.json()["is_validated"])
+
     def test_student_cannot_create_diagnosis_for_unassigned_patient(self):
         available = Patient.objects.create(
             first_name="Libre",
@@ -776,4 +826,15 @@ class DiagnosisNotificationTests(APITestCase):
             ).count(),
             1,
         )
+
+    def test_editing_a_validated_diagnosis_notifies_docentes_again(self):
+        diagnosis_id = self._create_diagnosis()
+        self.client.force_authenticate(user=self.docente)
+        self.client.post(f"{self.url}{diagnosis_id}/validate/")
+        self.client.force_authenticate(user=self.student)
+        self.client.patch(f"{self.url}{diagnosis_id}/", {"content": "Caries en 17."})
+        pending = Notification.objects.filter(
+            recipient=self.docente, kind=Notification.Kind.DIAGNOSIS_PENDING
+        )
+        self.assertEqual(pending.count(), 2)
 

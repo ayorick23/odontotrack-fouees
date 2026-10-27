@@ -22,6 +22,8 @@ from .services import user_display_name
 
 
 class DiagnosticoSerializer(serializers.ModelSerializer):
+    # Para la cola de Supervisión, que lista diagnósticos de varios pacientes.
+    patient_name = serializers.SerializerMethodField()
     student_name = serializers.SerializerMethodField()
     validated_by_name = serializers.SerializerMethodField()
 
@@ -30,6 +32,7 @@ class DiagnosticoSerializer(serializers.ModelSerializer):
         fields = (
             "id",
             "patient",
+            "patient_name",
             "student",
             "student_name",
             "content",
@@ -48,6 +51,9 @@ class DiagnosticoSerializer(serializers.ModelSerializer):
             "is_validated",
             "validated_at",
         ]
+
+    def get_patient_name(self, obj: Diagnostico) -> str:
+        return f"{obj.patient.first_name} {obj.patient.last_name}"
 
     def get_student_name(self, obj: Diagnostico) -> str | None:
         return user_display_name(obj.student)

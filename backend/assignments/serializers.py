@@ -111,6 +111,30 @@ class AppointmentStatusSerializer(serializers.Serializer):
     )
 
 
+class FinalizableAssignmentSerializer(serializers.ModelSerializer):
+    patient_name = serializers.SerializerMethodField()
+    student_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Assignment
+        fields = [
+            "id",
+            "patient",
+            "patient_name",
+            "student_name",
+            "appointment_number",
+            "reason",
+            "assigned_date",
+        ]
+
+    def get_patient_name(self, assignment: Assignment) -> str:
+        return _person(assignment.patient.first_name, assignment.patient.last_name)
+
+    def get_student_name(self, assignment: Assignment) -> str:
+        student = assignment.student
+        return _person(student.first_name, student.last_name, student.username)
+
+
 class SchedulableAssignmentSerializer(serializers.ModelSerializer):
     patient = serializers.SerializerMethodField()
     student = serializers.SerializerMethodField()

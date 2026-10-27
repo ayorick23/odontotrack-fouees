@@ -2,12 +2,13 @@ from collections.abc import Iterable
 from datetime import date, datetime, time, timedelta
 
 from django.db import transaction
-from django.db.models import Count, Q, QuerySet
+from django.db.models import Count, Exists, OuterRef, Q, QuerySet
 from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
 from accounts.models import Notification, User
 from accounts.services import notify
+from clinical_records.models import Diagnostico
 from clinical_records.services import DiagnosisService
 from patients.models import Patient
 
@@ -208,6 +209,23 @@ def schedulable_assignments(user: User, search: str = "") -> QuerySet[Assignment
             | Q(student__last_name__icontains=term)
         )
     return assignments.order_by("patient__last_name", "patient__first_name", "id")
+
+
+def finalizable_assignments() -> QuerySet[Assignment]:
+    """Casos activos que ya cumplen lo que pide finalize_assignment.
+
+    Es la lista "listos para finalizar" de Supervisión: asignación activa
+    y al menos un diagnóstico validado del paciente.
+    """
+    validated = Diagnostico.objects.filter(
+        patient=OuterRef("patient"), is_validated=True
+    )
+    return (
+        Assignment.objects.filter(status=Assignment.AssignmentStatus.ACTIVA)
+        .filter(Exists(validated))
+        .select_related("patient", "student")
+        .order_by("assigned_date", "id")
+    )
 
 
 def _check_not_in_past(starts_at: datetime) -> None:

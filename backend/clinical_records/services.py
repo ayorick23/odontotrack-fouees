@@ -74,6 +74,18 @@ def _patient_name(patient: Patient) -> str:
     return f"{patient.first_name} {patient.last_name}"
 
 
+def _notify_pending(diagnosis: Diagnostico, body: str) -> None:
+    # Sin relación docente-estudiante: avisa a todos los docentes activos.
+    docentes = User.objects.filter(role=User.Role.DOCENTE, is_active=True)
+    notify(
+        docentes,
+        Notification.Kind.DIAGNOSIS_PENDING,
+        "Diagnóstico por validar",
+        body,
+        link="/supervision",
+    )
+
+
 class DiagnosisService:
     @staticmethod
     def create(*, student: User, **fields) -> Diagnostico:
@@ -83,15 +95,38 @@ class DiagnosisService:
         docentes activos. Editarlo después no vuelve a avisar.
         """
         diagnosis = Diagnostico.objects.create(student=student, **fields)
-        docentes = User.objects.filter(role=User.Role.DOCENTE, is_active=True)
-        notify(
-            docentes,
-            Notification.Kind.DIAGNOSIS_PENDING,
-            "Diagnóstico por validar",
+        _notify_pending(
+            diagnosis,
             f"{_patient_name(diagnosis.patient)}: registrado por "
             f"{user_display_name(student)}.",
-            link="/supervision",
         )
+        return diagnosis
+
+    @staticmethod
+    def update(diagnosis: Diagnostico, **fields) -> Diagnostico:
+        """Guarda la edición; si cambia el contenido de uno validado, lo anula.
+
+        El docente avaló un texto concreto: si el texto cambia, la
+        validación ya no lo cubre y el diagnóstico vuelve a la cola de
+        Supervisión (y se avisa, porque ya había salido de ella).
+        """
+        content_changed = (
+            "content" in fields and fields["content"] != diagnosis.content
+        )
+        was_validated = diagnosis.is_validated
+        for name, value in fields.items():
+            setattr(diagnosis, name, value)
+        if was_validated and content_changed:
+            diagnosis.is_validated = False
+            diagnosis.validated_by = None
+            diagnosis.validated_at = None
+        diagnosis.save()
+        if was_validated and content_changed:
+            _notify_pending(
+                diagnosis,
+                f"{_patient_name(diagnosis.patient)}: se editó un diagnóstico "
+                "ya validado y necesita revisión.",
+            )
         return diagnosis
 
     @staticmethod

@@ -11,6 +11,7 @@ import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { can } from "../../acl/can";
+import { FinalizeCaseButton } from "./FinalizeCaseButton";
 import { PatientClinicalTabs, hasClinicalTabs } from "./PatientClinicalTabs";
 import { useAuth } from "../../hooks/useAuth";
 import { useTheme } from "../../hooks/useTheme";
@@ -114,6 +115,7 @@ export function PatientDetail() {
   const assignedLocked =
     user?.role === "recepcion" && patient.has_active_assignment;
   const canEdit = can(user, "patients.edit") && !assignedLocked;
+  const canFinalize = can(user, "assignments.change_status");
   const areaName = patient.clinical_area
     ? areaLabel(areas, patient.clinical_area)
     : null;
@@ -134,15 +136,35 @@ export function PatientDetail() {
         >
           ← Volver al directorio
         </Link>
-        {canEdit ? (
-          <Link
-            to={`/patients/${patient.id}/edit`}
-            className={primaryActionClass}
-          >
-            <Pencil className="size-4" />
-            Editar ficha
-          </Link>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          {canFinalize && patient.active_assignment_id !== null ? (
+            <FinalizeCaseButton
+              assignmentId={patient.active_assignment_id}
+              patientName={patientFullName(patient)}
+              onFinalized={() =>
+                setState({
+                  status: "ready",
+                  areas,
+                  patient: {
+                    ...patient,
+                    case_status: "finalizado",
+                    has_active_assignment: false,
+                    active_assignment_id: null,
+                  },
+                })
+              }
+            />
+          ) : null}
+          {canEdit ? (
+            <Link
+              to={`/patients/${patient.id}/edit`}
+              className={primaryActionClass}
+            >
+              <Pencil className="size-4" />
+              Editar ficha
+            </Link>
+          ) : null}
+        </div>
       </div>
 
       {assignedLocked ? (
