@@ -512,6 +512,37 @@ class CaseTransitionTests(APITestCase):
         response = self.client.post(self.finalize_url)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
+    def test_docente_can_finalize(self):
+        self._validated_diagnosis()
+        self.client.force_authenticate(user=self.docente)
+        response = self.client.post(self.finalize_url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.patient.refresh_from_db()
+        self.assertEqual(self.patient.case_status, Patient.CaseStatus.FINALIZADO)
+
+    def test_finalizable_lists_only_active_cases_with_validated_diagnosis(self):
+        # Dos validados del mismo paciente: el caso aparece una sola vez.
+        self._validated_diagnosis()
+        self._validated_diagnosis()
+        not_ready = Patient.objects.create(
+            first_name="Sin", last_name="Validar", dui="ASG-TRANS-003"
+        )
+        Assignment.objects.create(patient=not_ready, student=self.student)
+        Diagnostico.objects.create(
+            patient=not_ready, student=self.student, content="Pendiente."
+        )
+        self.client.force_authenticate(user=self.docente)
+        response = self.client.get("/api/assignments/finalizable/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        body = response.json()
+        self.assertEqual([item["id"] for item in body], [self.assignment.id])
+        self.assertEqual(body[0]["patient_name"], "Rosa Transicion")
+
+    def test_finalizable_requires_change_status(self):
+        self.client.force_authenticate(user=self.recepcion)
+        response = self.client.get("/api/assignments/finalizable/")
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
     def test_status_cannot_be_changed_by_patch(self):
         self.client.force_authenticate(user=self.admin)
         response = self.client.patch(
@@ -712,12 +743,23 @@ class AppointmentApiTests(APITestCase):
 
     def test_editing_requires_the_edit_permission(self):
         appointment_id = self._schedule(self.recepcion, self.case_maria, self.ten).json()["id"]
+        # El docente ve el calendario pero no tiene calendar.edit.
+        self.client.force_authenticate(user=self.docente)
         response = self.client.patch(
             f"{self.url}{appointment_id}/",
             {"starts_at": (self.ten + timedelta(hours=2)).isoformat()},
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_recepcion_can_reschedule(self):
+        appointment_id = self._schedule(self.recepcion, self.case_maria, self.ten).json()["id"]
+        response = self.client.patch(
+            f"{self.url}{appointment_id}/",
+            {"starts_at": (self.ten + timedelta(hours=2)).isoformat()},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_reschedule_then_cancel_frees_the_slot(self):
         appointment_id = self._schedule(self.admin, self.case_maria, self.ten).json()["id"]

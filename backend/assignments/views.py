@@ -17,6 +17,7 @@ from .serializers import (
     AssignmentSerializer,
     BulkAssignmentSerializer,
     ClaimAssignmentSerializer,
+    FinalizableAssignmentSerializer,
     SchedulableAssignmentSerializer,
 )
 from .services import (
@@ -25,6 +26,7 @@ from .services import (
     assignable_students,
     change_appointment_status,
     claim_available_patients,
+    finalizable_assignments,
     finalize_assignment,
     reschedule_appointment,
     schedulable_assignments,
@@ -53,6 +55,7 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         "partial_update": "assignments.edit",
         "destroy": "assignments.edit",
         "finalize": "assignments.change_status",
+        "finalizable": "assignments.change_status",
         "claim": "assignments.claim",
         "assign": ("assignments.create", "assignments.assign_student"),
         "students": "assignments.assign_student",
@@ -76,6 +79,12 @@ class AssignmentViewSet(viewsets.ModelViewSet):
     def finalize(self, request, pk=None):
         assignment = finalize_assignment(self.get_object())
         return Response(self.get_serializer(assignment).data)
+
+    @action(detail=False, methods=["get"])
+    def finalizable(self, request):
+        return Response(
+            FinalizableAssignmentSerializer(finalizable_assignments(), many=True).data
+        )
 
     @action(detail=False, methods=["post"])
     def claim(self, request):

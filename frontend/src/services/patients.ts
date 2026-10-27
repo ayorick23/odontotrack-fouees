@@ -66,6 +66,7 @@ export type Patient = {
   clinical_subcategory: string;
   case_status: CaseStatus;
   has_active_assignment: boolean;
+  active_assignment_id: number | null;
   assigned_to: string | null;
   /** Nota que se dejó al asignar; vacía si no hay o no hay asignación activa. */
   assignment_note: string;

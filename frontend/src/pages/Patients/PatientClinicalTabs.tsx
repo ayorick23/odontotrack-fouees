@@ -22,6 +22,7 @@ import {
   listDiagnoses,
   listEvolutions,
   listTreatments,
+  validateDiagnosis,
   type DiagnosisRecord,
   type EvolutionRecord,
   type TreatmentRecord,
@@ -121,7 +122,24 @@ function DiagnosisTab({ patientId }: { patientId: number }) {
   const [items, setItems] = useState<DiagnosisRecord[] | null>(null);
   const [content, setContent] = useState("");
   const [saving, setSaving] = useState(false);
+  const [validatingId, setValidatingId] = useState<number | null>(null);
   const canCreate = can(user, "diagnoses.create");
+  const canValidate = can(user, "diagnoses.validate");
+
+  function handleValidate(id: number) {
+    setValidatingId(id);
+    validateDiagnosis(id)
+      .then((validated) => {
+        setItems((current) =>
+          (current ?? []).map((item) => (item.id === id ? validated : item)),
+        );
+        toast.success("Diagnóstico validado.");
+      })
+      .catch((error) =>
+        toast.error(getClinicalRecordError(error, "No se pudo validar el diagnóstico.")),
+      )
+      .finally(() => setValidatingId(null));
+  }
 
   function load() {
     listDiagnoses(patientId)
@@ -172,7 +190,19 @@ function DiagnosisTab({ patientId }: { patientId: number }) {
                 <p className="text-xs font-medium text-slate-400">
                   {item.student_name ?? "Estudiante"} · {formatDateTime(item.created_at)}
                 </p>
-                <ValidationBadge validated={item.is_validated} name={item.validated_by_name} />
+                <div className="flex items-center gap-2">
+                  <ValidationBadge validated={item.is_validated} name={item.validated_by_name} />
+                  {canValidate && !item.is_validated ? (
+                    <button
+                      type="button"
+                      disabled={validatingId !== null}
+                      onClick={() => handleValidate(item.id)}
+                      className="rounded-full bg-brand px-3 py-1 text-xs font-semibold text-white transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {validatingId === item.id ? "Validando..." : "Validar"}
+                    </button>
+                  ) : null}
+                </div>
               </div>
               <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700 dark:text-slate-200">
                 {item.content}

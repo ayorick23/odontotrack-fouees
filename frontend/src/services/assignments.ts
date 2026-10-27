@@ -11,6 +11,17 @@ export type AssignmentRecord = {
   status: string;
 };
 
+/** Caso activo con diagnóstico validado: ya se puede finalizar. */
+export type FinalizableAssignment = {
+  id: number;
+  patient: number;
+  patient_name: string;
+  student_name: string;
+  appointment_number: number;
+  reason: string;
+  assigned_date: string;
+};
+
 export type AssignableStudent = {
   id: number;
   name: string;
@@ -45,6 +56,18 @@ export function listAssignableStudents(search: string): Promise<AssignableStuden
     .then((response) => response.data);
 }
 
+export function listFinalizableAssignments(): Promise<FinalizableAssignment[]> {
+  return api
+    .get<FinalizableAssignment[]>("/assignments/finalizable/")
+    .then((response) => response.data);
+}
+
+export function finalizeAssignment(id: number): Promise<AssignmentRecord> {
+  return api
+    .post<AssignmentRecord>(`/assignments/${id}/finalize/`)
+    .then((response) => response.data);
+}
+
 export function getAssignmentError(error: unknown): string {
   if (!axios.isAxiosError(error) || error.response === undefined) {
     return "No se pudo guardar la asignación. Intenta de nuevo.";
@@ -57,7 +80,7 @@ export function getAssignmentError(error: unknown): string {
     return "No se pudo guardar la asignación. Revisa los datos.";
   }
   const record = data as Record<string, unknown>;
-  for (const key of ["patient", "student", "reason", "detail"]) {
+  for (const key of ["patient", "student", "reason", "status", "detail"]) {
     const message = firstMessage(record[key]);
     if (message) {
       return message;

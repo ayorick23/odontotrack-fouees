@@ -17,6 +17,7 @@ type ConfirmDeleteDialogProps = {
   error?: string | null;
   busy?: boolean;
   confirmLabel?: string;
+  busyLabel?: string;
   onCancel: () => void;
   onConfirm: () => void;
 };
@@ -28,6 +29,7 @@ export function ConfirmDeleteDialog({
   error,
   busy = false,
   confirmLabel = "Eliminar",
+  busyLabel = "Eliminando...",
   onCancel,
   onConfirm,
 }: ConfirmDeleteDialogProps) {
@@ -67,7 +69,7 @@ export function ConfirmDeleteDialog({
               onConfirm();
             }}
           >
-            {busy ? "Eliminando..." : confirmLabel}
+            {busy ? busyLabel : confirmLabel}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

@@ -5,6 +5,7 @@ import { api, type PaginatedResponse } from "./api";
 export type DiagnosisRecord = {
   id: number;
   patient: number;
+  patient_name: string;
   student: number;
   student_name: string | null;
   content: string;
@@ -44,6 +45,21 @@ export function listDiagnoses(patientId: number): Promise<DiagnosisRecord[]> {
       params: { patient: patientId },
     })
     .then((response) => response.data.results);
+}
+
+// Cola de Supervisión: diagnósticos de todos los pacientes visibles sin validar.
+export function listPendingDiagnoses(page = 1): Promise<PaginatedResponse<DiagnosisRecord>> {
+  return api
+    .get<PaginatedResponse<DiagnosisRecord>>("/clinical-records/diagnoses/", {
+      params: { is_validated: "false", page },
+    })
+    .then((response) => response.data);
+}
+
+export function validateDiagnosis(id: number): Promise<DiagnosisRecord> {
+  return api
+    .post<DiagnosisRecord>(`/clinical-records/diagnoses/${id}/validate/`)
+    .then((response) => response.data);
 }
 
 export function createDiagnosis(payload: {

@@ -106,6 +106,8 @@ class PatientSerializer(serializers.ModelSerializer):
     )
     photo = PatientPhotoField(required=False, allow_null=True)
     has_active_assignment = serializers.SerializerMethodField()
+    # Para finalizar el caso desde la ficha (/assignments/{id}/finalize/).
+    active_assignment_id = serializers.SerializerMethodField()
     assigned_to = serializers.SerializerMethodField()
     assignment_note = serializers.SerializerMethodField()
     clinical_area = OptionalSlugRelatedField(
@@ -142,6 +144,7 @@ class PatientSerializer(serializers.ModelSerializer):
             "clinical_subcategory",
             "case_status",
             "has_active_assignment",
+            "active_assignment_id",
             "assigned_to",
             "assignment_note",
             "created_at",
@@ -151,6 +154,7 @@ class PatientSerializer(serializers.ModelSerializer):
             "id",
             "case_status",
             "has_active_assignment",
+            "active_assignment_id",
             "assigned_to",
             "assignment_note",
             "created_at",
@@ -169,6 +173,10 @@ class PatientSerializer(serializers.ModelSerializer):
     def get_assignment_note(self, patient: Patient) -> str:
         assignment = active_assignment(patient)
         return assignment.reason if assignment else ""
+
+    def get_active_assignment_id(self, patient: Patient) -> int | None:
+        assignment = active_assignment(patient)
+        return assignment.pk if assignment else None
 
     def validate(self, attrs):
         attrs = super().validate(attrs)

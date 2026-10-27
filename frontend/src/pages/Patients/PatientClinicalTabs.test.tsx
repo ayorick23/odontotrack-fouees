@@ -11,6 +11,7 @@ const api = vi.hoisted(() => ({
   createDiagnosis: vi.fn(),
   createTreatment: vi.fn(),
   createEvolution: vi.fn(),
+  validateDiagnosis: vi.fn(),
 }));
 
 vi.mock("../../hooks/useAuth", () => ({
@@ -41,6 +42,7 @@ vi.mock("../../services/clinicalRecords", () => ({
   createDiagnosis: api.createDiagnosis,
   createTreatment: api.createTreatment,
   createEvolution: api.createEvolution,
+  validateDiagnosis: api.validateDiagnosis,
 }));
 
 const areas = [
