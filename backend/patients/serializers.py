@@ -51,12 +51,30 @@ def active_assignment(patient: Patient) -> Assignment | None:
     )
 
 
-def assigned_student_name(patient: Patient) -> str | None:
+def latest_assignment(patient: Patient) -> Assignment | None:
+    # La activa o, si el caso ya se cerró, la última finalizada; así la
+    # ficha conserva quién atendió el caso. Las canceladas no cuentan:
+    # ese estudiante dejó el caso sin atenderlo.
     assignment = active_assignment(patient)
+    if assignment is not None:
+        return assignment
+    finished = [
+        assignment
+        for assignment in patient.assignments.all()
+        if assignment.status == Assignment.AssignmentStatus.FINALIZADA
+    ]
+    return max(finished, key=lambda a: a.created_at, default=None)
+
+
+def student_name(assignment: Assignment | None) -> str | None:
     if assignment is None:
         return None
     student = assignment.student
     return student.get_full_name() or student.username
+
+
+def assigned_student_name(patient: Patient) -> str | None:
+    return student_name(active_assignment(patient))
 
 
 class PatientPhotoField(serializers.ImageField):
@@ -168,10 +186,10 @@ class PatientSerializer(serializers.ModelSerializer):
         )
 
     def get_assigned_to(self, patient: Patient) -> str | None:
-        return assigned_student_name(patient)
+        return student_name(latest_assignment(patient))
 
     def get_assignment_note(self, patient: Patient) -> str:
-        assignment = active_assignment(patient)
+        assignment = latest_assignment(patient)
         return assignment.reason if assignment else ""
 
     def get_active_assignment_id(self, patient: Patient) -> int | None:
