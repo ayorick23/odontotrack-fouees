@@ -377,6 +377,9 @@ export function PatientForm() {
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
                 className="sr-only"
+                // El botón de abajo lo abre y ya tiene nombre accesible.
+                tabIndex={-1}
+                aria-hidden="true"
                 disabled={!canWrite}
                 onChange={(event) => handlePhotoChange(event.target.files)}
               />
@@ -482,7 +485,7 @@ export function PatientForm() {
                       }}
                       disabled={!canWrite}
                     >
-                      <SelectTrigger className={selectClass}>
+                      <SelectTrigger aria-label="Área clínica" className={selectClass}>
                         <SelectValue placeholder="Sin área" />
                       </SelectTrigger>
                       <SelectContent
@@ -525,7 +528,7 @@ export function PatientForm() {
                       }
                       disabled={!canWrite || subcategoryOptions.length === 0}
                     >
-                      <SelectTrigger className={selectClass}>
+                      <SelectTrigger aria-label="Tratamiento" className={selectClass}>
                         <SelectValue
                           placeholder={
                             selectedArea
@@ -662,7 +665,10 @@ export function PatientForm() {
                     }
                     disabled={!canWrite}
                   >
-                    <SelectTrigger className={selectClass}>
+                    <SelectTrigger
+                      aria-label="Parentesco del contacto de emergencia"
+                      className={selectClass}
+                    >
                       <SelectValue placeholder="Sin parentesco" />
                     </SelectTrigger>
                     <SelectContent

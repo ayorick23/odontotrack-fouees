@@ -350,7 +350,7 @@ function TreatmentsTab({
               value={areaId === "" ? AREA_NONE : String(areaId)}
               onValueChange={handleAreaChange}
             >
-              <SelectTrigger className={selectClass}>
+              <SelectTrigger aria-label="Área" className={selectClass}>
                 <SelectValue placeholder="Selecciona un área" />
               </SelectTrigger>
               <SelectContent
@@ -378,7 +378,7 @@ function TreatmentsTab({
               }
               disabled={areaId === ""}
             >
-              <SelectTrigger className={selectClass}>
+              <SelectTrigger aria-label="Tratamiento" className={selectClass}>
                 <SelectValue placeholder="Selecciona un tratamiento" />
               </SelectTrigger>
               <SelectContent
