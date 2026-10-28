@@ -67,9 +67,12 @@ export type Patient = {
   case_status: CaseStatus;
   has_active_assignment: boolean;
   active_assignment_id: number | null;
+  /** Estudiante de la asignación activa o, si el caso se cerró, de la última finalizada. */
   assigned_to: string | null;
-  /** Nota que se dejó al asignar; vacía si no hay o no hay asignación activa. */
+  /** Nota que se dejó al asignar (misma asignación que `assigned_to`). */
   assignment_note: string;
+  /** El usuario actual puede agregar registros clínicos (caso abierto y, si es estudiante, suyo). */
+  can_write_clinical: boolean;
   created_at: string;
   updated_at: string;
 };

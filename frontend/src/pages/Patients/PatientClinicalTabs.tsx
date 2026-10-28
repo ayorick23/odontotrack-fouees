@@ -56,6 +56,8 @@ type PatientClinicalTabsProps = {
   areas: ClinicalAreaRecord[];
   clinicalAreaSlug: string;
   clinicalTreatmentSlug: string;
+  /** Caso abierto y, si es estudiante, asignado a él; si no, solo lectura. */
+  canWriteClinical: boolean;
 };
 
 export function PatientClinicalTabs({
@@ -63,6 +65,7 @@ export function PatientClinicalTabs({
   areas,
   clinicalAreaSlug,
   clinicalTreatmentSlug,
+  canWriteClinical,
 }: PatientClinicalTabsProps) {
   const { user } = useAuth();
   const visibleTabs = TABS.filter((tab) => can(user, tab.view));
@@ -102,28 +105,40 @@ export function PatientClinicalTabs({
       </div>
 
       <div className="mt-5">
-        {tab === "diagnostico" ? <DiagnosisTab patientId={patientId} /> : null}
+        {tab === "diagnostico" ? (
+          <DiagnosisTab patientId={patientId} canWriteClinical={canWriteClinical} />
+        ) : null}
         {tab === "tratamientos" ? (
           <TreatmentsTab
             patientId={patientId}
             areas={areas}
             clinicalAreaSlug={clinicalAreaSlug}
             clinicalTreatmentSlug={clinicalTreatmentSlug}
+            canWriteClinical={canWriteClinical}
           />
         ) : null}
-        {tab === "evolucion" ? <EvolutionTab patientId={patientId} /> : null}
+        {tab === "evolucion" ? (
+          <EvolutionTab patientId={patientId} canWriteClinical={canWriteClinical} />
+        ) : null}
       </div>
     </section>
   );
 }
 
-function DiagnosisTab({ patientId }: { patientId: number }) {
+function DiagnosisTab({
+  patientId,
+  canWriteClinical,
+}: {
+  patientId: number;
+  canWriteClinical: boolean;
+}) {
   const { user } = useAuth();
   const [items, setItems] = useState<DiagnosisRecord[] | null>(null);
   const [content, setContent] = useState("");
   const [saving, setSaving] = useState(false);
   const [validatingId, setValidatingId] = useState<number | null>(null);
-  const canCreate = can(user, "diagnoses.create");
+  const hasPermission = can(user, "diagnoses.create");
+  const canCreate = hasPermission && canWriteClinical;
   const canValidate = can(user, "diagnoses.validate");
 
   function handleValidate(id: number) {
@@ -229,6 +244,8 @@ function DiagnosisTab({ patientId }: { patientId: number }) {
             {saving ? "Guardando..." : "Registrar diagnóstico"}
           </button>
         </form>
+      ) : hasPermission ? (
+        <ClosedCaseNote />
       ) : null}
     </div>
   );
@@ -239,11 +256,13 @@ function TreatmentsTab({
   areas,
   clinicalAreaSlug,
   clinicalTreatmentSlug,
+  canWriteClinical,
 }: {
   patientId: number;
   areas: ClinicalAreaRecord[];
   clinicalAreaSlug: string;
   clinicalTreatmentSlug: string;
+  canWriteClinical: boolean;
 }) {
   const { user } = useAuth();
   const [items, setItems] = useState<TreatmentRecord[] | null>(null);
@@ -254,7 +273,8 @@ function TreatmentsTab({
     selectedArea?.treatments.find((item) => item.slug === clinicalTreatmentSlug)?.id ?? "";
   const [treatmentId, setTreatmentId] = useState<number | "">(defaultTreatmentId);
   const [saving, setSaving] = useState(false);
-  const canCreate = can(user, "treatments.create");
+  const hasPermission = can(user, "treatments.create");
+  const canCreate = hasPermission && canWriteClinical;
   const treatments = selectedArea?.treatments.filter((item) => item.is_active) ?? [];
 
   function load() {
@@ -378,18 +398,27 @@ function TreatmentsTab({
             </button>
           </div>
         </form>
+      ) : hasPermission ? (
+        <ClosedCaseNote />
       ) : null}
     </div>
   );
 }
 
-function EvolutionTab({ patientId }: { patientId: number }) {
+function EvolutionTab({
+  patientId,
+  canWriteClinical,
+}: {
+  patientId: number;
+  canWriteClinical: boolean;
+}) {
   const { user } = useAuth();
   const [items, setItems] = useState<EvolutionRecord[] | null>(null);
   const [date, setDate] = useState(todayIsoDate());
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
-  const canCreate = can(user, "evolution.create");
+  const hasPermission = can(user, "evolution.create");
+  const canCreate = hasPermission && canWriteClinical;
 
   function load() {
     listEvolutions(patientId)
@@ -478,8 +507,18 @@ function EvolutionTab({ patientId }: { patientId: number }) {
             {saving ? "Guardando..." : "Registrar evolución"}
           </button>
         </form>
+      ) : hasPermission ? (
+        <ClosedCaseNote />
       ) : null}
     </div>
+  );
+}
+
+function ClosedCaseNote() {
+  return (
+    <p className="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-500 dark:bg-slate-800/60 dark:text-slate-400">
+      Solo lectura: el caso no tiene una asignación activa.
+    </p>
   );
 }
 

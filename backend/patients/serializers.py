@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
+from accounts.models import User
 from assignments.models import Assignment
 from catalogs.models import ClinicalArea, ClinicalTreatment
 
@@ -128,6 +129,9 @@ class PatientSerializer(serializers.ModelSerializer):
     active_assignment_id = serializers.SerializerMethodField()
     assigned_to = serializers.SerializerMethodField()
     assignment_note = serializers.SerializerMethodField()
+    # Si la ficha muestra los formularios clínicos; misma regla que
+    # assert_can_write_clinical + assert_case_open en clinical_records.
+    can_write_clinical = serializers.SerializerMethodField()
     clinical_area = OptionalSlugRelatedField(
         slug_field="slug",
         queryset=ClinicalArea.objects.all(),
@@ -165,6 +169,7 @@ class PatientSerializer(serializers.ModelSerializer):
             "active_assignment_id",
             "assigned_to",
             "assignment_note",
+            "can_write_clinical",
             "created_at",
             "updated_at",
         )
@@ -175,6 +180,7 @@ class PatientSerializer(serializers.ModelSerializer):
             "active_assignment_id",
             "assigned_to",
             "assignment_note",
+            "can_write_clinical",
             "created_at",
             "updated_at",
         )
@@ -195,6 +201,16 @@ class PatientSerializer(serializers.ModelSerializer):
     def get_active_assignment_id(self, patient: Patient) -> int | None:
         assignment = active_assignment(patient)
         return assignment.pk if assignment else None
+
+    def get_can_write_clinical(self, patient: Patient) -> bool:
+        assignment = active_assignment(patient)
+        if assignment is None:
+            return False
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        if user is None or user.role != User.Role.ESTUDIANTE:
+            return True
+        return assignment.student_id == user.id
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
