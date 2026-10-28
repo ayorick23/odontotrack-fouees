@@ -309,6 +309,9 @@ function TreatmentsTab({
     })
       .then((created) => {
         setItems((current) => [created, ...(current ?? [])]);
+        // Se conserva el área; limpiar el tratamiento evita duplicarlo
+        // con un segundo clic.
+        setTreatmentId("");
         toast.success("Tratamiento registrado.");
       })
       .catch(() => toast.error("No se pudo guardar el tratamiento."))
@@ -393,7 +396,11 @@ function TreatmentsTab({
             </Select>
           </label>
           <div className="sm:col-span-2">
-            <button type="submit" disabled={saving} className={primaryActionClass}>
+            <button
+              type="submit"
+              disabled={saving || treatmentId === ""}
+              className={primaryActionClass}
+            >
               {saving ? "Guardando..." : "Registrar tratamiento"}
             </button>
           </div>

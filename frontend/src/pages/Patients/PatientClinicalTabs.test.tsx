@@ -167,6 +167,40 @@ describe("PatientClinicalTabs", () => {
     expect(await screen.findByText("Fractura en 21.")).toBeInTheDocument();
   });
 
+  it("limpia el tratamiento tras registrarlo para no duplicarlo", async () => {
+    const user = userEvent.setup();
+    api.createTreatment.mockReset();
+    api.createTreatment.mockResolvedValue({
+      id: 3,
+      patient: 4,
+      clinical_area: 1,
+      clinical_area_name: "Endodoncia",
+      clinical_treatment: 10,
+      clinical_treatment_name: "Pulpectomía",
+      created_at: "2026-09-23T12:00:00Z",
+      updated_at: "2026-09-23T12:00:00Z",
+    });
+
+    render(
+      <PatientClinicalTabs
+        patientId={4}
+        areas={areas}
+        clinicalAreaSlug="endodoncia"
+        clinicalTreatmentSlug="pulpectomia"
+        canWriteClinical
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: "Tratamientos" }));
+    const submit = await screen.findByRole("button", {
+      name: "Registrar tratamiento",
+    });
+    await user.click(submit);
+
+    await waitFor(() => expect(submit).toBeDisabled());
+    await user.click(submit);
+    expect(api.createTreatment).toHaveBeenCalledTimes(1);
+  });
+
   it("en un caso cerrado muestra el expediente sin formularios", async () => {
     const user = userEvent.setup();
     render(
