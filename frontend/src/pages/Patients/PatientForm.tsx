@@ -92,6 +92,10 @@ const patientFormSchema = z.object({
       return birth <= today;
     }, "La fecha de nacimiento no puede ser futura"),
   phone_number: z.string().trim().max(20, "El teléfono no puede superar 20 caracteres"),
+  whatsapp_number: z
+    .string()
+    .trim()
+    .max(20, "El WhatsApp no puede superar 20 caracteres"),
   email: z
     .string()
     .trim()
@@ -124,6 +128,7 @@ const EMPTY_VALUES: PatientFormValues = {
   dui: "",
   date_of_birth: "",
   phone_number: "",
+  whatsapp_number: "",
   email: "",
   address: "",
   emergency_contact_name: "",
@@ -372,6 +377,9 @@ export function PatientForm() {
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
                 className="sr-only"
+                // El botón de abajo lo abre y ya tiene nombre accesible.
+                tabIndex={-1}
+                aria-hidden="true"
                 disabled={!canWrite}
                 onChange={(event) => handlePhotoChange(event.target.files)}
               />
@@ -477,7 +485,7 @@ export function PatientForm() {
                       }}
                       disabled={!canWrite}
                     >
-                      <SelectTrigger className={selectClass}>
+                      <SelectTrigger aria-label="Área clínica" className={selectClass}>
                         <SelectValue placeholder="Sin área" />
                       </SelectTrigger>
                       <SelectContent
@@ -520,7 +528,7 @@ export function PatientForm() {
                       }
                       disabled={!canWrite || subcategoryOptions.length === 0}
                     >
-                      <SelectTrigger className={selectClass}>
+                      <SelectTrigger aria-label="Tratamiento" className={selectClass}>
                         <SelectValue
                           placeholder={
                             selectedArea
@@ -567,7 +575,7 @@ export function PatientForm() {
         <section className={cardClass}>
           <SectionHeading
             title="Contacto"
-            description="Teléfono y correo para localizar al paciente."
+            description="Teléfono, WhatsApp y correo para localizar al paciente."
           />
           <div className="grid gap-4 md:grid-cols-2">
             <Field label="Teléfono" error={errors.phone_number?.message}>
@@ -580,6 +588,16 @@ export function PatientForm() {
                 {...register("phone_number")}
               />
             </Field>
+            <Field label="WhatsApp" error={errors.whatsapp_number?.message}>
+              <input
+                type="tel"
+                autoComplete="off"
+                disabled={!canWrite}
+                placeholder="7777-7777"
+                className={inputClass}
+                {...register("whatsapp_number")}
+              />
+            </Field>
             <Field label="Correo" error={errors.email?.message}>
               <input
                 type="email"
@@ -590,11 +608,7 @@ export function PatientForm() {
                 {...register("email")}
               />
             </Field>
-            <Field
-              label="Dirección"
-              error={errors.address?.message}
-              className="md:col-span-2"
-            >
+            <Field label="Dirección" error={errors.address?.message}>
               <input
                 autoComplete="street-address"
                 disabled={!canWrite}
@@ -651,7 +665,10 @@ export function PatientForm() {
                     }
                     disabled={!canWrite}
                   >
-                    <SelectTrigger className={selectClass}>
+                    <SelectTrigger
+                      aria-label="Parentesco del contacto de emergencia"
+                      className={selectClass}
+                    >
                       <SelectValue placeholder="Sin parentesco" />
                     </SelectTrigger>
                     <SelectContent
@@ -797,6 +814,7 @@ function toFormValues(patient: Patient): PatientFormValues {
     dui: formatDocumentId(patient.dui),
     date_of_birth: patient.date_of_birth ?? "",
     phone_number: patient.phone_number,
+    whatsapp_number: patient.whatsapp_number,
     email: patient.email,
     address: patient.address,
     emergency_contact_name: patient.emergency_contact_name,
@@ -814,6 +832,7 @@ function toPayload(values: PatientFormValues): PatientWritePayload {
     dui: values.dui,
     date_of_birth: values.date_of_birth || null,
     phone_number: values.phone_number,
+    whatsapp_number: values.whatsapp_number,
     email: values.email,
     address: values.address,
     emergency_contact_name: values.emergency_contact_name,

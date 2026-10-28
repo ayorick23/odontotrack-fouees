@@ -116,6 +116,10 @@ export function PatientDetail() {
     user?.role === "recepcion" && patient.has_active_assignment;
   const canEdit = can(user, "patients.edit") && !assignedLocked;
   const canFinalize = can(user, "assignments.change_status");
+  // El backend solo deja al estudiante editar el odontograma de sus casos
+  // activos; docente y admin pueden corregirlo aun con el caso cerrado.
+  const odontogramLocked =
+    user?.role === "estudiante" && !patient.can_write_clinical;
   const areaName = patient.clinical_area
     ? areaLabel(areas, patient.clinical_area)
     : null;
@@ -150,6 +154,7 @@ export function PatientDetail() {
                     case_status: "finalizado",
                     has_active_assignment: false,
                     active_assignment_id: null,
+                    can_write_clinical: false,
                   },
                 })
               }
@@ -293,6 +298,7 @@ export function PatientDetail() {
           areas={areas}
           clinicalAreaSlug={patient.clinical_area}
           clinicalTreatmentSlug={patient.clinical_subcategory}
+          canWriteClinical={patient.can_write_clinical}
         />
       ) : null}
 
@@ -307,7 +313,7 @@ export function PatientDetail() {
           <PatientOdontogramSection
             patientId={patient.id}
             patientName={patientFullName(patient)}
-            readOnly={!can(user, "odontogram.update")}
+            readOnly={!can(user, "odontogram.update") || odontogramLocked}
             darkMode={theme === "dark"}
           />
         </Suspense>

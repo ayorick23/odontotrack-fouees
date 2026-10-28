@@ -660,6 +660,28 @@ class TreatmentApiTests(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_admin_cannot_add_treatment_to_closed_case(self):
+        admin = User.objects.create_user(
+            username="admin-tx-cerrado",
+            password="pass12345",
+            role=User.Role.ADMIN,
+        )
+        self.patient.assignments.update(
+            status=Assignment.AssignmentStatus.FINALIZADA
+        )
+        self.client.force_authenticate(user=admin)
+        response = self.client.post(
+            self.url,
+            {
+                "patient": self.patient.id,
+                "clinical_area": self.area.id,
+                "clinical_treatment": self.treatment.id,
+            },
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("patient", response.json())
+        self.assertEqual(Tratamiento.objects.count(), 0)
+
 
 class ClinicalEvolutionApiTests(APITestCase):
     def setUp(self):

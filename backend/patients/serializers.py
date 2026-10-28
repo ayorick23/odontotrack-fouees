@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
+from accounts.models import User
 from assignments.models import Assignment
 from catalogs.models import ClinicalArea, ClinicalTreatment
 
@@ -51,12 +52,30 @@ def active_assignment(patient: Patient) -> Assignment | None:
     )
 
 
-def assigned_student_name(patient: Patient) -> str | None:
+def latest_assignment(patient: Patient) -> Assignment | None:
+    # La activa o, si el caso ya se cerró, la última finalizada; así la
+    # ficha conserva quién atendió el caso. Las canceladas no cuentan:
+    # ese estudiante dejó el caso sin atenderlo.
     assignment = active_assignment(patient)
+    if assignment is not None:
+        return assignment
+    finished = [
+        assignment
+        for assignment in patient.assignments.all()
+        if assignment.status == Assignment.AssignmentStatus.FINALIZADA
+    ]
+    return max(finished, key=lambda a: a.created_at, default=None)
+
+
+def student_name(assignment: Assignment | None) -> str | None:
     if assignment is None:
         return None
     student = assignment.student
     return student.get_full_name() or student.username
+
+
+def assigned_student_name(patient: Patient) -> str | None:
+    return student_name(active_assignment(patient))
 
 
 class PatientPhotoField(serializers.ImageField):
@@ -110,6 +129,9 @@ class PatientSerializer(serializers.ModelSerializer):
     active_assignment_id = serializers.SerializerMethodField()
     assigned_to = serializers.SerializerMethodField()
     assignment_note = serializers.SerializerMethodField()
+    # Si la ficha muestra los formularios clínicos; misma regla que
+    # assert_can_write_clinical + assert_case_open en clinical_records.
+    can_write_clinical = serializers.SerializerMethodField()
     clinical_area = OptionalSlugRelatedField(
         slug_field="slug",
         queryset=ClinicalArea.objects.all(),
@@ -147,6 +169,7 @@ class PatientSerializer(serializers.ModelSerializer):
             "active_assignment_id",
             "assigned_to",
             "assignment_note",
+            "can_write_clinical",
             "created_at",
             "updated_at",
         )
@@ -157,6 +180,7 @@ class PatientSerializer(serializers.ModelSerializer):
             "active_assignment_id",
             "assigned_to",
             "assignment_note",
+            "can_write_clinical",
             "created_at",
             "updated_at",
         )
@@ -168,15 +192,25 @@ class PatientSerializer(serializers.ModelSerializer):
         )
 
     def get_assigned_to(self, patient: Patient) -> str | None:
-        return assigned_student_name(patient)
+        return student_name(latest_assignment(patient))
 
     def get_assignment_note(self, patient: Patient) -> str:
-        assignment = active_assignment(patient)
+        assignment = latest_assignment(patient)
         return assignment.reason if assignment else ""
 
     def get_active_assignment_id(self, patient: Patient) -> int | None:
         assignment = active_assignment(patient)
         return assignment.pk if assignment else None
+
+    def get_can_write_clinical(self, patient: Patient) -> bool:
+        assignment = active_assignment(patient)
+        if assignment is None:
+            return False
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        if user is None or user.role != User.Role.ESTUDIANTE:
+            return True
+        return assignment.student_id == user.id
 
     def validate(self, attrs):
         attrs = super().validate(attrs)

@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -21,6 +21,7 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 export function Login() {
   const { isAuthenticated, isReady, login } = useAuth();
   const navigate = useNavigate();
+  const [showResetHelp, setShowResetHelp] = useState(false);
 
   const {
     register,
@@ -122,10 +123,25 @@ export function Login() {
               />
               Recuérdame
             </label>
-            <span className="cursor-not-allowed text-slate-400">
+            <button
+              type="button"
+              aria-expanded={showResetHelp}
+              aria-controls="reset-help"
+              onClick={() => setShowResetHelp((open) => !open)}
+              className="text-teal-600 hover:text-teal-700 dark:text-teal-400"
+            >
               ¿Olvidaste tu contraseña?
-            </span>
+            </button>
           </div>
+          {showResetHelp ? (
+            <p
+              id="reset-help"
+              className="rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-500 dark:bg-slate-800/60 dark:text-slate-400"
+            >
+              Pide a administración o soporte que restablezca tu contraseña
+              desde Usuarios. Después podrás cambiarla desde tu cuenta.
+            </p>
+          ) : null}
 
           <button
             type="submit"

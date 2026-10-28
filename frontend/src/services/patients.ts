@@ -67,9 +67,12 @@ export type Patient = {
   case_status: CaseStatus;
   has_active_assignment: boolean;
   active_assignment_id: number | null;
+  /** Estudiante de la asignación activa o, si el caso se cerró, de la última finalizada. */
   assigned_to: string | null;
-  /** Nota que se dejó al asignar; vacía si no hay o no hay asignación activa. */
+  /** Nota que se dejó al asignar (misma asignación que `assigned_to`). */
   assignment_note: string;
+  /** El usuario actual puede agregar registros clínicos (caso abierto y, si es estudiante, suyo). */
+  can_write_clinical: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -80,6 +83,7 @@ export type PatientWritePayload = {
   dui: string;
   date_of_birth: string | null;
   phone_number: string;
+  whatsapp_number: string;
   email: string;
   address: string;
   emergency_contact_name: string;
@@ -256,6 +260,7 @@ const PATIENT_FIELDS = new Set<PatientFieldName>([
   "dui",
   "date_of_birth",
   "phone_number",
+  "whatsapp_number",
   "email",
   "address",
   "photo",

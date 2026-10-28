@@ -107,6 +107,7 @@ describe("PatientClinicalTabs", () => {
         areas={areas}
         clinicalAreaSlug="endodoncia"
         clinicalTreatmentSlug="pulpectomia"
+        canWriteClinical
       />,
     );
 
@@ -146,6 +147,7 @@ describe("PatientClinicalTabs", () => {
         areas={areas}
         clinicalAreaSlug="endodoncia"
         clinicalTreatmentSlug="pulpectomia"
+        canWriteClinical
       />,
     );
     await screen.findByText("Caries en pieza 16.");
@@ -163,5 +165,70 @@ describe("PatientClinicalTabs", () => {
       });
     });
     expect(await screen.findByText("Fractura en 21.")).toBeInTheDocument();
+  });
+
+  it("limpia el tratamiento tras registrarlo para no duplicarlo", async () => {
+    const user = userEvent.setup();
+    api.createTreatment.mockReset();
+    api.createTreatment.mockResolvedValue({
+      id: 3,
+      patient: 4,
+      clinical_area: 1,
+      clinical_area_name: "Endodoncia",
+      clinical_treatment: 10,
+      clinical_treatment_name: "Pulpectomía",
+      created_at: "2026-09-23T12:00:00Z",
+      updated_at: "2026-09-23T12:00:00Z",
+    });
+
+    render(
+      <PatientClinicalTabs
+        patientId={4}
+        areas={areas}
+        clinicalAreaSlug="endodoncia"
+        clinicalTreatmentSlug="pulpectomia"
+        canWriteClinical
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: "Tratamientos" }));
+    const submit = await screen.findByRole("button", {
+      name: "Registrar tratamiento",
+    });
+    await user.click(submit);
+
+    await waitFor(() => expect(submit).toBeDisabled());
+    await user.click(submit);
+    expect(api.createTreatment).toHaveBeenCalledTimes(1);
+  });
+
+  it("en un caso cerrado muestra el expediente sin formularios", async () => {
+    const user = userEvent.setup();
+    render(
+      <PatientClinicalTabs
+        patientId={4}
+        areas={areas}
+        clinicalAreaSlug="endodoncia"
+        clinicalTreatmentSlug="pulpectomia"
+        canWriteClinical={false}
+      />,
+    );
+
+    expect(await screen.findByText("Caries en pieza 16.")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Registrar diagnóstico" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText(/Solo lectura/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Tratamientos" }));
+    await screen.findByText("Endodoncia · 22 sep 2026");
+    expect(
+      screen.queryByRole("button", { name: "Registrar tratamiento" }),
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Evolución clínica" }));
+    await screen.findByText("Aún no hay notas de evolución.");
+    expect(
+      screen.queryByRole("button", { name: "Registrar evolución" }),
+    ).not.toBeInTheDocument();
   });
 });

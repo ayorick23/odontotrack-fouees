@@ -141,6 +141,10 @@ export function PatientOdontogramSection({
               {findingCount}{" "}
               {findingCount === 1 ? "hallazgo" : "hallazgos"}
             </span>
+          ) : loadStatus === "ready" ? (
+            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+              Sin hallazgos
+            </span>
           ) : null}
           {activeMarks.map((label) => (
             <span

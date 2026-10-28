@@ -294,6 +294,84 @@ class PatientDirectoryTests(APITestCase):
             "Viene por dolor en una muela",
         )
 
+    def test_detail_keeps_student_of_finalized_case(self):
+        student = User.objects.create_user(
+            username="estudiante-cierre",
+            password="pass12345",
+            role=User.Role.ESTUDIANTE,
+            first_name="Carla",
+            last_name="Cierre",
+        )
+        patient = Patient.objects.create(
+            first_name="Luis",
+            last_name="Cerrado",
+            dui="CIERRE-001",
+        )
+        assignment = Assignment.objects.create(
+            patient=patient, student=student, reason="Control de limpieza"
+        )
+        Assignment.objects.filter(pk=assignment.pk).update(
+            status=Assignment.AssignmentStatus.FINALIZADA
+        )
+
+        body = self.client.get(f"/api/patients/{patient.id}/").json()
+        self.assertEqual(body["assigned_to"], "Carla Cierre")
+        self.assertEqual(body["assignment_note"], "Control de limpieza")
+        self.assertIsNone(body["active_assignment_id"])
+        self.assertFalse(body["has_active_assignment"])
+
+    def test_detail_can_write_clinical_only_on_open_case(self):
+        student = User.objects.create_user(
+            username="estudiante-escribe",
+            password="pass12345",
+            role=User.Role.ESTUDIANTE,
+        )
+        admin = User.objects.create_user(
+            username="admin-escribe",
+            password="pass12345",
+            role=User.Role.ADMIN,
+        )
+        patient = Patient.objects.create(
+            first_name="Ana",
+            last_name="Escritura",
+            dui="ESCRIBE-001",
+        )
+        assignment = Assignment.objects.create(patient=patient, student=student)
+        url = f"/api/patients/{patient.id}/"
+
+        for user in (student, admin):
+            self.client.force_authenticate(user=user)
+            self.assertTrue(self.client.get(url).json()["can_write_clinical"])
+
+        Assignment.objects.filter(pk=assignment.pk).update(
+            status=Assignment.AssignmentStatus.FINALIZADA
+        )
+        for user in (student, admin):
+            self.client.force_authenticate(user=user)
+            self.assertFalse(self.client.get(url).json()["can_write_clinical"])
+
+    def test_detail_ignores_cancelled_assignment(self):
+        student = User.objects.create_user(
+            username="estudiante-cancelada",
+            password="pass12345",
+            role=User.Role.ESTUDIANTE,
+        )
+        patient = Patient.objects.create(
+            first_name="Ema",
+            last_name="Cancelada",
+            dui="CANCEL-001",
+        )
+        assignment = Assignment.objects.create(
+            patient=patient, student=student, reason="Se reasignará"
+        )
+        Assignment.objects.filter(pk=assignment.pk).update(
+            status=Assignment.AssignmentStatus.CANCELADA
+        )
+
+        body = self.client.get(f"/api/patients/{patient.id}/").json()
+        self.assertIsNone(body["assigned_to"])
+        self.assertEqual(body["assignment_note"], "")
+
     def test_assignees_lists_students_with_active_assignment(self):
         assigned = User.objects.create_user(
             username="estudiante-activo",

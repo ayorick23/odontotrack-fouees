@@ -50,6 +50,16 @@ def assert_can_write_clinical(user: User, patient: Patient) -> None:
         )
 
 
+def assert_case_open(patient: Patient) -> None:
+    """No se agregan registros nuevos a un caso sin asignación activa."""
+    if not patient.assignments.filter(
+        status=Assignment.AssignmentStatus.ACTIVA
+    ).exists():
+        raise ValidationError(
+            {"patient": "El caso no tiene una asignación activa."}
+        )
+
+
 def resolve_clinical_student(*, user: User, patient: Patient) -> User:
     if user.role == User.Role.ESTUDIANTE:
         return user

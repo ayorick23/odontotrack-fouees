@@ -20,6 +20,7 @@ from .services import (
     DiagnosisService,
     OdontogramService,
     assert_can_write_clinical,
+    assert_case_open,
     queryset_for_patient,
     resolve_clinical_student,
     scope_clinical_queryset,
@@ -126,9 +127,10 @@ class TreatmentViewSet(ClinicalScopeMixin, ModelViewSet):
     }
 
     def perform_create(self, serializer):
-        assert_can_write_clinical(
-            self.request.user, serializer.validated_data["patient"]
-        )
+        patient = serializer.validated_data["patient"]
+        assert_can_write_clinical(self.request.user, patient)
+        # Diagnóstico y evolución ya lo exigen al resolver el estudiante.
+        assert_case_open(patient)
         serializer.save()
 
 
