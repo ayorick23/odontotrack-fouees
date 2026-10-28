@@ -13,7 +13,7 @@ import { NotificationBell } from "./NotificationBell";
 import { ThemeToggle } from "./ThemeToggle";
 
 const PAGE_META: Record<string, { title: string; crumb: string }> = {
-  "/dashboard": { title: "Panel Administrativo", crumb: "Dashboard › Inicio" },
+  "/dashboard": { title: "Panel", crumb: "Dashboard › Inicio" },
   "/patients": { title: "Directorio de pacientes", crumb: "Pacientes › Directorio" },
   "/patients/new": {
     title: "Registro de paciente",
@@ -32,7 +32,21 @@ const PAGE_META: Record<string, { title: string; crumb: string }> = {
   "/support": { title: "Soporte técnico", crumb: "Dashboard › Soporte" },
 };
 
-function pageMeta(pathname: string): { title: string; crumb: string } {
+const DASHBOARD_TITLES: Record<AuthUser["role"], string> = {
+  admin: "Panel administrativo",
+  docente: "Panel docente",
+  estudiante: "Mi panel",
+  recepcion: "Panel de recepción",
+  soporte: "Panel de soporte",
+};
+
+function pageMeta(
+  pathname: string,
+  user: AuthUser | null,
+): { title: string; crumb: string } {
+  if (pathname === "/dashboard" && user) {
+    return { ...PAGE_META[pathname], title: DASHBOARD_TITLES[user.role] };
+  }
   const exact = PAGE_META[pathname];
   if (exact) {
     return exact;
@@ -60,7 +74,7 @@ export function Navbar({
   onLogout: () => void;
 }) {
   const location = useLocation();
-  const meta = pageMeta(location.pathname);
+  const meta = pageMeta(location.pathname, user);
   const [passwordOpen, setPasswordOpen] = useState(false);
 
   return (
