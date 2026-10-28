@@ -10,6 +10,10 @@ function cloneOdontogram(value: OdontogramValue): OdontogramValue {
   return JSON.parse(JSON.stringify(value)) as OdontogramValue;
 }
 
+function clinicalKey(value: OdontogramValue): string {
+  return JSON.stringify({ teeth: value.teeth, oralMarks: value.oralMarks });
+}
+
 export function useOdontogramData(patientId: number) {
   const [value, setValue] = useState<OdontogramValue>(() => emptyOdontogram());
   const [savedValue, setSavedValue] = useState<OdontogramValue>(() =>
@@ -76,6 +80,12 @@ export function useOdontogramData(patientId: number) {
     setEditorKey((key) => key + 1);
   }, [savedValue]);
 
+  // Un odontograma nunca guardado llega sin snapshot y el editor genera uno
+  // al dibujarlo; eso solo no cuenta como cambio sin guardar.
+  const isDirty = savedValue.visualSnapshot
+    ? domainKey(value) !== savedKey
+    : clinicalKey(value) !== clinicalKey(savedValue);
+
   return {
     value,
     onChange,
@@ -84,7 +94,7 @@ export function useOdontogramData(patientId: number) {
     reload: load,
     loadStatus,
     isSaving,
-    isDirty: domainKey(value) !== savedKey,
+    isDirty,
     editorKey,
   };
 }
