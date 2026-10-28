@@ -83,6 +83,7 @@ export type PatientWritePayload = {
   dui: string;
   date_of_birth: string | null;
   phone_number: string;
+  whatsapp_number: string;
   email: string;
   address: string;
   emergency_contact_name: string;
@@ -259,6 +260,7 @@ const PATIENT_FIELDS = new Set<PatientFieldName>([
   "dui",
   "date_of_birth",
   "phone_number",
+  "whatsapp_number",
   "email",
   "address",
   "photo",
