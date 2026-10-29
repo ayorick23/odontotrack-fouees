@@ -227,6 +227,20 @@ def finalizable_assignments() -> QuerySet[Assignment]:
         .order_by("assigned_date", "id")
     )
 
+def in_progress_assignments() -> QuerySet[Assignment]:
+    """Casos activos para que el docente vea como va cada uno.
+    
+    Marca si el paciente tiene algun diagnostico y si alguno esta validado
+    """
+    diagnoses = Diagnostico.objects.filter(patient = OuterRef("patient"))
+    return (
+        Assignment.objects.filter(status= Assignment.AssignmentStatus.ACTIVA)
+        .annotate(
+            has_diagnosis= Exists(diagnoses),
+            has_validated=Exists(diagnoses.filter(is_validated=True)),
+        ).select_related("patient", "student")
+        .order_by("assigned_date", "id")
+    )
 
 def _check_not_in_past(starts_at: datetime) -> None:
     if starts_at < timezone.now():

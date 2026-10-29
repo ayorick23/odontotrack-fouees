@@ -543,6 +543,46 @@ class CaseTransitionTests(APITestCase):
         response = self.client.get("/api/assignments/finalizable/")
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
+    def test_in_progress_lists_active_cases_with_diagnosis_state(self):
+        self._validated_diagnosis()
+        Diagnostico.objects.create(
+            patient=self.patient, student=self.student, content="Otro."
+        )
+        pending = Patient.objects.create(
+            first_name="Por", last_name="Validar", dui="ASG-TRANS-004"
+        )
+        pending_assignment = Assignment.objects.create(
+            patient=pending, student=self.student
+        )
+        Diagnostico.objects.create(
+            patient=pending, student=self.student, content="Pendiente."
+        )
+        empty = Patient.objects.create(
+            first_name="Sin", last_name="Diagnostico", dui="ASG-TRANS-005"
+        )
+        empty_assignment = Assignment.objects.create(
+            patient=empty, student=self.student
+        )
+        closed = Patient.objects.create(
+            first_name="Ya", last_name="Cerrado", dui="ASG-TRANS-006"
+        )
+
+        closed_assignment = Assignment.objects.create(
+            patient=closed,
+            student=self.student,
+            status=Assignment.AssignmentStatus.FINALIZADA,
+        )
+
+        self.client.force_authenticate(user=self.docente)
+        response = self.client.get("/api/assignments/in_progress/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        states = {item["id"]: item["diagnosis_state"] for item in response.json()}
+        self.assertEqual(states[self.assignment.id], "validated")
+        self.assertEqual(states[pending_assignment.id], "pending")
+        self.assertEqual(states[empty_assignment.id], "none")
+        self.assertNotIn(closed_assignment.id, states)
+
+
     def test_status_cannot_be_changed_by_patch(self):
         self.client.force_authenticate(user=self.admin)
         response = self.client.patch(

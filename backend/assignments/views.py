@@ -18,6 +18,7 @@ from .serializers import (
     BulkAssignmentSerializer,
     ClaimAssignmentSerializer,
     FinalizableAssignmentSerializer,
+    InProgressAssignmentSerializer,
     SchedulableAssignmentSerializer,
 )
 from .services import (
@@ -28,6 +29,7 @@ from .services import (
     claim_available_patients,
     finalizable_assignments,
     finalize_assignment,
+    in_progress_assignments,
     reschedule_appointment,
     schedulable_assignments,
     schedule_appointment,
@@ -56,6 +58,7 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         "destroy": "assignments.edit",
         "finalize": "assignments.change_status",
         "finalizable": "assignments.change_status",
+        "in_progress": "assignments.change_status",
         "claim": "assignments.claim",
         "assign": ("assignments.create", "assignments.assign_student"),
         "students": "assignments.assign_student",
@@ -125,6 +128,10 @@ class AssignmentViewSet(viewsets.ModelViewSet):
                 many=True,
             ).data
         )
+    
+    @action(detail=False, methods=["get"])
+    def in_progress(self, request):
+        return Response(InProgressAssignmentSerializer(in_progress_assignments(), many=True).data)
 
 
 class AppointmentViewSet(

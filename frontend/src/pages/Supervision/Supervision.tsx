@@ -14,6 +14,8 @@ import {
   getAssignmentError,
   listFinalizableAssignments,
   type FinalizableAssignment,
+  listInProgressAssignments,
+  type InProgressAssignment,
 } from "../../services/assignments";
 import {
   getClinicalRecordError,
@@ -30,6 +32,13 @@ type LoadState<T> =
 const cardClass =
   "rounded-2xl bg-white p-4 shadow-[0_10px_30px_rgba(15,40,80,0.06)] dark:bg-slate-900 dark:shadow-none dark:ring-1 dark:ring-white/10 sm:p-5";
 
+const diagnosisStateLabel: Record<InProgressAssignment["diagnosis_state"], string>  = {
+  none: "Sin diagnostico",
+  pending: "Por validar",
+  validated: "Valido",
+};
+
+
 // Cola del docente: validar diagnósticos y finalizar los casos que ya
 // tienen uno validado. Validar desbloquea finalizar, por eso al validar
 // se recarga la segunda lista.
@@ -38,14 +47,24 @@ export function Supervision() {
   const canValidate = can(user, "diagnoses.validate");
   const canFinalize = can(user, "assignments.change_status");
   const [finalizableToken, setFinalizableToken] = useState(0);
+  const [inProgressToken, setInProgressToken] = useState(0);
 
   return (
     <div className="flex flex-col gap-6">
       <PendingDiagnoses
         canValidate={canValidate}
-        onValidated={() => setFinalizableToken((token) => token + 1)}
+        onValidated={() => {
+          setFinalizableToken((token) => token + 1);
+          setInProgressToken((token) => token + 1);
+        }}
       />
-      {canFinalize ? <FinalizableCases reloadToken={finalizableToken} /> : null}
+      {canFinalize ? (
+        <FinalizableCases 
+          reloadToken={finalizableToken}
+          onFinalized={() => setInProgressToken((token) => token + 1)}
+        />
+      ) : null}
+      {canFinalize ? <InProgressCases reloadToken={inProgressToken} /> : null}
     </div>
   );
 }
@@ -185,14 +204,19 @@ function PendingDiagnoses({
   );
 }
 
-function FinalizableCases({ reloadToken }: { reloadToken: number }) {
-  const [state, setState] = useState<LoadState<FinalizableAssignment[]>>({
-    status: "loading",
-  });
-  const [retryToken, setRetryToken] = useState(0);
-  const [pending, setPending] = useState<FinalizableAssignment | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [dialogError, setDialogError] = useState<string | null>(null);
+function FinalizableCases({
+  reloadToken, 
+  onFinalized}:{
+    reloadToken: number; 
+    onFinalized: () => void;
+  }){
+    const [state, setState] = useState<LoadState<FinalizableAssignment[]>>({
+      status: "loading",
+    });
+    const [retryToken, setRetryToken] = useState(0);
+    const [pending, setPending] = useState<FinalizableAssignment | null>(null);
+    const [busy, setBusy] = useState(false);
+    const [dialogError, setDialogError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -236,6 +260,7 @@ function FinalizableCases({ reloadToken }: { reloadToken: number }) {
           : current,
       );
       closeDialog();
+      onFinalized();
     } catch (error) {
       setDialogError(getAssignmentError(error));
     } finally {
@@ -324,6 +349,92 @@ function FinalizableCases({ reloadToken }: { reloadToken: number }) {
     </section>
   );
 }
+
+function InProgressCases({ reloadToken }: { reloadToken: number }) {
+  const [state, setState] = useState<LoadState<InProgressAssignment[]>>({
+    status: "loading",
+  });
+  const [retryToken, setRetryToken] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    setState({ status: "loading" });
+    listInProgressAssignments()
+      .then((data) => {
+        if (!cancelled) {
+          setState({ status: "ready", data });
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setState({
+            status: "error",
+            message: "No se pudieron cargar los casos en proceso.",
+          });
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [reloadToken, retryToken]);
+
+  const columns = useMemo(
+    () => [
+      {
+        header: "Paciente",
+        render: (row: InProgressAssignment) => (
+          <Link
+            to={`/patients/${row.patient}`}
+            className="font-medium text-slate-800 hover:text-brand dark:text-slate-100"
+          >
+            {row.patient_name}
+          </Link>
+        ),
+      },
+      { header: "Estudiante", render: (row: InProgressAssignment) => row.student_name },
+      { header: "Cita", render: (row: InProgressAssignment) => `#${row.appointment_number}` },
+      {
+        header: "Asignado",
+        render: (row: InProgressAssignment) => formatDate(row.assigned_date),
+      },
+      {
+        header: "Diagnóstico",
+        render: (row: InProgressAssignment) => diagnosisStateLabel[row.diagnosis_state],
+      },
+    ],
+    [],
+  );
+
+  return (
+    <section className={cardClass} aria-labelledby="in-progress-title">
+      <SectionHeader
+        id="in-progress-title"
+        title="Casos en proceso"
+        count={state.status === "ready" ? state.data.length : null}
+      />
+
+      {state.status === "loading" ? <LoadingMessage text="Cargando casos..." /> : null}
+
+      {state.status === "error" ? (
+        <ErrorMessage
+          message={state.message}
+          onRetry={() => setRetryToken((token) => token + 1)}
+        />
+      ) : null}
+
+      {state.status === "ready" ? (
+        <Table
+          caption="Casos en proceso"
+          columns={columns}
+          rows={state.data}
+          getRowKey={(row) => row.id}
+          emptyMessage="No hay casos en proceso."
+        />
+      ) : null}
+    </section>
+  );
+}
+
 
 function SectionHeader({
   id,

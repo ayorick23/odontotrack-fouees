@@ -135,6 +135,19 @@ class FinalizableAssignmentSerializer(serializers.ModelSerializer):
         return _person(student.first_name, student.last_name, student.username)
 
 
+class InProgressAssignmentSerializer(FinalizableAssignmentSerializer):
+    diagnosis_state = serializers.SerializerMethodField()
+
+    class Meta(FinalizableAssignmentSerializer.Meta):
+        fields = [*FinalizableAssignmentSerializer.Meta.fields, "diagnosis_state"]
+
+    def get_diagnosis_state(self, assignment: Assignment) -> str:
+        if assignment.has_validated:
+            return "validated"
+        if assignment.has_diagnosis:
+            return "pending"
+        return "none"
+
 class SchedulableAssignmentSerializer(serializers.ModelSerializer):
     patient = serializers.SerializerMethodField()
     student = serializers.SerializerMethodField()
