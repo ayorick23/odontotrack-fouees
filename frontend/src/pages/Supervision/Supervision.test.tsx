@@ -9,6 +9,7 @@ const api = vi.hoisted(() => ({
   listPendingDiagnoses: vi.fn(),
   validateDiagnosis: vi.fn(),
   listFinalizableAssignments: vi.fn(),
+  listInProgressAssignments: vi.fn(),
   finalizeAssignment: vi.fn(),
 }));
 
@@ -38,6 +39,7 @@ vi.mock("../../services/clinicalRecords", () => ({
 
 vi.mock("../../services/assignments", () => ({
   listFinalizableAssignments: api.listFinalizableAssignments,
+  listInProgressAssignments: api.listInProgressAssignments,
   finalizeAssignment: api.finalizeAssignment,
   getAssignmentError: () => "No se pudo guardar la asignación.",
 }));
@@ -81,6 +83,7 @@ describe("Supervision", () => {
     api.listPendingDiagnoses.mockReset();
     api.validateDiagnosis.mockReset();
     api.listFinalizableAssignments.mockReset();
+    api.listInProgressAssignments.mockReset();
     api.finalizeAssignment.mockReset();
     api.listPendingDiagnoses.mockResolvedValue({
       count: 1,
@@ -89,6 +92,17 @@ describe("Supervision", () => {
       results: [pendingDiagnosis],
     });
     api.listFinalizableAssignments.mockResolvedValue([]);
+    api.listInProgressAssignments.mockResolvedValue([]);
+  });
+
+  it("muestra los casos en proceso con el estado de su diagnóstico", async ()=>{
+    api.listInProgressAssignments.mockResolvedValue([
+      { ...finalizableCase, patient_name: "Luis Mejía", diagnosis_state: "pending" },
+    ]);
+    renderPage();
+    
+    expect(await screen.findByText("Luis Mejía")).toBeInTheDocument();
+    expect(screen.getByText("Por validar")).toBeInTheDocument();
   });
 
   it("valida un diagnóstico y recarga los casos listos para finalizar", async () => {

@@ -22,6 +22,17 @@ export type FinalizableAssignment = {
   assigned_date: string;
 };
 
+export type InProgressAssignment = {
+  id: number;
+  patient: number;
+  patient_name: string;
+  student_name: string;
+  appointment_number: number;
+  reason: string;
+  assigned_date: string;
+  diagnosis_state: "none" | "pending" | "validated";
+};
+
 export type AssignableStudent = {
   id: number;
   name: string;
@@ -59,6 +70,12 @@ export function listAssignableStudents(search: string): Promise<AssignableStuden
 export function listFinalizableAssignments(): Promise<FinalizableAssignment[]> {
   return api
     .get<FinalizableAssignment[]>("/assignments/finalizable/")
+    .then((response) => response.data);
+}
+
+export function listInProgressAssignments(): Promise<InProgressAssignment[]> {
+  return api
+    .get<InProgressAssignment[]>("/assignments/in_progress/")
     .then((response) => response.data);
 }
 
