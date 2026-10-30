@@ -11,10 +11,9 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
-  // Lee el archivo .env desde la raíz del monorepo (no desde
-  // frontend/) para que backend y frontend compartan un solo archivo
-  // de variables de entorno, tal como lo espera docker-compose.
-  envDir: '../',
+  // En Docker el .env vive en la raíz del repo. En Vercel el proyecto
+  // es solo frontend/ y la URL de la API llega como variable de entorno.
+  envDir: process.env.VERCEL ? "." : "../",
   server: {
     // host 0.0.0.0 es necesario para que el servidor de Vite sea
     // accesible desde fuera del contenedor Docker.

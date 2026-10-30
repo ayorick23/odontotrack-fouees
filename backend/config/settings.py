@@ -104,6 +104,11 @@ DATABASES = {
         "PASSWORD": config("DB_PASSWORD", default="odontotrack"),
         "HOST": config("DB_HOST", default="localhost"),
         "PORT": config("DB_PORT", default="5432"),
+        # Neon exige SSL. En Docker local "prefer" conecta sin certificado.
+        "OPTIONS": {
+            "sslmode": config("DB_SSLMODE", default="prefer"),
+            "channel_binding": config("DB_CHANNEL_BINDING", default="prefer"),
+        },
     }
 }
 
@@ -143,6 +148,11 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = "static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
+
+# Vercel termina HTTPS y reenvía la petición por HTTP.
+if not DEBUG:
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 # Fotos de paciente. En DEBUG se sirven en config/urls.py.
 # MEDIA_ROOT relativo a BASE_DIR si no es una ruta absoluta.
