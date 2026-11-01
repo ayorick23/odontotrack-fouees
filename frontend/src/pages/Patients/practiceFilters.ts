@@ -17,19 +17,36 @@ export const TOOTH_OPTIONS = [
     .map((fdi) => ({ value: String(fdi), label: `Pieza ${fdi} (temporal)` })),
 ];
 
-/** Tratamientos activos del catálogo como "Área · Tratamiento". */
-export function treatmentOptions(areas: ClinicalAreaRecord[]) {
+/**
+ * Tratamientos activos del catálogo. Con un área elegida, solo los de esa
+ * área; sin área, todos como "Área · Tratamiento".
+ */
+export function treatmentOptions(areas: ClinicalAreaRecord[], areaSlug?: string) {
+  const selected = areaSlug ? areas.filter((area) => area.slug === areaSlug) : areas;
   return [
     { value: PRACTICE_ALL, label: "Todos los tratamientos" },
-    ...areas.flatMap((area) =>
+    ...selected.flatMap((area) =>
       area.treatments
         .filter((treatment) => treatment.is_active)
         .map((treatment) => ({
           value: treatment.slug,
-          label: `${area.name} · ${treatment.name}`,
+          label: areaSlug ? treatment.name : `${area.name} · ${treatment.name}`,
         })),
     ),
   ];
+}
+
+/** El tratamiento pertenece al área (o no hay área elegida). */
+export function treatmentInArea(
+  areas: ClinicalAreaRecord[],
+  treatmentSlug: string,
+  areaSlug?: string,
+): boolean {
+  if (!areaSlug) {
+    return true;
+  }
+  const area = areas.find((item) => item.slug === areaSlug);
+  return Boolean(area?.treatments.some((treatment) => treatment.slug === treatmentSlug));
 }
 
 export function isToothFilter(value: string | null): value is string {

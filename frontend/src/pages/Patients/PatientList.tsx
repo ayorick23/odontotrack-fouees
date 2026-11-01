@@ -57,6 +57,7 @@ import {
   PRACTICE_ALL,
   TOOTH_OPTIONS,
   isToothFilter,
+  treatmentInArea,
   treatmentOptions,
 } from "./practiceFilters";
 
@@ -374,7 +375,10 @@ export function PatientList() {
     ],
     [areas],
   );
-  const practiceTreatmentOptions = useMemo(() => treatmentOptions(areas), [areas]);
+  const practiceTreatmentOptions = useMemo(
+    () => treatmentOptions(areas, clinicalArea),
+    [areas, clinicalArea],
+  );
   const range = useMemo(() => {
     if (state.status !== "ready" || state.count === 0) {
       return { from: 0, to: 0 };
@@ -581,12 +585,20 @@ export function PatientList() {
               label="Área"
               value={clinicalArea ?? AREA_ALL}
               options={areaOptions}
-              onChange={(value) =>
-                setSelectParam(
-                  "clinical_area",
-                  value === AREA_ALL ? AREA_ALL : value,
-                )
-              }
+              onChange={(value) => {
+                const next = new URLSearchParams(searchParams);
+                if (value === AREA_ALL) {
+                  next.delete("clinical_area");
+                } else {
+                  next.set("clinical_area", value);
+                }
+                // Un tratamiento de otra área dejaría el filtro sin resultados.
+                if (treatment && !treatmentInArea(areas, treatment, value === AREA_ALL ? undefined : value)) {
+                  next.delete("treatment");
+                }
+                next.delete("page");
+                setSearchParams(next);
+              }}
             />
             <DirectoryFilter
               id="directory-tooth"

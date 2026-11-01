@@ -40,7 +40,15 @@ class PatientQuerySet(models.QuerySet):
         """
         if user.role != User.Role.ESTUDIANTE:
             return self
-        own = Assignment.objects.filter(student=user).values("patient_id")
+        # Sus casos activos y los que finalizó. Los que liberó (cancelada)
+        # no: si otro estudiante los toma, dejan de ser suyos.
+        own = Assignment.objects.filter(
+            student=user,
+            status__in=[
+                Assignment.AssignmentStatus.ACTIVA,
+                Assignment.AssignmentStatus.FINALIZADA,
+            ],
+        ).values("patient_id")
         active = Assignment.objects.filter(
             status=Assignment.AssignmentStatus.ACTIVA
         ).values("patient_id")
@@ -53,9 +61,15 @@ class PatientQuerySet(models.QuerySet):
         return self
 
     def by_clinical_area(self, clinical_area: str | None):
+        """Área de la ficha (la que registra recepción) o de alguna pieza
+        indicada para práctica en el odontograma."""
         if not clinical_area:
             return self
-        return self.filter(clinical_area__slug=clinical_area)
+        practice = {"practice": {"indicated": True, "clinicalArea": clinical_area}}
+        return self.filter(
+            Q(clinical_area__slug=clinical_area)
+            | Q(odontogram__teeth__contains=[practice])
+        )
 
     def by_indicated_practice(self, tooth: str | None, treatment: str | None):
         """Pacientes con una pieza indicada para práctica.
