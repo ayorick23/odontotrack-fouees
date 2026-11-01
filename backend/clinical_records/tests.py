@@ -222,6 +222,56 @@ class OdontogramApiTests(APITestCase):
         saved = self.client.put(self.url, self._payload(placa=True), format="json")
         self.assertEqual(saved.status_code, status.HTTP_200_OK)
 
+    def _practice_payload(self, area, treatment):
+        payload = self._payload()
+        payload["teeth"] = [
+            {
+                "fdi": 18,
+                "marks": [],
+                "practice": {
+                    "indicated": True,
+                    "clinicalArea": area,
+                    "clinicalTreatment": treatment,
+                },
+            }
+        ]
+        return payload
+
+    def _tooth(self, response, fdi):
+        return next(t for t in response.json()["teeth"] if t["fdi"] == fdi)
+
+    def test_practice_saves_specific_treatment(self):
+        self.client.force_authenticate(user=self.student)
+        response = self.client.put(
+            self.url,
+            self._practice_payload("endodoncia", "endodoncia_monorradicular"),
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            self._tooth(response, 18)["practice"]["clinicalTreatment"],
+            "endodoncia_monorradicular",
+        )
+
+    def test_practice_treatment_must_match_area_and_exist(self):
+        self.client.force_authenticate(user=self.student)
+        for area, treatment in (
+            ("operatoria", "endodoncia_monorradicular"),
+            ("endodoncia", "no_existe"),
+        ):
+            response = self.client.put(
+                self.url, self._practice_payload(area, treatment), format="json"
+            )
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, treatment)
+
+    def test_practice_with_only_area_still_works(self):
+        self.client.force_authenticate(user=self.student)
+        response = self.client.put(
+            self.url, self._practice_payload("endodoncia", None), format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIsNone(self._tooth(response, 18)["practice"]["clinicalTreatment"])
+
     def test_student_cannot_view_patient_of_another_student(self):
         other = User.objects.create_user(
             username="estudiante-otro",

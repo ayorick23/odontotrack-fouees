@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { MousePointerClick } from "lucide-react";
 
-import type { OdontogramValue } from "../../types";
+import type { OdontogramValue, PracticeArea } from "../../types";
 import { OdontogramClinicalFields } from "./OdontogramClinicalFields";
 import { OdontogramToolbar } from "./OdontogramToolbar";
 
@@ -26,7 +26,7 @@ type OdontogramClinicalPanelProps = {
   readOnly: boolean;
   onOpenPerio: () => void;
   focusedFdi?: number | null;
-  clinicalAreas?: Array<{ slug: string; name: string }>;
+  clinicalAreas?: PracticeArea[];
   onClearFocus?: () => void;
 };
 

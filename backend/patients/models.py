@@ -8,6 +8,7 @@ from django.utils import timezone
 
 from accounts.models import User
 from assignments.models import Assignment
+from clinical_records.catalog import is_fdi_tooth
 
 PERIOD_DAYS = {
     "1m": 30,
@@ -55,6 +56,26 @@ class PatientQuerySet(models.QuerySet):
         if not clinical_area:
             return self
         return self.filter(clinical_area__slug=clinical_area)
+
+    def by_indicated_practice(self, tooth: str | None, treatment: str | None):
+        """Pacientes con una pieza indicada para práctica.
+
+        Con pieza y tratamiento, deben ser la misma pieza: la contención
+        JSON de Postgres busca un elemento de `teeth` con todas las claves.
+        """
+        practice: dict = {"indicated": True}
+        if treatment:
+            practice["clinicalTreatment"] = treatment
+        item: dict = {"practice": practice}
+        try:
+            number = int(tooth or "")
+        except ValueError:
+            number = None
+        if number is not None and is_fdi_tooth(number):
+            item["fdi"] = number
+        if len(item) == 1 and len(practice) == 1:
+            return self
+        return self.filter(odontogram__teeth__contains=[item])
 
     def by_assignee(self, assigned_to: str | None):
         if assigned_to == "unassigned":

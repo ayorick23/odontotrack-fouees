@@ -59,6 +59,7 @@ const ana = {
   case_status: "pendiente" as const,
   created_at: "2026-09-01T00:00:00Z",
   assigned_to: null,
+  indicated_practices: [],
 };
 
 const luis = { ...ana, id: 6, first_name: "Luis", dui: "DISP-002" };

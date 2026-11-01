@@ -52,6 +52,13 @@ import {
   treatmentLabel,
   type ClinicalAreaRecord,
 } from "../../services/catalogs";
+import { IndicatedPractices } from "./IndicatedPractices";
+import {
+  PRACTICE_ALL,
+  TOOTH_OPTIONS,
+  isToothFilter,
+  treatmentOptions,
+} from "./practiceFilters";
 
 const PAGE_SIZE = 20;
 const PERIOD_FILTERS: Array<{ value: DirectoryPeriod | "todos"; label: string }> = [
@@ -71,6 +78,8 @@ const SELECT_PARAM_KEYS = [
   "case_status",
   "clinical_area",
   "assigned_to",
+  "tooth",
+  "treatment",
 ] as const;
 const STATUS_ICONS: Record<CaseStatus, LucideIcon> = {
   pendiente: Clock3,
@@ -119,6 +128,9 @@ export function PatientList() {
   const assignedTo = isAssigneeFilter(assignedFromUrl)
     ? assignedFromUrl
     : undefined;
+  const toothFromUrl = searchParams.get("tooth");
+  const tooth = isToothFilter(toothFromUrl) ? toothFromUrl : undefined;
+  const treatment = searchParams.get("treatment") || undefined;
 
   const [searchInput, setSearchInput] = useState(searchFromUrl);
   const [reloadToken, setReloadToken] = useState(0);
@@ -148,6 +160,8 @@ export function PatientList() {
         caseStatus,
         clinicalArea,
         assignedTo,
+        tooth,
+        treatment,
       });
     } catch {
       toast.error("No se pudo exportar el directorio.");
@@ -251,6 +265,8 @@ export function PatientList() {
       caseStatus,
       clinicalArea,
       assignedTo,
+      tooth,
+      treatment,
     })
       .then((payload) => {
         if (!cancelled) {
@@ -273,7 +289,17 @@ export function PatientList() {
     return () => {
       cancelled = true;
     };
-  }, [page, searchFromUrl, period, caseStatus, clinicalArea, assignedTo, reloadToken]);
+  }, [
+    page,
+    searchFromUrl,
+    period,
+    caseStatus,
+    clinicalArea,
+    assignedTo,
+    tooth,
+    treatment,
+    reloadToken,
+  ]);
 
   function setSelectParam(
     key: (typeof SELECT_PARAM_KEYS)[number],
@@ -325,7 +351,7 @@ export function PatientList() {
 
   const pageCount = state.status === "ready" ? Math.max(Math.ceil(state.count / PAGE_SIZE), 1) : 1;
   const hasSelectFilters = Boolean(
-    caseStatus || clinicalArea || assignedTo,
+    caseStatus || clinicalArea || assignedTo || tooth || treatment,
   );
   const assigneeOptions = useMemo(
     () => [
@@ -348,6 +374,7 @@ export function PatientList() {
     ],
     [areas],
   );
+  const practiceTreatmentOptions = useMemo(() => treatmentOptions(areas), [areas]);
   const range = useMemo(() => {
     if (state.status !== "ready" || state.count === 0) {
       return { from: 0, to: 0 };
@@ -403,6 +430,12 @@ export function PatientList() {
           ) : (
             <span className="text-slate-400">Sin área</span>
           ),
+      },
+      {
+        header: "Pieza · tratamiento",
+        render: (patient: PatientListItem) => (
+          <IndicatedPractices practices={patient.indicated_practices} />
+        ),
       },
       {
         header: "Asignado a",
@@ -556,6 +589,20 @@ export function PatientList() {
               }
             />
             <DirectoryFilter
+              id="directory-tooth"
+              label="Pieza"
+              value={tooth ?? PRACTICE_ALL}
+              options={TOOTH_OPTIONS}
+              onChange={(value) => setSelectParam("tooth", value)}
+            />
+            <DirectoryFilter
+              id="directory-treatment"
+              label="Tratamiento"
+              value={treatment ?? PRACTICE_ALL}
+              options={practiceTreatmentOptions}
+              onChange={(value) => setSelectParam("treatment", value)}
+            />
+            <DirectoryFilter
               id="directory-assignee"
               label="Asignado"
               value={assignedTo ?? "todos"}
@@ -621,7 +668,9 @@ export function PatientList() {
                     period ||
                     caseStatus ||
                     clinicalArea ||
-                    assignedTo,
+                    assignedTo ||
+                    tooth ||
+                    treatment,
                 ),
               )}
             />

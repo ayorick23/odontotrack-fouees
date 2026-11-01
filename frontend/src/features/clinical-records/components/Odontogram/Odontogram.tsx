@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   OdontogramChartSurface,
   OdontogramProvider,
@@ -16,6 +16,7 @@ import {
   withoutPrimaryTeeth,
   type FdiToothNumber,
   type OdontogramValue,
+  type PracticeArea,
 } from "../../types";
 import {
   applyPdfPatientName,
@@ -73,9 +74,17 @@ export function Odontogram({
   const importingRef = useRef(false);
   const [perioOpen, setPerioOpen] = useState(false);
   const [focusedFdi, setFocusedFdi] = useState<FdiToothNumber | null>(null);
-  const [clinicalAreas, setClinicalAreas] = useState<
-    Array<{ slug: string; name: string }>
-  >([]);
+  const [clinicalAreas, setClinicalAreas] = useState<PracticeArea[]>([]);
+  const practiceNames = useMemo(
+    () =>
+      Object.fromEntries(
+        clinicalAreas.flatMap((area) => [
+          [area.slug, area.name],
+          ...area.treatments.map((treatment) => [treatment.slug, treatment.name]),
+        ]),
+      ) as Record<string, string>,
+    [clinicalAreas],
+  );
 
   useEffect(() => {
     onChangeRef.current = onChange;
@@ -86,7 +95,15 @@ export function Odontogram({
     listClinicalAreas(true)
       .then((areas) => {
         if (!cancelled) {
-          setClinicalAreas(areas.map((area) => ({ slug: area.slug, name: area.name })));
+          setClinicalAreas(
+            areas.map((area) => ({
+              slug: area.slug,
+              name: area.name,
+              treatments: area.treatments
+                .filter((treatment) => treatment.is_active)
+                .map((treatment) => ({ slug: treatment.slug, name: treatment.name })),
+            })),
+          );
         }
       })
       .catch(() => {
@@ -258,6 +275,7 @@ export function Odontogram({
               />
               <OdontogramFindings
                 value={value ?? emptyOdontogram()}
+                practiceNames={practiceNames}
                 focusedFdi={focusedFdi}
                 onFocusTooth={setFocusedFdi}
               />

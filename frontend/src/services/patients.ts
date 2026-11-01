@@ -35,6 +35,22 @@ export type PatientListItem = {
   case_status: CaseStatus;
   created_at: string;
   assigned_to: string | null;
+  /** Piezas indicadas para práctica en el odontograma, en orden FDI. */
+  indicated_practices: IndicatedPractice[];
+};
+
+export type IndicatedPractice = {
+  tooth: number;
+  /** Slug del tratamiento; null si la pieza solo tiene área. */
+  treatment: string | null;
+  /** "18 · Endodoncia monorradicular" */
+  label: string;
+};
+
+/** Filtros "pieza + tratamiento" (directorio y disponibles). */
+export type PracticeFilters = {
+  tooth?: string;
+  treatment?: string;
 };
 
 export type EmergencyContactRelationship =
@@ -134,7 +150,7 @@ export type ListPatientsParams = {
   clinicalArea?: string;
   assignedTo?: "unassigned" | string;
   period?: DirectoryPeriod;
-};
+} & PracticeFilters;
 
 export function listPatients(
   params: ListPatientsParams = {},
@@ -186,14 +202,25 @@ function directoryQuery(
   if (params.period) {
     query.period = params.period;
   }
+  return { ...query, ...practiceQuery(params) };
+}
+
+function practiceQuery(params: PracticeFilters): Record<string, string> {
+  const query: Record<string, string> = {};
+  if (params.tooth) {
+    query.tooth = params.tooth;
+  }
+  if (params.treatment) {
+    query.treatment = params.treatment;
+  }
   return query;
 }
 
 export function listAvailablePatients(params: {
   page?: number;
   search?: string;
-} = {}): Promise<PaginatedResponse<PatientListItem>> {
-  const query: Record<string, string | number> = {};
+} & PracticeFilters = {}): Promise<PaginatedResponse<PatientListItem>> {
+  const query: Record<string, string | number> = practiceQuery(params);
   if (params.page && params.page > 1) {
     query.page = params.page;
   }

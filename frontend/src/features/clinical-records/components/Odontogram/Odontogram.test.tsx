@@ -214,7 +214,7 @@ describe("Odontogram wrapper", () => {
     if (tooth) {
       tooth.marks = [{ layer: "hecho", status: "implante", surfaces: [] }];
       tooth.oralMarks = { placa: false, sangrado: false, sarro: false };
-      tooth.practice = { indicated: false, clinicalArea: null };
+      tooth.practice = { indicated: false, clinicalArea: null, clinicalTreatment: null };
     }
 
     render(<Odontogram value={value} readOnly />);
@@ -282,7 +282,7 @@ describe("Odontogram wrapper", () => {
         fdi: 16,
         marks: [{ layer: "hallazgo", status: "caries", surfaces: ["oclusal"] }],
         oralMarks: { placa: false, sangrado: false, sarro: false },
-        practice: { indicated: false, clinicalArea: null },
+        practice: { indicated: false, clinicalArea: null, clinicalTreatment: null },
       },
     );
     expect(value.oralMarks).toEqual({

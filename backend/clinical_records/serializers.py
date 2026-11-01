@@ -1,5 +1,7 @@
 from rest_framework import serializers
 
+from catalogs.models import ClinicalTreatment
+
 from .catalog import (
     FDI_ALL_TOOTH_NUMBER_SET,
     ToothLayer,
@@ -153,6 +155,12 @@ class ToothPracticeSerializer(serializers.Serializer):
         allow_blank=True,
         max_length=80,
     )
+    clinicalTreatment = serializers.CharField(
+        required=False,
+        allow_null=True,
+        allow_blank=True,
+        max_length=80,
+    )
 
 
 class ToothFindingSerializer(serializers.Serializer):
@@ -184,6 +192,36 @@ class ToothFindingSerializer(serializers.Serializer):
         return normalize_tooth(attrs)
 
 
+def validate_practice_treatments(teeth: list[dict]) -> None:
+    """El tratamiento indicado en cada pieza existe y es del área elegida.
+
+    Una sola consulta para todas las piezas.
+    """
+    practices = [
+        (tooth["fdi"], tooth["practice"])
+        for tooth in teeth
+        if tooth["practice"]["clinicalTreatment"]
+    ]
+    if not practices:
+        return
+    slugs = {practice["clinicalTreatment"] for _, practice in practices}
+    area_by_treatment = dict(
+        ClinicalTreatment.objects.filter(slug__in=slugs).values_list(
+            "slug", "area__slug"
+        )
+    )
+    for fdi, practice in practices:
+        area = area_by_treatment.get(practice["clinicalTreatment"])
+        if area is None:
+            raise serializers.ValidationError(
+                f"Pieza {fdi}: el tratamiento no existe en el catálogo."
+            )
+        if area != practice["clinicalArea"]:
+            raise serializers.ValidationError(
+                f"Pieza {fdi}: el tratamiento no corresponde al área clínica."
+            )
+
+
 class OdontogramSerializer(serializers.ModelSerializer):
     teeth = ToothFindingSerializer(many=True)
 
@@ -207,6 +245,7 @@ class OdontogramSerializer(serializers.ModelSerializer):
         unknown = set(numbers) - FDI_ALL_TOOTH_NUMBER_SET
         if unknown:
             raise serializers.ValidationError("Número FDI inválido.")
+        validate_practice_treatments(value)
         padded = pad_teeth(value)
         derived = derive_oral_marks(padded)
         self.context["derived_oral_marks"] = derived

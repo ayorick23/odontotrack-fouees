@@ -181,6 +181,15 @@ export type ToothMark = {
 export type ToothPractice = {
   indicated: boolean;
   clinicalArea: string | null;
+  /** Tratamiento específico del catálogo (p. ej. endodoncia_monorradicular). */
+  clinicalTreatment: string | null;
+};
+
+/** Área clínica con sus tratamientos, para elegir la práctica de una pieza. */
+export type PracticeArea = {
+  slug: string;
+  name: string;
+  treatments: Array<{ slug: string; name: string }>;
 };
 
 export type ToothFinding = {
@@ -233,7 +242,7 @@ export function emptyOralMarks(): OralGeneralMarks {
 }
 
 export function emptyPractice(): ToothPractice {
-  return { indicated: false, clinicalArea: null };
+  return { indicated: false, clinicalArea: null, clinicalTreatment: null };
 }
 
 export function emptyTooth(fdi: FdiToothNumber): ToothFinding {
