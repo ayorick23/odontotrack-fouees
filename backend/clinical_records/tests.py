@@ -161,6 +161,46 @@ class OdontogramApiTests(APITestCase):
         self.url = f"/api/clinical-records/odontogram/{self.patient.id}/"
         self.client.force_authenticate(user=self.admin)
 
+    def _put_mark_18(self, user, layer, **extra):
+        teeth = default_tooth_findings()
+        teeth[0]["marks"] = [
+            {
+                "layer": layer,
+                "status": "endodoncia",
+                "surfaces": [],
+                "treatment": self.endo.slug,
+                **extra,
+            }
+        ]
+        self.client.force_authenticate(user=user)
+        response = self.client.put(
+            self.url,
+            {"placa": False, "sangrado": False, "sarro": False, "teeth": teeth},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
+        return response.json()["teeth"][0]["marks"][0]
+
+    def test_done_records_who_and_when_server_side(self):
+        self.endo = ClinicalTreatment.objects.filter(odontogram_status="endodoncia").first()
+        self.student.first_name, self.student.last_name = "Lucía", "Zepeda"
+        self.student.save()
+        planned = self._put_mark_18(self.student, "plan")
+        self.assertNotIn("doneBy", planned)
+
+        # El cliente no puede atribuírselo a otro: el servidor lo ignora.
+        done = self._put_mark_18(self.student, "hecho", doneBy=self.admin.pk)
+        self.assertEqual(done["doneBy"], self.student.pk)
+        self.assertEqual(done["doneByName"], "Lucía Zepeda")
+        self.assertEqual(done["doneAt"], timezone.localdate().isoformat())
+
+        # Otro usuario guarda después: se conserva el autor original.
+        again = self._put_mark_18(self.admin, "hecho")
+        self.assertEqual(again["doneBy"], self.student.pk)
+
+        # Volver a pendiente borra el autor.
+        self.assertNotIn("doneBy", self._put_mark_18(self.admin, "plan"))
+
     def test_get_creates_empty_odontogram_with_thirty_two_teeth(self):
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)

@@ -183,7 +183,9 @@ class PatientOdontogramView(APIView):
         OdontogramService.assert_can_update(request.user, patient)
         odontogram = OdontogramService.get_or_create(patient)
         OdontogramService.record_revision(odontogram, request.user)
-        serializer = OdontogramSerializer(odontogram, data=request.data)
+        serializer = OdontogramSerializer(
+            odontogram, data=request.data, context={"user": request.user}
+        )
         serializer.is_valid(raise_exception=True)
         serializer.save(updated_by=request.user)
         return Response(serializer.data)

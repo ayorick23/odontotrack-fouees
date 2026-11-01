@@ -144,6 +144,21 @@ describe("plan", () => {
     expect(marks(setDone(done, 18, 0, false))).toEqual(marks(planned));
   });
 
+  it("volver a pendiente borra quién lo realizó", () => {
+    const done = start({
+      layer: "hecho",
+      status: "endodoncia",
+      surfaces: [],
+      treatment: ENDO.slug,
+      doneBy: 3,
+      doneByName: "Lucía Zepeda",
+      doneAt: "2026-11-01",
+    });
+    expect(marks(setDone(done, 18, 0, false))).toEqual([
+      { layer: "plan", status: "endodoncia", surfaces: [], treatment: ENDO.slug },
+    ]);
+  });
+
   it("Realizado solo aplica a tratamientos del plan", () => {
     const finding = start({ layer: "hallazgo", status: "caries", surfaces: ["oclusal"] });
     expect(setDone(finding, 18, 0, true)).toBe(finding);

@@ -65,7 +65,7 @@ class MyCasesSerializer(serializers.Serializer):
     upcoming_appointments = AppointmentRowSerializer(many=True)
     diagnoses_awaiting_validation = serializers.IntegerField()
     bank_available = serializers.IntegerField()
-    done_treatments_in_my_cases = serializers.IntegerField()
+    my_done_treatments = serializers.IntegerField()
 
 
 class SupervisionBlockSerializer(serializers.Serializer):

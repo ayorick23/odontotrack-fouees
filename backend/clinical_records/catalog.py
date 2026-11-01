@@ -185,6 +185,45 @@ def _treatment_slug(raw: dict) -> str | None:
     return None
 
 
+DONE_KEYS = ("doneBy", "doneByName", "doneAt")
+
+
+def stamp_done_marks(previous_teeth, teeth, user, day) -> None:
+    """Pone autor y fecha a los tratamientos que se marcan como realizados.
+
+    Una marca hecho que ya lo estaba (misma pieza y tratamiento) conserva
+    su autor original aunque guarde otro usuario; una que recién pasa a
+    hecho queda a nombre de quien guarda. Lo que mande el cliente en esas
+    claves no se usa.
+    """
+    before = {
+        (tooth.get("fdi"), mark.get("treatment")): mark
+        for tooth in previous_teeth or []
+        for mark in tooth.get("marks") or []
+        if mark.get("layer") == ToothLayer.HECHO and mark.get("treatment")
+    }
+    name = user.get_full_name() or user.username
+    for tooth in teeth:
+        for mark in tooth.get("marks") or []:
+            if mark.get("layer") != ToothLayer.HECHO or not mark.get("treatment"):
+                continue
+            for key in DONE_KEYS:
+                mark.pop(key, None)
+            previous = before.get((tooth["fdi"], mark["treatment"]))
+            if previous and previous.get("doneBy") is not None:
+                for key in DONE_KEYS:
+                    if previous.get(key) is not None:
+                        mark[key] = previous[key]
+            elif previous:
+                # Marcado como hecho antes de que existiera el autor: no
+                # se le atribuye a quien guarda ahora.
+                continue
+            else:
+                mark.update(
+                    {"doneBy": user.pk, "doneByName": name, "doneAt": day.isoformat()}
+                )
+
+
 def normalize_tooth_mark(raw: dict) -> dict | None:
     """Una marca: capa + estado (símbolo) + superficies [+ tratamiento].
 
@@ -214,6 +253,12 @@ def normalize_tooth_mark(raw: dict) -> dict | None:
     mark = {"layer": layer, "status": status, "surfaces": surfaces}
     if treatment:
         mark["treatment"] = treatment
+    if layer == ToothLayer.HECHO and treatment:
+        # Quién lo realizó y cuándo. Lo pone el servidor al guardar
+        # (stamp_done_marks), nunca el cliente; aquí solo se conserva.
+        for key in DONE_KEYS:
+            if raw.get(key) is not None:
+                mark[key] = raw[key]
     return mark
 
 

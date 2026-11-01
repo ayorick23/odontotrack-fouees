@@ -1,3 +1,4 @@
+from django.utils import timezone
 from rest_framework import serializers
 
 from catalogs.models import ClinicalTreatment
@@ -11,6 +12,7 @@ from .catalog import (
     derive_oral_marks,
     is_fdi_tooth,
     normalize_tooth,
+    stamp_done_marks,
     normalize_tooth_marks,
     pad_teeth,
 )
@@ -252,6 +254,11 @@ class OdontogramSerializer(serializers.ModelSerializer):
         return padded
 
     def update(self, instance, validated_data):
+        user = self.context.get("user")
+        if user is not None and "teeth" in validated_data:
+            stamp_done_marks(
+                instance.teeth, validated_data["teeth"], user, timezone.localdate()
+            )
         derived = self.context.get("derived_oral_marks")
         if derived and any(derived.values()):
             validated_data["placa"] = derived["placa"]
@@ -264,7 +271,9 @@ class OdontogramSerializer(serializers.ModelSerializer):
         if not data.get("teeth"):
             data["teeth"] = default_tooth_findings()
             return data
-        data["teeth"] = [normalize_tooth(tooth) for tooth in data["teeth"]]
+        # Desde lo guardado: el serializer de marcas solo devuelve los
+        # campos que el cliente puede mandar y perdería el autor.
+        data["teeth"] = [normalize_tooth(tooth) for tooth in instance.teeth]
         derived = derive_oral_marks(data["teeth"])
         if any(derived.values()):
             data["placa"] = derived["placa"]
