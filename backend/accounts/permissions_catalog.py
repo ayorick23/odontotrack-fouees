@@ -50,6 +50,7 @@ VALIDATE = ActionSpec("validate", "Validar")
 ASSIGN_STUDENT = ActionSpec("assign_student", "Asignar estudiante")
 CLAIM = ActionSpec("claim", "Elegir paciente")
 CHANGE_STATUS = ActionSpec("change_status", "Cambiar estado")
+RELEASE = ActionSpec("release", "Liberar paciente")
 UPDATE = ActionSpec("update", "Actualizar")
 
 PERMISSION_CATALOG: Final[tuple[SectionSpec, ...]] = (
@@ -85,7 +86,15 @@ PERMISSION_CATALOG: Final[tuple[SectionSpec, ...]] = (
                 key="assignments",
                 label="Asignaciones",
                 description="Asignar paciente a estudiante y estado del caso.",
-                actions=(VIEW, CREATE, EDIT, ASSIGN_STUDENT, CLAIM, CHANGE_STATUS),
+                actions=(
+                    VIEW,
+                    CREATE,
+                    EDIT,
+                    ASSIGN_STUDENT,
+                    CLAIM,
+                    CHANGE_STATUS,
+                    RELEASE,
+                ),
             ),
             ModuleSpec(
                 key="calendar",
@@ -257,6 +266,7 @@ SYSTEM_ROLES: Final[tuple[SystemRoleSpec, ...]] = (
             "assignments.view",
             # Finaliza casos, p. ej. si el estudiante pierde el acceso.
             "assignments.change_status",
+            "assignments.release",
             "calendar.view",
             "clinical_records.view",
             "diagnoses.view",
@@ -271,12 +281,17 @@ SYSTEM_ROLES: Final[tuple[SystemRoleSpec, ...]] = (
     SystemRoleSpec(
         slug="estudiante",
         name="Estudiante",
-        description="Elige pacientes disponibles y carga diagnóstico, tratamiento, evolución y odontograma.",
+        description="Registra pacientes, evalúa y elige disponibles, y carga el expediente de sus casos.",
         permissions=_names(
             "dashboard.view",
             "notifications.view",
             "patients.view",
+            # Banco de pacientes: registra y edita disponibles y los suyos
+            # (EstudianteEditsOwnOrAvailablePatient decide cuáles).
+            "patients.create",
+            "patients.edit",
             "assignments.claim",
+            "assignments.release",
             "calendar.view",
             "clinical_records.view",
             "clinical_records.create",
@@ -308,6 +323,7 @@ SYSTEM_ROLES: Final[tuple[SystemRoleSpec, ...]] = (
             "assignments.view",
             "assignments.create",
             "assignments.assign_student",
+            "assignments.release",
             "calendar.view",
             "calendar.create",
             "calendar.edit",

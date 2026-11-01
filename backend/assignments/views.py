@@ -19,6 +19,7 @@ from .serializers import (
     ClaimAssignmentSerializer,
     FinalizableAssignmentSerializer,
     InProgressAssignmentSerializer,
+    ReleaseAssignmentSerializer,
     SchedulableAssignmentSerializer,
 )
 from .services import (
@@ -29,6 +30,7 @@ from .services import (
     claim_available_patients,
     finalizable_assignments,
     finalize_assignment,
+    release_assignment,
     in_progress_assignments,
     reschedule_appointment,
     schedulable_assignments,
@@ -60,6 +62,7 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         "finalizable": "assignments.change_status",
         "in_progress": "assignments.change_status",
         "claim": "assignments.claim",
+        "release": "assignments.release",
         "assign": ("assignments.create", "assignments.assign_student"),
         "students": "assignments.assign_student",
     }
@@ -81,6 +84,17 @@ class AssignmentViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"])
     def finalize(self, request, pk=None):
         assignment = finalize_assignment(self.get_object())
+        return Response(self.get_serializer(assignment).data)
+
+    @action(detail=True, methods=["post"])
+    def release(self, request, pk=None):
+        payload = ReleaseAssignmentSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        assignment = release_assignment(
+            self.get_object(),
+            user=request.user,
+            reason=payload.validated_data["reason"],
+        )
         return Response(self.get_serializer(assignment).data)
 
     @action(detail=False, methods=["get"])

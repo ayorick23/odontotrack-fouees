@@ -85,6 +85,12 @@ export function finalizeAssignment(id: number): Promise<AssignmentRecord> {
     .then((response) => response.data);
 }
 
+export function releaseAssignment(id: number, reason = ""): Promise<AssignmentRecord> {
+  return api
+    .post<AssignmentRecord>(`/assignments/${id}/release/`, { reason })
+    .then((response) => response.data);
+}
+
 export function getAssignmentError(error: unknown): string {
   if (!axios.isAxiosError(error) || error.response === undefined) {
     return "No se pudo guardar la asignación. Intenta de nuevo.";

@@ -19,6 +19,7 @@ from .serializers import (
 from .services import (
     DiagnosisService,
     OdontogramService,
+    assert_can_edit_diagnosis,
     assert_can_write_clinical,
     assert_case_open,
     queryset_for_patient,
@@ -83,17 +84,20 @@ class DiagnosisViewSet(ClinicalScopeMixin, ModelViewSet):
         return queryset
 
     def perform_update(self, serializer):
-        assert_can_write_clinical(self.request.user, serializer.instance.patient)
+        assert_can_edit_diagnosis(self.request.user, serializer.instance)
         new_patient = serializer.validated_data.get("patient")
         if new_patient is not None:
-            assert_can_write_clinical(self.request.user, new_patient)
+            assert_can_write_clinical(
+                self.request.user, new_patient, allow_available=True
+            )
         serializer.instance = DiagnosisService.update(
             serializer.instance, **serializer.validated_data
         )
 
     def perform_create(self, serializer):
         patient = serializer.validated_data["patient"]
-        assert_can_write_clinical(self.request.user, patient)
+        # Se puede evaluar a un paciente disponible antes de tomarlo.
+        assert_can_write_clinical(self.request.user, patient, allow_available=True)
         serializer.instance = DiagnosisService.create(
             student=resolve_clinical_student(
                 user=self.request.user,
