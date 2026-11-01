@@ -470,6 +470,23 @@ class DashboardOverviewTests(APITestCase):
         self.assertEqual(by_role[User.Role.ESTUDIANTE], 2)
         self.assertEqual(block["inactive"], 1)
 
+    def test_menu_counters_follow_permissions(self):
+        def counters(user):
+            self.client.force_authenticate(user=user)
+            return self.client.get("/api/dashboard/counters/").json()
+
+        self.assertEqual(
+            counters(self.student), {"supervision": None, "assignments": 2}
+        )
+        self.assertEqual(
+            counters(self._user("doc-c", User.Role.DOCENTE)),
+            {"supervision": 2, "assignments": None},
+        )
+        self.assertEqual(
+            counters(self._user("sop-c", User.Role.SOPORTE)),
+            {"supervision": None, "assignments": None},
+        )
+
     def test_series_all_time(self):
         old = Patient.objects.create(first_name="Viejo", last_name="Registro", dui="OV-OLD")
         Patient.objects.filter(pk=old.pk).update(

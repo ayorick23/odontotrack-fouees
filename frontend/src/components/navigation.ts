@@ -13,24 +13,37 @@ export type NavGroup = {
   children: readonly NavLeaf[];
 };
 
-export type NavEntry =
+/** Grupo con título en el menú lateral. */
+export type NavSection = "principal" | "clinica" | "administracion";
+
+export const NAV_SECTIONS: ReadonlyArray<{ id: NavSection; label: string }> = [
+  { id: "principal", label: "Principal" },
+  { id: "clinica", label: "Clínica" },
+  { id: "administracion", label: "Administración" },
+];
+
+export type NavEntry = { section: NavSection } & (
   | (NavLeaf & { icon: "dashboard" | "calendar" | "supervision" | "students" | "users" | "support" | "roles" | "catalogs" })
-  | (NavGroup & { icon: "patients" });
+  | (NavGroup & { icon: "patients" })
+);
 
 export const NAV_ENTRIES: readonly NavEntry[] = [
   {
+    section: "principal",
     to: "/dashboard",
     label: "Dashboard",
     icon: "dashboard",
     permission: "dashboard.view",
   },
   {
+    section: "principal",
     to: "/calendar",
     label: "Calendario de citas",
     icon: "calendar",
     permission: "calendar.view",
   },
   {
+    section: "principal",
     label: "Pacientes",
     icon: "patients",
     children: [
@@ -54,36 +67,42 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
     ],
   },
   {
+    section: "clinica",
     to: "/supervision",
     label: "Supervisión",
     icon: "supervision",
     permission: "supervision.view",
   },
   {
+    section: "clinica",
     to: "/students",
     label: "Base de estudiantes",
     icon: "students",
     permission: "students.view",
   },
   {
+    section: "administracion",
     to: "/users",
     label: "Usuarios",
     icon: "users",
     permission: "users.view",
   },
   {
+    section: "administracion",
     to: "/roles",
     label: "Roles y permisos",
     icon: "roles",
     permission: "roles.view",
   },
   {
+    section: "administracion",
     to: "/catalogs",
     label: "Catálogos clínicos",
     icon: "catalogs",
     permission: "catalogs.view",
   },
   {
+    section: "administracion",
     to: "/support",
     label: "Soporte técnico",
     icon: "support",

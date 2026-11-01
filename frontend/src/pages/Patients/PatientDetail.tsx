@@ -42,7 +42,7 @@ const PatientOdontogramSection = lazy(() =>
 );
 
 const cardClass =
-  "rounded-2xl bg-white p-5 shadow-[0_10px_30px_rgba(15,40,80,0.06)] dark:bg-slate-900 dark:shadow-none dark:ring-1 dark:ring-white/10 sm:p-6";
+  "rounded-2xl bg-white p-5 dark:bg-slate-900 sm:p-6";
 
 const STATUS_ICONS: Record<CaseStatus, LucideIcon> = {
   pendiente: Clock3,

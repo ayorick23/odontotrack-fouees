@@ -1,4 +1,5 @@
 import { KeyRound, LogOut, Search } from "lucide-react";
+import { DropdownMenu } from "radix-ui";
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -9,6 +10,7 @@ import {
   type AuthUser,
 } from "../context/AuthContext";
 import { ChangePasswordModal } from "./ChangePasswordModal";
+import { Avatar } from "./Sidebar";
 import { NotificationBell } from "./NotificationBell";
 import { ThemeToggle } from "./ThemeToggle";
 
@@ -80,20 +82,21 @@ export function Navbar({
   const [query, setQuery] = useState("");
 
   return (
-    <header className="flex items-center justify-between rounded-2xl bg-white px-5 py-3 shadow-sm dark:bg-slate-900 dark:shadow-none dark:ring-1 dark:ring-white/10">
-      <div>
-        <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-100">
+    // Pintada sobre el marco: sin tarjeta, mismo color que el fondo.
+    <header className="flex items-center justify-between gap-4 px-3 py-4">
+      <div className="min-w-0">
+        <h1 className="truncate text-xl font-semibold tracking-tight text-slate-900 dark:text-white">
           {meta.title}
         </h1>
-        <p className="text-xs text-slate-400">{meta.crumb}</p>
+        <p className="text-xs text-slate-500">{meta.crumb}</p>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2">
         {can(user, "patients.view") ? (
           // Búsqueda rápida: lleva al directorio filtrado (nombre, DUI o teléfono).
           <form
             role="search"
-            className="hidden items-center gap-2 rounded-full bg-slate-50 px-3 py-2 text-sm text-slate-400 transition focus-within:ring-2 focus-within:ring-brand/30 dark:bg-slate-800 md:flex"
+            className="hidden items-center gap-2 rounded-full bg-white px-3.5 py-2.5 text-sm text-slate-400 transition focus-within:ring-2 focus-within:ring-teal-500/40 dark:bg-slate-900 md:flex"
             onSubmit={(event) => {
               event.preventDefault();
               const term = query.trim();
@@ -108,42 +111,52 @@ export function Navbar({
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Buscar paciente"
               aria-label="Buscar paciente por nombre, DUI o teléfono"
-              className="w-40 bg-transparent text-slate-700 outline-none dark:text-slate-100"
+              className="w-52 bg-transparent text-slate-700 outline-none placeholder:text-slate-400 dark:text-slate-100"
             />
           </form>
         ) : null}
-        <div className="flex items-center">
-          <ThemeToggle />
-          {can(user, "notifications.view") ? <NotificationBell /> : null}
-        </div>
+        <ThemeToggle />
+        {can(user, "notifications.view") ? <NotificationBell /> : null}
         {user ? (
-          <p className="hidden text-right text-sm font-medium text-slate-700 sm:block dark:text-slate-200">
-            {displayName(user)}
-            <span className="block text-xs font-normal text-slate-400">
-              {ROLE_LABELS[user.role]}
-            </span>
-          </p>
-        ) : null}
-        {user ? (
-          <button
-            type="button"
-            onClick={() => setPasswordOpen(true)}
-            title="Cambiar contraseña"
-            aria-label="Cambiar contraseña"
-            className="flex size-9 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
-          >
-            <KeyRound className="size-4" />
-          </button>
+          <DropdownMenu.Root>
+            <DropdownMenu.Trigger
+              aria-label="Menú de la cuenta"
+              className="rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500"
+            >
+              <Avatar user={user} size="size-10" />
+            </DropdownMenu.Trigger>
+            <DropdownMenu.Portal>
+              <DropdownMenu.Content
+                align="end"
+                sideOffset={8}
+                className="z-50 w-60 rounded-2xl bg-white p-1.5 shadow-[0_12px_40px_-8px_rgba(15,23,42,0.25)] dark:bg-slate-900 dark:ring-1 dark:ring-white/10"
+              >
+                <div className="px-3 py-2">
+                  <p className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
+                    {displayName(user)}
+                  </p>
+                  <p className="truncate text-xs text-slate-500">{ROLE_LABELS[user.role]}</p>
+                </div>
+                <DropdownMenu.Separator className="my-1 h-px bg-slate-100 dark:bg-slate-800" />
+                <DropdownMenu.Item
+                  onSelect={() => setPasswordOpen(true)}
+                  className="flex cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-sm text-slate-700 outline-none data-[highlighted]:bg-slate-100 dark:text-slate-200 dark:data-[highlighted]:bg-slate-800"
+                >
+                  <KeyRound className="size-4" />
+                  Cambiar contraseña
+                </DropdownMenu.Item>
+                <DropdownMenu.Item
+                  onSelect={onLogout}
+                  className="flex cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-sm text-rose-700 outline-none data-[highlighted]:bg-rose-50 dark:text-rose-300 dark:data-[highlighted]:bg-rose-950/50"
+                >
+                  <LogOut className="size-4" />
+                  Cerrar sesión
+                </DropdownMenu.Item>
+              </DropdownMenu.Content>
+            </DropdownMenu.Portal>
+          </DropdownMenu.Root>
         ) : null}
         <ChangePasswordModal isOpen={passwordOpen} onClose={() => setPasswordOpen(false)} />
-        <button
-          type="button"
-          onClick={onLogout}
-          className="flex items-center gap-2 rounded-full border border-slate-200 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-        >
-          <LogOut className="size-4" />
-          Salir
-        </button>
       </div>
     </header>
   );

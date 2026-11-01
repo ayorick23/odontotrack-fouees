@@ -307,3 +307,21 @@ def build_overview(user) -> dict:
         "faculty": faculty(user) if user.has_acl("dashboard.faculty") else None,
         "accounts": accounts(user) if user.has_acl("users.view") else None,
     }
+
+
+def menu_counters(user) -> dict:
+    """Contadores livianos del menú lateral (dos COUNT), para pedirlos en
+    cada navegación sin calcular todo el dashboard. None = no aplica."""
+    takes_or_assigns = user.has_acl("assignments.claim") or user.has_acl(
+        "assignments.assign_student"
+    )
+    return {
+        "supervision": (
+            dashboard_scope_for(user).diagnoses.filter(is_validated=False).count()
+            if user.has_acl("diagnoses.validate")
+            else None
+        ),
+        "assignments": (
+            Patient.objects.available().count() if takes_or_assigns else None
+        ),
+    }

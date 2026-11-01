@@ -120,3 +120,8 @@ class DashboardOverviewSerializer(serializers.Serializer):
     bank = BankBlockSerializer(allow_null=True)
     faculty = FacultyBlockSerializer(allow_null=True)
     accounts = AccountsBlockSerializer(allow_null=True)
+
+
+class MenuCountersSerializer(serializers.Serializer):
+    supervision = serializers.IntegerField(allow_null=True)
+    assignments = serializers.IntegerField(allow_null=True)

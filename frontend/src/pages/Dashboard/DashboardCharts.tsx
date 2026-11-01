@@ -288,7 +288,7 @@ export function ChartCard({
 }) {
   return (
     <article
-      className={`rounded-2xl bg-white p-5 shadow-[0_10px_30px_rgba(15,40,80,0.06)] dark:bg-slate-900 dark:shadow-none dark:ring-1 dark:ring-white/10 ${className}`}
+      className={`rounded-2xl bg-white p-5 dark:bg-slate-900 ${className}`}
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">{title}</h2>

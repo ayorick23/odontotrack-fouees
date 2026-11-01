@@ -115,7 +115,7 @@ export function NotificationBell() {
           unread > 0 ? `Notificaciones (${unread} sin leer)` : "Notificaciones"
         }
         aria-expanded={open}
-        className="relative rounded-full p-2 text-slate-500 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+        className="relative grid size-10 place-items-center rounded-full bg-white text-slate-500 transition-colors hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 dark:bg-slate-900 dark:text-slate-300 dark:hover:text-white"
       >
         <Bell className="size-4" />
         {unread > 0 ? (

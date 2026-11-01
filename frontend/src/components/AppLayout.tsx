@@ -13,7 +13,7 @@ export function AppLayout() {
 
   if (!isReady || (isAuthenticated && user === null)) {
     return (
-      <div className="flex min-h-svh items-center justify-center bg-[#eef3f8] dark:bg-slate-950">
+      <div className="flex min-h-svh items-center justify-center bg-slate-100 dark:bg-slate-950">
         <p className="text-sm text-slate-500 dark:text-slate-400">
           Cargando sesión...
         </p>
@@ -31,7 +31,7 @@ export function AppLayout() {
       return <Navigate to={fallback} replace />;
     }
     return (
-      <div className="flex min-h-svh items-center justify-center bg-[#eef3f8] dark:bg-slate-950">
+      <div className="flex min-h-svh items-center justify-center bg-slate-100 dark:bg-slate-950">
         <p className="text-sm text-slate-500 dark:text-slate-400">
           Tu rol no tiene pantallas habilitadas. Pide a administración que revise
           la matriz de permisos.
@@ -46,12 +46,14 @@ export function AppLayout() {
     navigate("/login", { replace: true });
   }
 
+  // Marco de un solo color (fondo, menú y barra superior, sin bordes);
+  // solo el panel de contenido se eleva y tiene su propio scroll.
   return (
-    <div className="flex min-h-svh gap-3 bg-[#eef3f8] p-3 dark:bg-slate-950">
-      <Sidebar user={user} />
-      <div className="flex min-w-0 flex-1 flex-col gap-3">
+    <div className="flex h-svh bg-slate-100 dark:bg-slate-950">
+      <Sidebar user={user} onLogout={handleLogout} />
+      <div className="flex min-w-0 flex-1 flex-col pb-3 pr-3">
         <Navbar user={user} onLogout={handleLogout} />
-        <main className="min-w-0 flex-1 px-2 pb-4">
+        <main className="min-h-0 min-w-0 flex-1 overflow-auto rounded-3xl bg-slate-50 p-6 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_40px_-12px_rgba(15,23,42,0.10)] dark:bg-[#0b1220] dark:shadow-none">
           <Outlet />
         </main>
       </div>

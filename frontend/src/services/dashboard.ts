@@ -129,3 +129,15 @@ export function getDashboardOverview(): Promise<DashboardOverview> {
     .get<DashboardOverview>("/dashboard/overview/")
     .then((response) => response.data);
 }
+
+/** Contadores del menú lateral; null = el usuario no ve ese módulo. */
+export type MenuCounters = {
+  supervision: number | null;
+  assignments: number | null;
+};
+
+export function getMenuCounters(): Promise<MenuCounters> {
+  return api
+    .get<MenuCounters>("/dashboard/counters/")
+    .then((response) => response.data);
+}
