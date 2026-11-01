@@ -16,7 +16,7 @@ from .serializers import assigned_student_name
 COLUMNS = (
     "Nombre",
     "Apellido",
-    "DUI",
+    "Documento",
     "Teléfono",
     "Área clínica",
     "Tratamiento",
@@ -36,11 +36,19 @@ def safe_text(value: str) -> str:
     return value
 
 
+def document_label(patient: Patient) -> str:
+    if patient.document_type == Patient.DocumentType.MENOR:
+        return f"Menor (resp. {patient.guardian_dui})"
+    if patient.document_type == Patient.DocumentType.PASAPORTE:
+        return f"Pasaporte {patient.dui}"
+    return patient.dui or ""
+
+
 def patient_row(patient: Patient) -> list[str]:
     return [
         safe_text(patient.first_name),
         safe_text(patient.last_name),
-        patient.dui,
+        document_label(patient),
         patient.phone_number,
         patient.clinical_area.name if patient.clinical_area else "",
         patient.clinical_treatment.name if patient.clinical_treatment else "",
