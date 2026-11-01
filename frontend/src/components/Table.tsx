@@ -52,7 +52,7 @@ export function Table<Row>({
           {rows.map((row, index) => (
             <tr
               key={getRowKey ? getRowKey(row, index) : index}
-              className="border-b border-slate-50 last:border-0 dark:border-slate-800/80"
+              className="border-b border-slate-50 transition-colors last:border-0 hover:bg-slate-50/80 dark:border-slate-800/80 dark:hover:bg-slate-800/50"
             >
               {columns.map((column) => (
                 <td

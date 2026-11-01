@@ -79,7 +79,10 @@ class PatientQuerySet(models.QuerySet):
 
     def by_assignee(self, assigned_to: str | None):
         if assigned_to == "unassigned":
-            return self.unassigned()
+            # "Sin asignar" = pendientes en el banco, como la tarjeta del
+            # directorio. Un caso finalizado tampoco tiene asignación
+            # activa, pero no está sin asignar: está cerrado.
+            return self.available()
         try:
             student_id = int(assigned_to or "")
         except ValueError:

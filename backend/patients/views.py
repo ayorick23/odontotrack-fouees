@@ -35,7 +35,14 @@ class PatientViewSet(viewsets.ModelViewSet):
         "available": ("assignments.claim", "assignments.assign_student"),
     }
     filter_backends = [filters.SearchFilter]
-    search_fields = ["first_name", "last_name"]
+    # Nombre sin acentos ("Mendez" encuentra "Méndez"), documento y teléfono.
+    search_fields = [
+        "first_name__unaccent",
+        "last_name__unaccent",
+        "dui",
+        "guardian_dui",
+        "phone_number",
+    ]
 
     def get_queryset(self):
         # Lista aparte del directorio: un scoping futuro por rol no debe

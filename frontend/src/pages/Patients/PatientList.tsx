@@ -632,7 +632,7 @@ export function PatientList() {
               type="search"
               value={searchInput}
               onChange={(event) => setSearchInput(event.target.value)}
-              placeholder="Buscar por nombre"
+              placeholder="Nombre, DUI o teléfono"
               className="w-52 bg-transparent outline-none placeholder:text-slate-400"
             />
           </label>

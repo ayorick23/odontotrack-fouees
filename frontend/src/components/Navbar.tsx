@@ -1,6 +1,6 @@
 import { KeyRound, LogOut, Search } from "lucide-react";
 import { useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
 import { can } from "../acl/can";
 import {
@@ -76,6 +76,8 @@ export function Navbar({
   const location = useLocation();
   const meta = pageMeta(location.pathname, user);
   const [passwordOpen, setPasswordOpen] = useState(false);
+  const navigate = useNavigate();
+  const [query, setQuery] = useState("");
 
   return (
     <header className="flex items-center justify-between rounded-2xl bg-white px-5 py-3 shadow-sm dark:bg-slate-900 dark:shadow-none dark:ring-1 dark:ring-white/10">
@@ -87,14 +89,29 @@ export function Navbar({
       </div>
 
       <div className="flex items-center gap-3">
-        <label className="hidden items-center gap-2 rounded-full bg-slate-50 px-3 py-2 text-sm text-slate-400 dark:bg-slate-800 md:flex">
-          <Search className="size-4" />
-          <input
-            disabled
-            placeholder="¿Buscas algo?"
-            className="w-40 bg-transparent outline-none"
-          />
-        </label>
+        {can(user, "patients.view") ? (
+          // Búsqueda rápida: lleva al directorio filtrado (nombre, DUI o teléfono).
+          <form
+            role="search"
+            className="hidden items-center gap-2 rounded-full bg-slate-50 px-3 py-2 text-sm text-slate-400 transition focus-within:ring-2 focus-within:ring-brand/30 dark:bg-slate-800 md:flex"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const term = query.trim();
+              navigate(term ? `/patients?search=${encodeURIComponent(term)}` : "/patients");
+              setQuery("");
+            }}
+          >
+            <Search className="size-4" />
+            <input
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Buscar paciente"
+              aria-label="Buscar paciente por nombre, DUI o teléfono"
+              className="w-40 bg-transparent text-slate-700 outline-none dark:text-slate-100"
+            />
+          </form>
+        ) : null}
         <div className="flex items-center">
           <ThemeToggle />
           {can(user, "notifications.view") ? <NotificationBell /> : null}

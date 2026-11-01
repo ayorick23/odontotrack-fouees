@@ -107,7 +107,7 @@ class PatientDirectoryTests(APITestCase):
         )
         self.client.force_authenticate(user=self.admin)
 
-    def test_search_matches_last_name_not_dui(self):
+    def test_search_matches_last_name_and_document(self):
         Patient.objects.create(
             first_name="María",
             last_name="Gómez",
@@ -126,9 +126,14 @@ class PatientDirectoryTests(APITestCase):
             ["Gómez"],
         )
 
+        # Desde 2026-10-31 también busca por documento (recepción encuentra
+        # al paciente por su DUI y evita registrarlo dos veces).
         by_document = self.client.get("/api/patients/", {"search": "99999999-9"})
         self.assertEqual(by_document.status_code, status.HTTP_200_OK)
-        self.assertEqual(by_document.json()["results"], [])
+        self.assertEqual(
+            [row["last_name"] for row in by_document.json()["results"]],
+            ["Pérez"],
+        )
 
     def test_filter_by_clinical_area(self):
         Patient.objects.create(
@@ -1492,3 +1497,47 @@ class IndicatedPracticeTests(APITestCase):
         self.assertIn(
             "18 · Endodoncia monorradicular; 27 · Endodoncia multirradicular", content
         )
+
+
+class DirectorySearchTests(APITestCase):
+    """Bugs de búsqueda reportados en la demo."""
+
+    def setUp(self):
+        sync_acl()
+        self.admin = User.objects.create_user(
+            username="admin-busqueda", password="pass12345", role=User.Role.ADMIN
+        )
+        self.client.force_authenticate(user=self.admin)
+        self.jose = Patient.objects.create(
+            first_name="José",
+            last_name="Peña",
+            dui="05000001-1",
+            phone_number="+503 7123-4567",
+        )
+        self.minor = Patient.objects.create(
+            first_name="Leo",
+            last_name="Ruiz",
+            document_type=Patient.DocumentType.MENOR,
+            guardian_dui="05000002-2",
+        )
+
+    def ids(self, **params):
+        return {row["id"] for row in self.client.get("/api/patients/", params).json()["results"]}
+
+    def test_search_ignores_accents_and_case(self):
+        for term in ("jose pena", "JOSÉ", "Pena"):
+            self.assertEqual(self.ids(search=term), {self.jose.id}, term)
+
+    def test_search_by_document_and_phone(self):
+        self.assertEqual(self.ids(search="05000001-1"), {self.jose.id})
+        self.assertEqual(self.ids(search="05000002-2"), {self.minor.id})
+        self.assertEqual(self.ids(search="7123-4567"), {self.jose.id})
+
+    def test_unassigned_filter_excludes_finished_cases(self):
+        Patient.objects.create(
+            first_name="Ana",
+            last_name="Cerrada",
+            dui="05000003-3",
+            case_status=Patient.CaseStatus.FINALIZADO,
+        )
+        self.assertEqual(self.ids(assigned_to="unassigned"), {self.jose.id, self.minor.id})
