@@ -6,6 +6,7 @@ import {
   type FdiToothNumber,
   type OdontogramValue,
   type ToothLayer,
+  type ToothPractice,
   type ToothStatus,
 } from "../../types";
 
@@ -45,12 +46,15 @@ type FindingChip = {
 
 type OdontogramFindingsProps = {
   value: OdontogramValue;
+  /** Nombre por slug de área o tratamiento, para la etiqueta de la práctica. */
+  practiceNames?: Record<string, string>;
   focusedFdi?: number | null;
   onFocusTooth?: (fdi: FdiToothNumber) => void;
 };
 
 export function OdontogramFindings({
   value,
+  practiceNames = {},
   focusedFdi,
   onFocusTooth,
 }: OdontogramFindingsProps) {
@@ -78,7 +82,7 @@ export function OdontogramFindings({
           ([mark]) =>
             ORAL_GENERAL_MARK_LABELS[mark as keyof typeof ORAL_GENERAL_MARK_LABELS],
         ),
-      tooth.practice.indicated ? "Práctica" : null,
+      tooth.practice.indicated ? practiceLabel(tooth.practice, practiceNames) : null,
     ].filter((item): item is string => item != null);
 
     if (tooth.marks.length === 0) {
@@ -148,4 +152,10 @@ export function OdontogramFindings({
       })}
     </div>
   );
+}
+
+function practiceLabel(practice: ToothPractice, names: Record<string, string>): string {
+  const slug = practice.clinicalTreatment ?? practice.clinicalArea;
+  const name = slug ? names[slug] : undefined;
+  return name ? `Práctica: ${name}` : "Práctica";
 }

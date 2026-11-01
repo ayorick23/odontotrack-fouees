@@ -8,6 +8,7 @@ from catalogs.models import ClinicalArea, ClinicalTreatment
 
 from .models import Patient
 from .phones import normalize_phone
+from .practices import CatalogNames, indicated_practices
 
 MAX_PHOTO_BYTES = 2 * 1024 * 1024
 ALLOWED_PHOTO_CONTENT_TYPES = frozenset(
@@ -402,6 +403,8 @@ class PatientSerializer(serializers.ModelSerializer):
 
 class PatientListSerializer(serializers.ModelSerializer):
     assigned_to = serializers.SerializerMethodField()
+    # Columna "pieza + tratamiento" del directorio (sale del odontograma).
+    indicated_practices = serializers.SerializerMethodField()
     clinical_area = OptionalSlugRelatedField(
         slug_field="slug",
         read_only=True,
@@ -428,10 +431,19 @@ class PatientListSerializer(serializers.ModelSerializer):
             "case_status",
             "created_at",
             "assigned_to",
+            "indicated_practices",
         )
 
     def get_assigned_to(self, patient: Patient) -> str | None:
         return assigned_student_name(patient)
+
+    def get_indicated_practices(self, patient: Patient) -> list[dict]:
+        # El contexto es del serializer raíz: los nombres se cargan una
+        # sola vez para todas las filas de la página.
+        names = self.context.get("catalog_names")
+        if names is None:
+            names = self.context["catalog_names"] = CatalogNames.load()
+        return indicated_practices(patient, names)
 
     def to_representation(self, instance):
         return empty_catalog_slugs(super().to_representation(instance))

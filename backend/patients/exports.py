@@ -11,6 +11,7 @@ from django.http import HttpResponse
 from django.utils import timezone
 
 from .models import Patient
+from .practices import CatalogNames, indicated_practices
 from .serializers import assigned_student_name
 
 COLUMNS = (
@@ -20,6 +21,7 @@ COLUMNS = (
     "Teléfono",
     "Área clínica",
     "Tratamiento",
+    "Prácticas indicadas",
     "Estado del caso",
     "Estudiante asignado",
     "Fecha de registro",
@@ -44,7 +46,7 @@ def document_label(patient: Patient) -> str:
     return patient.dui or ""
 
 
-def patient_row(patient: Patient) -> list[str]:
+def patient_row(patient: Patient, names: CatalogNames) -> list[str]:
     return [
         safe_text(patient.first_name),
         safe_text(patient.last_name),
@@ -53,6 +55,7 @@ def patient_row(patient: Patient) -> list[str]:
         safe_text(patient.phone_number),
         patient.clinical_area.name if patient.clinical_area else "",
         patient.clinical_treatment.name if patient.clinical_treatment else "",
+        "; ".join(item["label"] for item in indicated_practices(patient, names)),
         patient.get_case_status_display(),
         assigned_student_name(patient) or "",
         timezone.localtime(patient.created_at).strftime("%Y-%m-%d"),
@@ -67,6 +70,7 @@ def patients_csv_response(patients: Iterable[Patient]) -> HttpResponse:
     response.write("﻿")
     writer = csv.writer(response)
     writer.writerow(COLUMNS)
+    names = CatalogNames.load()
     for patient in patients:
-        writer.writerow(patient_row(patient))
+        writer.writerow(patient_row(patient, names))
     return response

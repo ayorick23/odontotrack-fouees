@@ -40,14 +40,15 @@ class PatientViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         # Lista aparte del directorio: un scoping futuro por rol no debe
         # ocultar los pendientes sin asignación.
+        params = self.request.query_params
         if self.action == "available":
             return (
                 Patient.objects.prefetch_related("assignments__student")
-                .select_related("clinical_area", "clinical_treatment")
+                .select_related("clinical_area", "clinical_treatment", "odontogram")
                 .available()
+                .by_indicated_practice(params.get("tooth"), params.get("treatment"))
                 .order_by("id")
             )
-        params = self.request.query_params
         queryset = Patient.objects.prefetch_related("assignments__student")
         if self.action not in ("list", "export"):
             # Solo la ficha muestra created_by_name y first_diagnosis_by.
@@ -56,12 +57,13 @@ class PatientViewSet(viewsets.ModelViewSet):
             )
         return (
             queryset
-            .select_related("clinical_area", "clinical_treatment")
+            .select_related("clinical_area", "clinical_treatment", "odontogram")
             .visible_to(self.request.user)
             .in_period(params.get("period"))
             .by_case_status(params.get("case_status"))
             .by_clinical_area(params.get("clinical_area"))
             .by_assignee(params.get("assigned_to"))
+            .by_indicated_practice(params.get("tooth"), params.get("treatment"))
             .order_by("id")
         )
 
@@ -80,6 +82,7 @@ class PatientViewSet(viewsets.ModelViewSet):
         serializer = PatientListSerializer(
             page if page is not None else queryset,
             many=True,
+            context=self.get_serializer_context(),
         )
         if page is not None:
             return self.get_paginated_response(serializer.data)

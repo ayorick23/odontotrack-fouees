@@ -11,7 +11,7 @@ describe("engineToothToFinding", () => {
       fdi: 16,
       marks: [{ layer: "hecho", status: "extraido", surfaces: [] }],
       oralMarks: { placa: false, sangrado: false, sarro: false },
-      practice: { indicated: false, clinicalArea: null },
+      practice: { indicated: false, clinicalArea: null, clinicalTreatment: null },
     });
   });
 
@@ -32,7 +32,7 @@ describe("engineToothToFinding", () => {
         { layer: "hallazgo", status: "caries", surfaces: ["oclusal"] },
       ],
       oralMarks: { placa: false, sangrado: false, sarro: false },
-      practice: { indicated: false, clinicalArea: null },
+      practice: { indicated: false, clinicalArea: null, clinicalTreatment: null },
     });
     expect(
       engineToothToFinding(36, {
@@ -47,7 +47,7 @@ describe("engineToothToFinding", () => {
         { layer: "hecho", status: "obturado", surfaces: ["oclusal"] },
       ],
       oralMarks: { placa: false, sangrado: false, sarro: false },
-      practice: { indicated: false, clinicalArea: null },
+      practice: { indicated: false, clinicalArea: null, clinicalTreatment: null },
     });
   });
 });
@@ -73,7 +73,7 @@ describe("chartToDomain", () => {
       fdi: 16,
       marks: [{ layer: "hallazgo", status: "caries", surfaces: ["oclusal"] }],
       oralMarks: { placa: true, sangrado: true, sarro: true },
-      practice: { indicated: false, clinicalArea: null },
+      practice: { indicated: false, clinicalArea: null, clinicalTreatment: null },
     });
     expect(value.teeth.find((tooth) => tooth.fdi === 11)?.marks).toEqual([]);
     expect(value.oralMarks).toEqual({

@@ -1278,6 +1278,7 @@ class PatientExportTests(APITestCase):
                 "7777-0000",
                 area.name,
                 treatment.name,
+                "",
                 "En proceso",
                 "Elena Ruiz",
                 timezone.localdate().isoformat(),
@@ -1405,3 +1406,89 @@ class StudentPatientBankTests(APITestCase):
         available = self.patient("04000006-6")
         response = self.client.delete(f"/api/patients/{available.id}/")
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class IndicatedPracticeTests(APITestCase):
+    """Columna y filtros "pieza + tratamiento" del directorio."""
+
+    def setUp(self):
+        from clinical_records.models import Odontogram
+
+        sync_acl()
+        self.admin = User.objects.create_user(
+            username="admin-practicas", password="pass12345", role=User.Role.ADMIN
+        )
+        self.client.force_authenticate(user=self.admin)
+
+        def with_practices(dui, *practices):
+            patient = Patient.objects.create(first_name="Ana", last_name=dui, dui=dui)
+            Odontogram.objects.create(
+                patient=patient,
+                teeth=[
+                    {
+                        "fdi": fdi,
+                        "marks": [],
+                        "practice": {
+                            "indicated": True,
+                            "clinicalArea": "endodoncia",
+                            "clinicalTreatment": treatment,
+                        },
+                    }
+                    for fdi, treatment in practices
+                ],
+            )
+            return patient
+
+        # 27 multirradicular y 18 monorradicular: piezas distintas.
+        self.mixed = with_practices(
+            "PZ-1", (27, "endodoncia_multirradicular"), (18, "endodoncia_monorradicular")
+        )
+        self.only_27 = with_practices("PZ-2", (27, "endodoncia_monorradicular"))
+        self.without = Patient.objects.create(first_name="Ana", last_name="PZ-3", dui="PZ-3")
+
+    def ids(self, url="/api/patients/", **params):
+        response = self.client.get(url, params)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        return {row["id"] for row in response.json()["results"]}
+
+    def test_list_shows_tooth_and_specific_treatment(self):
+        rows = {
+            row["id"]: row
+            for row in self.client.get("/api/patients/").json()["results"]
+        }
+        self.assertEqual(
+            [item["label"] for item in rows[self.mixed.id]["indicated_practices"]],
+            ["18 · Endodoncia monorradicular", "27 · Endodoncia multirradicular"],
+        )
+        self.assertEqual(rows[self.without.id]["indicated_practices"], [])
+
+    def test_filter_by_tooth(self):
+        self.assertEqual(self.ids(tooth="27"), {self.mixed.id, self.only_27.id})
+        self.assertEqual(self.ids(tooth="18"), {self.mixed.id})
+
+    def test_filter_by_treatment(self):
+        self.assertEqual(
+            self.ids(treatment="endodoncia_monorradicular"),
+            {self.mixed.id, self.only_27.id},
+        )
+
+    def test_tooth_and_treatment_must_be_the_same_tooth(self):
+        # mixed tiene la 27 y una monorradicular, pero en la 18.
+        self.assertEqual(
+            self.ids(tooth="27", treatment="endodoncia_monorradicular"),
+            {self.only_27.id},
+        )
+
+    def test_invalid_tooth_is_ignored(self):
+        self.assertEqual(len(self.ids(tooth="99")), 3)
+
+    def test_available_list_uses_the_same_filters(self):
+        self.assertEqual(
+            self.ids("/api/patients/available/", tooth="18"), {self.mixed.id}
+        )
+
+    def test_export_includes_practices(self):
+        content = self.client.get("/api/patients/export/").content.decode("utf-8-sig")
+        self.assertIn(
+            "18 · Endodoncia monorradicular; 27 · Endodoncia multirradicular", content
+        )

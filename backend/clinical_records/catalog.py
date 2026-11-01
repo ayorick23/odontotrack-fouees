@@ -124,7 +124,7 @@ def empty_oral_marks() -> dict:
 
 
 def empty_practice() -> dict:
-    return {"indicated": False, "clinicalArea": None}
+    return {"indicated": False, "clinicalArea": None, "clinicalTreatment": None}
 
 
 def normalize_oral_marks(raw: dict | None) -> dict:
@@ -141,7 +141,16 @@ def normalize_practice(raw: dict | None) -> dict:
     indicated = bool(source.get("indicated"))
     area = source.get("clinicalArea") or source.get("clinical_area")
     if indicated and isinstance(area, str) and area.strip():
-        return {"indicated": True, "clinicalArea": area.strip()}
+        # Tratamiento específico del catálogo (p. ej. endodoncia
+        # monorradicular): es lo que el directorio muestra y filtra.
+        treatment = source.get("clinicalTreatment") or source.get("clinical_treatment")
+        if not (isinstance(treatment, str) and treatment.strip()):
+            treatment = None
+        return {
+            "indicated": True,
+            "clinicalArea": area.strip(),
+            "clinicalTreatment": treatment.strip() if treatment else None,
+        }
     return empty_practice()
 
 

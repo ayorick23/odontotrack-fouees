@@ -1,5 +1,5 @@
 import { Search, UserCheck } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { can } from "../../acl/can";
@@ -26,6 +26,19 @@ import {
   patientInitials,
   type PatientListItem,
 } from "../../services/patients";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../components/ui/select";
+import { IndicatedPractices } from "../Patients/IndicatedPractices";
+import {
+  PRACTICE_ALL,
+  TOOTH_OPTIONS,
+  treatmentOptions,
+} from "../Patients/practiceFilters";
 import { StudentCombobox } from "./StudentCombobox";
 
 const PAGE_SIZE = 20;
@@ -42,6 +55,9 @@ export function AvailablePatients() {
   const [page, setPage] = useState(1);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
+  // Pieza y tratamiento que el estudiante necesita practicar.
+  const [tooth, setTooth] = useState(PRACTICE_ALL);
+  const [treatment, setTreatment] = useState(PRACTICE_ALL);
   const [reloadToken, setReloadToken] = useState(0);
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const [areas, setAreas] = useState<ClinicalAreaRecord[]>([]);
@@ -76,7 +92,12 @@ export function AvailablePatients() {
 
   useEffect(() => {
     let cancelled = false;
-    listAvailablePatients({ page, search })
+    listAvailablePatients({
+      page,
+      search,
+      tooth: tooth === PRACTICE_ALL ? undefined : tooth,
+      treatment: treatment === PRACTICE_ALL ? undefined : treatment,
+    })
       .then((response) => {
         if (!cancelled) {
           setState({
@@ -97,7 +118,8 @@ export function AvailablePatients() {
     return () => {
       cancelled = true;
     };
-  }, [page, search, reloadToken]);
+  }, [page, search, tooth, treatment, reloadToken]);
+  const practiceTreatmentOptions = useMemo(() => treatmentOptions(areas), [areas]);
 
   const pageCount =
     state.status === "ready" ? Math.max(Math.ceil(state.count / PAGE_SIZE), 1) : 1;
@@ -191,6 +213,24 @@ export function AvailablePatients() {
               className="w-full bg-transparent text-sm text-slate-700 outline-none dark:text-slate-100"
             />
           </form>
+          <PracticeFilter
+            label="Pieza"
+            value={tooth}
+            options={TOOTH_OPTIONS}
+            onChange={(value) => {
+              setPage(1);
+              setTooth(value);
+            }}
+          />
+          <PracticeFilter
+            label="Tratamiento"
+            value={treatment}
+            options={practiceTreatmentOptions}
+            onChange={(value) => {
+              setPage(1);
+              setTreatment(value);
+            }}
+          />
           {checked.size > 0 ? (
             <button
               type="button"
@@ -252,6 +292,12 @@ export function AvailablePatients() {
                   ) : (
                     <span className="text-slate-400">Sin área</span>
                   ),
+              },
+              {
+                header: "Pieza · tratamiento",
+                render: (patient) => (
+                  <IndicatedPractices practices={patient.indicated_practices} />
+                ),
               },
               {
                 header: "Teléfono",
@@ -376,4 +422,34 @@ function successMessage(
   }
   const owners = student ? `quedaron asignados a ${student.name}` : "quedaron en tu carga";
   return `${patients.length} pacientes ${owners}.`;
+}
+
+function PracticeFilter({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: Array<{ value: string; label: string }>;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger
+        aria-label={`Filtrar por ${label.toLowerCase()}`}
+        className="h-9 w-auto min-w-40 rounded-full border-slate-200 bg-slate-50 px-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+      >
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent className="max-h-72">
+        {options.map((option) => (
+          <SelectItem key={option.value} value={option.value}>
+            {option.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
 }

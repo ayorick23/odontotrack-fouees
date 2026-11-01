@@ -12,6 +12,7 @@ import {
   type FdiToothNumber,
   type OralGeneralMark,
   type OdontogramValue,
+  type PracticeArea,
   type ToothStatus,
 } from "../../types";
 import {
@@ -80,7 +81,7 @@ type OdontogramToolbarProps = {
   onOralMarksChange: (value: OdontogramValue) => void;
   readOnly: boolean;
   focusedFdi?: number | null;
-  clinicalAreas?: Array<{ slug: string; name: string }>;
+  clinicalAreas?: PracticeArea[];
   onClearFocus?: () => void;
 };
 
@@ -101,6 +102,9 @@ export function OdontogramToolbar({
       : undefined;
   const focusedOral = focused?.oralMarks ?? emptyOralMarks();
   const focusedPractice = focused?.practice ?? emptyPractice();
+  const focusedArea = clinicalAreas.find(
+    (area) => area.slug === focusedPractice.clinicalArea,
+  );
   const extrasOpen =
     focusedOral.placa ||
     focusedOral.sangrado ||
@@ -288,12 +292,9 @@ export function OdontogramToolbar({
                   }
                   onOralMarksChange(
                     updateTooth(value, fdi, {
-                      practice: {
-                        indicated: !focusedPractice.indicated,
-                        clinicalArea: focusedPractice.indicated
-                          ? null
-                          : focusedPractice.clinicalArea,
-                      },
+                      practice: focusedPractice.indicated
+                        ? emptyPractice()
+                        : { ...focusedPractice, indicated: true },
                     }),
                   );
                 }}
@@ -323,14 +324,41 @@ export function OdontogramToolbar({
                       }
                       onOralMarksChange(
                         updateTooth(value, fdi, {
+                          // El tratamiento anterior era de otra área.
                           practice: {
                             indicated: true,
                             clinicalArea: next || null,
+                            clinicalTreatment: null,
                           },
                         }),
                       );
                     }}
                   />
+                  {focusedArea ? (
+                    <div className="mt-2">
+                      <OdontogramFieldSelect
+                        label="Tratamiento"
+                        placeholder="Seleccionar tratamiento"
+                        disabled={readOnly}
+                        value={focusedPractice.clinicalTreatment ?? ""}
+                        options={focusedArea.treatments.map((treatment) => ({
+                          value: treatment.slug,
+                          label: treatment.name,
+                        }))}
+                        onChange={(next) => {
+                          const fdi = requireFocusedTooth();
+                          if (fdi == null) {
+                            return;
+                          }
+                          onOralMarksChange(
+                            updateTooth(value, fdi, {
+                              practice: { ...focusedPractice, clinicalTreatment: next || null },
+                            }),
+                          );
+                        }}
+                      />
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
             </div>
