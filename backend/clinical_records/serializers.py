@@ -11,6 +11,7 @@ from .catalog import (
     derive_oral_marks,
     is_fdi_tooth,
     normalize_tooth,
+    normalize_tooth_marks,
     pad_teeth,
 )
 from .models import (
@@ -133,7 +134,19 @@ class EvolucionClinicaSerializer(serializers.ModelSerializer):
 
 class ToothMarkSerializer(serializers.Serializer):
     layer = serializers.ChoiceField(choices=ToothLayer.choices)
-    status = serializers.ChoiceField(choices=ToothStatus.choices)
+    # Nulo solo con tratamiento sin dibujo (p. ej. diagnóstico).
+    status = serializers.ChoiceField(
+        choices=ToothStatus.choices,
+        required=False,
+        allow_null=True,
+    )
+    # Slug del tarifario. Solo en Plan y Hecho.
+    treatment = serializers.CharField(
+        required=False,
+        allow_null=True,
+        allow_blank=True,
+        max_length=80,
+    )
     surfaces = serializers.ListField(
         child=serializers.ChoiceField(choices=ToothSurface.choices),
         required=False,
@@ -147,27 +160,10 @@ class ToothOralMarksSerializer(serializers.Serializer):
     sarro = serializers.BooleanField(required=False, default=False)
 
 
-class ToothPracticeSerializer(serializers.Serializer):
-    indicated = serializers.BooleanField(required=False, default=False)
-    clinicalArea = serializers.CharField(
-        required=False,
-        allow_null=True,
-        allow_blank=True,
-        max_length=80,
-    )
-    clinicalTreatment = serializers.CharField(
-        required=False,
-        allow_null=True,
-        allow_blank=True,
-        max_length=80,
-    )
-
-
 class ToothFindingSerializer(serializers.Serializer):
     fdi = serializers.IntegerField()
     marks = ToothMarkSerializer(many=True, required=False)
     oralMarks = ToothOralMarksSerializer(required=False)
-    practice = ToothPracticeSerializer(required=False)
     status = serializers.ChoiceField(
         choices=ToothStatus.choices,
         required=False,
@@ -192,34 +188,38 @@ class ToothFindingSerializer(serializers.Serializer):
         return normalize_tooth(attrs)
 
 
-def validate_practice_treatments(teeth: list[dict]) -> None:
-    """El tratamiento indicado en cada pieza existe y es del área elegida.
+def apply_mark_treatments(teeth: list[dict]) -> None:
+    """Cada tratamiento existe en el tarifario y define el símbolo.
 
-    Una sola consulta para todas las piezas.
+    El estado (símbolo) de una marca con tratamiento lo pone el
+    tarifario, no el cliente: así el dibujo siempre corresponde al
+    tratamiento. Una sola consulta para todas las piezas.
     """
-    practices = [
-        (tooth["fdi"], tooth["practice"])
+    slugs = {
+        mark["treatment"]
         for tooth in teeth
-        if tooth["practice"]["clinicalTreatment"]
-    ]
-    if not practices:
+        for mark in tooth["marks"]
+        if mark.get("treatment")
+    }
+    if not slugs:
         return
-    slugs = {practice["clinicalTreatment"] for _, practice in practices}
-    area_by_treatment = dict(
+    status_by_slug = dict(
         ClinicalTreatment.objects.filter(slug__in=slugs).values_list(
-            "slug", "area__slug"
+            "slug", "odontogram_status"
         )
     )
-    for fdi, practice in practices:
-        area = area_by_treatment.get(practice["clinicalTreatment"])
-        if area is None:
-            raise serializers.ValidationError(
-                f"Pieza {fdi}: el tratamiento no existe en el catálogo."
-            )
-        if area != practice["clinicalArea"]:
-            raise serializers.ValidationError(
-                f"Pieza {fdi}: el tratamiento no corresponde al área clínica."
-            )
+    for tooth in teeth:
+        for mark in tooth["marks"]:
+            slug = mark.get("treatment")
+            if not slug:
+                continue
+            if slug not in status_by_slug:
+                raise serializers.ValidationError(
+                    f"Pieza {tooth['fdi']}: el tratamiento no existe en el catálogo."
+                )
+            mark["status"] = status_by_slug[slug] or None
+        # El símbolo pudo cambiar (p. ej. a extraído, que ocupa la pieza).
+        tooth["marks"] = normalize_tooth_marks(tooth["marks"])
 
 
 class OdontogramSerializer(serializers.ModelSerializer):
@@ -245,7 +245,7 @@ class OdontogramSerializer(serializers.ModelSerializer):
         unknown = set(numbers) - FDI_ALL_TOOTH_NUMBER_SET
         if unknown:
             raise serializers.ValidationError("Número FDI inválido.")
-        validate_practice_treatments(value)
+        apply_mark_treatments(value)
         padded = pad_teeth(value)
         derived = derive_oral_marks(padded)
         self.context["derived_oral_marks"] = derived

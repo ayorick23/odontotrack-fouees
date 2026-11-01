@@ -1,7 +1,8 @@
-import { Save, Undo2 } from "lucide-react";
+import { RotateCcw, Save, Undo2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
+import { UnsavedChangesGuard } from "../../components/UnsavedChangesGuard";
 import { Odontogram } from "../../features/clinical-records/components/Odontogram";
 import { OdontogramExportButtons } from "../../features/clinical-records/components/Odontogram/OdontogramExportButtons";
 import { useOdontogramData } from "../../features/clinical-records/hooks/useOdontogramData";
@@ -38,6 +39,8 @@ export function PatientOdontogramSection({
     value,
     onChange,
     save,
+    undo,
+    canUndo,
     discard,
     reload,
     loadStatus,
@@ -77,16 +80,22 @@ export function PatientOdontogramSection({
     .filter(([, active]) => active)
     .map(([mark]) => ORAL_GENERAL_MARK_LABELS[mark]);
 
-  const handleSave = useCallback(async () => {
+  /** Devuelve false si no se pudo guardar (el aviso de salida lo usa). */
+  const handleSave = useCallback(async (): Promise<boolean> => {
     try {
       await save();
-      const items = await listOdontogramHistory(patientId);
-      setRevisions(items);
-      setViewingRevisionId(null);
-      toast.success("Odontograma guardado.");
     } catch {
       toast.error("No se pudo guardar el odontograma.");
+      return false;
     }
+    toast.success("Odontograma guardado.");
+    try {
+      setRevisions(await listOdontogramHistory(patientId));
+    } catch {
+      // El guardado ya se hizo; el historial se refresca al volver.
+    }
+    setViewingRevisionId(null);
+    return true;
   }, [patientId, save]);
 
   useEffect(() => {
@@ -94,19 +103,37 @@ export function PatientOdontogramSection({
       return;
     }
     function onKeyDown(event: KeyboardEvent) {
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
+      if (!(event.ctrlKey || event.metaKey)) {
+        return;
+      }
+      const key = event.key.toLowerCase();
+      if (key === "s") {
         event.preventDefault();
         if (isDirty && !isSaving && loadStatus === "ready") {
           void handleSave();
         }
+        return;
+      }
+      // En un campo de texto, Ctrl+Z es el deshacer del propio campo.
+      const target = event.target as HTMLElement | null;
+      const typing =
+        target?.closest("input, textarea, select, [contenteditable='true']") != null;
+      if (key === "z" && !event.shiftKey && !typing && viewingRevisionId == null) {
+        event.preventDefault();
+        undo();
       }
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [handleSave, isDirty, isSaving, loadStatus, readOnly]);
+  }, [handleSave, isDirty, isSaving, loadStatus, readOnly, undo, viewingRevisionId]);
 
   return (
     <section className={cardClass}>
+      <UnsavedChangesGuard
+        when={isDirty && !readOnly && loadStatus === "ready"}
+        subject="el odontograma"
+        onSave={handleSave}
+      />
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-base font-semibold text-slate-800 dark:text-slate-100">
@@ -165,14 +192,25 @@ export function PatientOdontogramSection({
               <button
                 type="button"
                 className={secondaryActionClass}
-                disabled={!isDirty || isSaving || loadStatus !== "ready"}
-                onClick={() => {
-                  discard();
-                  toast.message("Cambios deshechos.");
-                }}
+                title="Deshacer el último cambio (Ctrl+Z)"
+                disabled={!canUndo || isSaving || loadStatus !== "ready"}
+                onClick={undo}
               >
                 <Undo2 className="size-4" />
                 Deshacer
+              </button>
+              <button
+                type="button"
+                className={secondaryActionClass}
+                title="Volver a lo último guardado"
+                disabled={!isDirty || isSaving || loadStatus !== "ready"}
+                onClick={() => {
+                  discard();
+                  toast.message("Cambios descartados.");
+                }}
+              >
+                <RotateCcw className="size-4" />
+                Descartar cambios
               </button>
               <button
                 type="button"

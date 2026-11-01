@@ -52,6 +52,9 @@ CLAIM = ActionSpec("claim", "Elegir paciente")
 CHANGE_STATUS = ActionSpec("change_status", "Cambiar estado")
 RELEASE = ActionSpec("release", "Liberar paciente")
 UPDATE = ActionSpec("update", "Actualizar")
+# Estadísticas de toda la facultad en el dashboard (por área, demanda del
+# banco, series). Admin la tiene por tener todo; se puede dar a otro rol.
+FACULTY = ActionSpec("faculty", "Ver estadísticas de la facultad")
 
 PERMISSION_CATALOG: Final[tuple[SectionSpec, ...]] = (
     SectionSpec(
@@ -62,7 +65,7 @@ PERMISSION_CATALOG: Final[tuple[SectionSpec, ...]] = (
                 key="dashboard",
                 label="Dashboard",
                 description="Indicadores y resumen del banco de pacientes.",
-                actions=(VIEW,),
+                actions=(VIEW, FACULTY),
             ),
             ModuleSpec(
                 key="notifications",

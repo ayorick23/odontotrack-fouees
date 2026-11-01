@@ -323,3 +323,156 @@ class DashboardIndicatorsTests(APITestCase):
             body["digitalization"], {"percent": None, "count": 0, "total": 0}
         )
 
+
+
+class DashboardOverviewTests(APITestCase):
+    """Dashboard por rol: cada bloque sale según los permisos ACL."""
+
+    URL = "/api/dashboard/overview/"
+    BLOCKS = ("my_cases", "supervision", "bank", "faculty", "accounts")
+
+    def setUp(self):
+        from assignments.models import Appointment
+        from catalogs.models import ClinicalTreatment
+
+        sync_acl()
+        self.student = self._user("est-ov", User.Role.ESTUDIANTE, "Lucía", "Zepeda")
+        self.other = self._user("est-ov-2", User.Role.ESTUDIANTE, "Mario", "Ruiz")
+
+        # Caso activo con cita en 2 días y otro sin cita.
+        self.soon = Patient.objects.create(first_name="Ana", last_name="Pronto", dui="OV-1")
+        self.later = Patient.objects.create(first_name="Beto", last_name="Sincita", dui="OV-2")
+        soon_assignment = Assignment.objects.create(patient=self.soon, student=self.student)
+        Assignment.objects.create(patient=self.later, student=self.student)
+        now = timezone.now()
+        Appointment.objects.create(assignment=soon_assignment, starts_at=now + timedelta(days=2))
+        # Fuera de los 7 días: cuenta como próxima cita del caso, no en la semana.
+        Appointment.objects.create(assignment=soon_assignment, starts_at=now + timedelta(days=20))
+        Diagnostico.objects.create(patient=self.soon, student=self.student, content="Caries.")
+        Diagnostico.objects.create(
+            patient=self.soon, student=self.student, content="Ok.", is_validated=True
+        )
+        # Lo del otro estudiante no cuenta como suyo.
+        others = Patient.objects.create(first_name="Otro", last_name="Caso", dui="OV-3")
+        Assignment.objects.create(patient=others, student=self.other)
+        Diagnostico.objects.create(patient=others, student=self.other, content="X.")
+        Odontogram.objects.create(
+            patient=self.soon,
+            teeth=[
+                {"fdi": 16, "marks": [
+                    {"layer": "hecho", "status": "obturado", "surfaces": ["oclusal"],
+                     "treatment": "resina"},
+                    {"layer": "plan", "status": "endodoncia", "surfaces": [],
+                     "treatment": "endo"},
+                ]},
+            ],
+        )
+
+        # Banco: dos disponibles con plan; un plan "hecho" no es demanda.
+        self.endo = ClinicalTreatment.objects.filter(odontogram_status="endodoncia").first()
+        for index in range(2):
+            patient = Patient.objects.create(
+                first_name="Banco", last_name=str(index), dui=f"OV-B{index}"
+            )
+            Odontogram.objects.create(
+                patient=patient,
+                teeth=[{"fdi": 18, "marks": [
+                    {"layer": "plan", "status": "endodoncia", "surfaces": [],
+                     "treatment": self.endo.slug},
+                ]}],
+            )
+
+    def _user(self, username, role, first="", last=""):
+        return User.objects.create_user(
+            username=username, password="pass12345", role=role,
+            first_name=first, last_name=last,
+        )
+
+    def get(self, user):
+        self.client.force_authenticate(user=user)
+        response = self.client.get(self.URL)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        return response.json()
+
+    def visible(self, body):
+        return {block for block in self.BLOCKS if body[block] is not None}
+
+    def test_each_role_sees_its_blocks(self):
+        expected = {
+            User.Role.ESTUDIANTE: {"my_cases"},
+            User.Role.DOCENTE: {"supervision"},
+            User.Role.RECEPCION: {"bank"},
+            User.Role.SOPORTE: {"accounts"},
+            # Admin no atiende casos: todo menos "mis casos".
+            User.Role.ADMIN: {"supervision", "bank", "faculty", "accounts"},
+        }
+        for role, blocks in expected.items():
+            user = self.student if role == User.Role.ESTUDIANTE else self._user(f"ov-{role}", role)
+            self.assertEqual(self.visible(self.get(user)), blocks, role)
+
+    def test_my_cases(self):
+        block = self.get(self.student)["my_cases"]
+        # El que tiene cita va primero; la próxima cita es la más cercana.
+        self.assertEqual(
+            [case["patient_name"] for case in block["cases"]], ["Ana Pronto", "Beto Sincita"]
+        )
+        self.assertIsNotNone(block["cases"][0]["next_appointment"])
+        self.assertIsNone(block["cases"][1]["next_appointment"])
+        self.assertEqual(len(block["upcoming_appointments"]), 1)
+        self.assertEqual(block["upcoming_appointments"][0]["patient_id"], self.soon.id)
+        self.assertEqual(block["diagnoses_awaiting_validation"], 1)
+        self.assertEqual(block["bank_available"], 2)
+        self.assertEqual(block["done_treatments_in_my_cases"], 1)
+
+    def test_supervision_counts_the_validation_queue(self):
+        block = self.get(self._user("doc-ov", User.Role.DOCENTE))["supervision"]
+        self.assertEqual(block["diagnoses_to_validate"], 2)
+        self.assertEqual(block["cases_in_progress"], 3)
+        self.assertEqual(block["students_with_active_cases"], 2)
+        self.assertEqual(block["indicators"]["validated_diagnoses"]["count"], 1)
+
+    def test_bank(self):
+        from assignments.models import Appointment
+
+        today = timezone.localtime().replace(hour=23, minute=0)
+        Appointment.objects.create(
+            assignment=Assignment.objects.get(patient=self.later), starts_at=today
+        )
+        block = self.get(self._user("rec-ov", User.Role.RECEPCION))["bank"]
+        self.assertEqual(block["unassigned"], 2)
+        self.assertEqual(block["registered_this_month"], Patient.objects.count())
+        self.assertEqual(
+            [row["student_name"] for row in block["today_appointments"]], ["Lucía Zepeda"]
+        )
+        # Asignados al momento de registrarse: espera ~0 días.
+        self.assertEqual(block["average_wait_days"], 0.0)
+
+    def test_faculty_bank_demand_counts_only_available_patients(self):
+        block = self.get(self._user("adm-ov", User.Role.ADMIN))["faculty"]
+        # El plan del caso asignado ("endo" de Ana) no está en el banco.
+        self.assertEqual(
+            block["bank_demand"],
+            [{"treatment": self.endo.slug, "name": self.endo.name,
+              "area": self.endo.area.name, "count": 2}],
+        )
+        sin_area = next(row for row in block["by_area"] if row["area"] == "Sin área")
+        self.assertEqual(sin_area["pendiente"] + sin_area["en_proceso"], Patient.objects.count())
+
+    def test_accounts_by_role(self):
+        inactive = self._user("inactivo", User.Role.RECEPCION)
+        inactive.is_active = False
+        inactive.save(update_fields=["is_active"])
+        block = self.get(self._user("sop-ov", User.Role.SOPORTE))["accounts"]
+        by_role = {row["role"]: row["count"] for row in block["active_by_role"]}
+        self.assertEqual(by_role[User.Role.ESTUDIANTE], 2)
+        self.assertEqual(block["inactive"], 1)
+
+    def test_series_all_time(self):
+        old = Patient.objects.create(first_name="Viejo", last_name="Registro", dui="OV-OLD")
+        Patient.objects.filter(pk=old.pk).update(
+            created_at=timezone.now() - timedelta(days=800)
+        )
+        self.client.force_authenticate(user=self._user("adm-series", User.Role.ADMIN))
+        months = self.client.get("/api/dashboard/series/", {"period": "todos"}).json()["months"]
+        self.assertGreater(len(months), 24)
+        self.assertEqual(sum(month["patients"] for month in months), Patient.objects.count())

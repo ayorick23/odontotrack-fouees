@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   OdontogramChartSurface,
   OdontogramProvider,
@@ -12,26 +12,28 @@ import {
   emptyOdontogram,
   hasPrimaryTeeth,
   isFdiToothNumber,
+  isToothStatus,
   withPrimaryTeeth,
   withoutPrimaryTeeth,
   type FdiToothNumber,
   type OdontogramValue,
+  type OdontogramView,
   type PracticeArea,
+  type ToothLayer,
 } from "../../types";
 import {
   applyPdfPatientName,
-  readActiveToothLayer,
+  applyToothLayer,
   readEngineChart,
   readSelectedFdi,
   subscribeEngine,
   writeEngineChart,
 } from "./engine";
-import { chartToDomain, domainKey, domainToChart, teethKey } from "./mapEngineState";
+import { domainKey, domainToChart, withEngineSnapshot } from "./mapEngineState";
 import { OdontogramChartMode } from "./OdontogramChartMode";
 import { OdontogramChartViews } from "./OdontogramChartViews";
 import { OdontogramClinicalPanel } from "./OdontogramClinicalPanel";
 import { OdontogramFindings } from "./OdontogramFindings";
-import { OdontogramPlanDiff } from "./OdontogramPlanDiff";
 import "./odontogram.css";
 import {
   FOUEES_ODONTOGRAM_THEME,
@@ -45,10 +47,14 @@ import {
  * FDI nativa y tipos TypeScript. Documentación:
  * https://github.com/ZoliQua/React-Odontogram-Modul
  *
+ * Las marcas (`value.teeth[].marks`) son la única fuente de verdad: el
+ * panel FOUEES las edita con funciones puras (edits.ts) y el dibujo se
+ * regenera desde ellas (domainToChart). Del motor solo se escucha lo que
+ * se edita en sus propias tarjetas (endo, orto, ICD-10, perio), que viaja
+ * en `visualSnapshot` sin tocar las marcas.
+ *
  * La app no debe importar OdontogramShell: si cambia la librería, solo se
- * reescribe esta carpeta. El gráfico y el panel FOUEES envuelven las cartas
- * clínicas (endo, perio, orto, ICD-10). PNG/PDF se exportan desde la barra
- * del expediente.
+ * reescribe esta carpeta. PNG/PDF se exportan desde la barra del expediente.
  */
 export type OdontogramProps = {
   value?: OdontogramValue;
@@ -59,6 +65,20 @@ export type OdontogramProps = {
   patientName?: string;
 };
 
+/** El motor solo distingue carta de estado y carta del plan. */
+function engineLayer(view: OdontogramView): ToothLayer {
+  return view === "plan" ? "plan" : "hallazgo";
+}
+
+function selectTile(fdi: number): void {
+  const tile = document.querySelector(
+    `.odontogram-fouees .tooth-tile[data-tooth="${fdi}"]`,
+  );
+  if (tile instanceof HTMLElement && !tile.classList.contains("active")) {
+    tile.click();
+  }
+}
+
 export function Odontogram({
   value,
   onChange,
@@ -67,21 +87,22 @@ export function Odontogram({
   patientName,
 }: OdontogramProps) {
   const onChangeRef = useRef(onChange);
-  const lastKeyRef = useRef("");
-  const lastTeethKeyRef = useRef("");
-  const lastDomainRef = useRef<OdontogramValue | undefined>(value);
-  const initialValueRef = useRef(value);
+  /** Último valor dibujado, con el snapshot tal como lo dejó el motor. */
+  const drawnRef = useRef<OdontogramValue | undefined>(undefined);
+  const drawnKeyRef = useRef("");
   const importingRef = useRef(false);
+  const [view, setView] = useState<OdontogramView>("diagnostico");
+  const viewRef = useRef<OdontogramView>("diagnostico");
   const [perioOpen, setPerioOpen] = useState(false);
   const [focusedFdi, setFocusedFdi] = useState<FdiToothNumber | null>(null);
+  const focusedRef = useRef<FdiToothNumber | null>(null);
   const [clinicalAreas, setClinicalAreas] = useState<PracticeArea[]>([]);
-  const practiceNames = useMemo(
+  const treatmentNames = useMemo(
     () =>
       Object.fromEntries(
-        clinicalAreas.flatMap((area) => [
-          [area.slug, area.name],
-          ...area.treatments.map((treatment) => [treatment.slug, treatment.name]),
-        ]),
+        clinicalAreas.flatMap((area) =>
+          area.treatments.map((treatment) => [treatment.slug, treatment.name]),
+        ),
       ) as Record<string, string>,
     [clinicalAreas],
   );
@@ -89,6 +110,10 @@ export function Odontogram({
   useEffect(() => {
     onChangeRef.current = onChange;
   }, [onChange]);
+
+  useEffect(() => {
+    focusedRef.current = focusedFdi;
+  }, [focusedFdi]);
 
   useEffect(() => {
     let cancelled = false;
@@ -101,7 +126,15 @@ export function Odontogram({
               name: area.name,
               treatments: area.treatments
                 .filter((treatment) => treatment.is_active)
-                .map((treatment) => ({ slug: treatment.slug, name: treatment.name })),
+                .map((treatment) => ({
+                  slug: treatment.slug,
+                  name: treatment.name,
+                  odontogramStatus:
+                    treatment.odontogram_status &&
+                    isToothStatus(treatment.odontogram_status)
+                      ? treatment.odontogram_status
+                      : null,
+                })),
             })),
           );
         }
@@ -122,72 +155,76 @@ export function Odontogram({
     }
   }, [patientName]);
 
+  const draw = useCallback((next: OdontogramValue) => {
+    importingRef.current = true;
+    try {
+      writeEngineChart(domainToChart(next), engineLayer(viewRef.current));
+    } finally {
+      importingRef.current = false;
+    }
+    // El motor completa el snapshot con sus valores por defecto: esa es la
+    // referencia, para que seleccionar un diente no cuente como cambio.
+    drawnRef.current = withEngineSnapshot(next, readEngineChart());
+    drawnKeyRef.current = domainKey(drawnRef.current);
+    // Redibujar borra la selección del motor; las tarjetas la necesitan.
+    if (focusedRef.current != null) {
+      selectTile(focusedRef.current);
+    }
+  }, []);
+
   useEffect(() => {
     const emit = () => {
       if (importingRef.current) {
         return;
       }
-      const previous = lastDomainRef.current;
-      const next = chartToDomain(readEngineChart(), {
-        previous,
-        activeLayer: readActiveToothLayer(),
-      });
-      const key = domainKey(next);
       const selected = readSelectedFdi();
       if (selected != null && isFdiToothNumber(selected)) {
         setFocusedFdi(selected);
       }
-      if (key === lastKeyRef.current) {
+      const drawn = drawnRef.current;
+      if (!drawn) {
         return;
       }
-      const changed = next.teeth.find((tooth) => {
-        const before = previous?.teeth.find((item) => item.fdi === tooth.fdi);
-        return JSON.stringify(tooth.marks) !== JSON.stringify(before?.marks);
-      });
-      if (changed && changed.marks.length > 0) {
-        setFocusedFdi(changed.fdi);
+      const next = withEngineSnapshot(drawn, readEngineChart());
+      const key = domainKey(next);
+      if (key === drawnKeyRef.current) {
+        return;
       }
-      lastKeyRef.current = key;
-      lastTeethKeyRef.current = teethKey(next);
-      lastDomainRef.current = next;
+      drawnRef.current = next;
+      drawnKeyRef.current = key;
       onChangeRef.current?.(next);
     };
-
-    const unsubscribe = subscribeEngine(emit);
-    const initialValue = initialValueRef.current;
-    if (initialValue) {
-      lastKeyRef.current = domainKey(initialValue);
-      lastTeethKeyRef.current = teethKey(initialValue);
-      lastDomainRef.current = initialValue;
-      importingRef.current = true;
-      writeEngineChart(domainToChart(initialValue));
-      importingRef.current = false;
-    } else {
-      emit();
-    }
-
-    return unsubscribe;
+    return subscribeEngine(emit);
   }, []);
 
   useEffect(() => {
     if (!value) {
       return;
     }
-    const key = domainKey(value);
-    if (key === lastKeyRef.current) {
+    // Lo que acaba de emitir el motor ya está dibujado.
+    if (domainKey(value) === drawnKeyRef.current) {
       return;
     }
-    lastKeyRef.current = key;
-    lastDomainRef.current = value;
-    const nextTeethKey = teethKey(value);
-    if (nextTeethKey === lastTeethKeyRef.current) {
-      return;
+    draw(value);
+  }, [value, draw]);
+
+  const changeView = (next: OdontogramView) => {
+    viewRef.current = next;
+    setView(next);
+    applyToothLayer(engineLayer(next));
+  };
+
+  const current = value ?? emptyOdontogram();
+  const planCounts = { pending: 0, done: 0 };
+  for (const tooth of current.teeth) {
+    for (const mark of tooth.marks) {
+      if (mark.layer === "plan") {
+        planCounts.pending += 1;
+      } else if (mark.layer === "hecho") {
+        planCounts.done += 1;
+      }
     }
-    lastTeethKeyRef.current = nextTeethKey;
-    importingRef.current = true;
-    writeEngineChart(domainToChart(value));
-    importingRef.current = false;
-  }, [value]);
+  }
 
   return (
     <div className="odontogram-fouees" aria-label="Odontograma FDI" translate="no">
@@ -212,23 +249,29 @@ export function Odontogram({
           }
         >
           <div className="min-w-0 space-y-3">
-            <OdontogramChartMode readOnly={readOnly} />
-            {readOnly || !value ? null : (
-              <label className="inline-flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
-                <input
-                  type="checkbox"
-                  checked={hasPrimaryTeeth(value)}
-                  onChange={(event) =>
-                    onChange?.(
-                      event.target.checked
-                        ? withPrimaryTeeth(value)
-                        : withoutPrimaryTeeth(value),
-                    )
-                  }
-                />
-                Dentición temporal / mixta
-              </label>
-            )}
+            <OdontogramChartMode
+              view={view}
+              onViewChange={changeView}
+              planCounts={planCounts}
+              readOnly={readOnly}
+            >
+              {readOnly || !value ? null : (
+                <label className="inline-flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                  <input
+                    type="checkbox"
+                    checked={hasPrimaryTeeth(value)}
+                    onChange={(event) =>
+                      onChange?.(
+                        event.target.checked
+                          ? withPrimaryTeeth(value)
+                          : withoutPrimaryTeeth(value),
+                      )
+                    }
+                  />
+                  Dentición temporal / mixta
+                </label>
+              )}
+            </OdontogramChartMode>
             <div
               className="odontogram-chart-wrap overflow-x-auto"
               onClick={(event) => {
@@ -268,27 +311,25 @@ export function Odontogram({
                 </div>
               </div>
             ) : null}
-            <div className="space-y-3">
-              <OdontogramPlanDiff
-                focusedFdi={focusedFdi}
-                onFocusTooth={setFocusedFdi}
-              />
-              <OdontogramFindings
-                value={value ?? emptyOdontogram()}
-                practiceNames={practiceNames}
-                focusedFdi={focusedFdi}
-                onFocusTooth={setFocusedFdi}
-              />
-            </div>
+            <OdontogramFindings
+              value={current}
+              treatmentNames={treatmentNames}
+              focusedFdi={focusedFdi}
+              onFocusTooth={setFocusedFdi}
+              onChange={readOnly ? undefined : onChange}
+              onViewChange={changeView}
+            />
           </div>
           {readOnly ? null : (
             <OdontogramClinicalPanel
-              value={value ?? emptyOdontogram()}
-              onOralMarksChange={(next) => onChange?.(next)}
+              value={current}
+              onChange={(next) => onChange?.(next)}
               readOnly={readOnly}
+              view={view}
               onOpenPerio={() => setPerioOpen(true)}
               focusedFdi={focusedFdi}
               clinicalAreas={clinicalAreas}
+              treatmentNames={treatmentNames}
               onClearFocus={() => setFocusedFdi(null)}
             />
           )}

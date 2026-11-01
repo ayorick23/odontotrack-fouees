@@ -41,10 +41,12 @@ export type PatientListItem = {
 
 export type IndicatedPractice = {
   tooth: number;
-  /** Slug del tratamiento; null si la pieza solo tiene área. */
-  treatment: string | null;
+  /** Slug del tratamiento del tarifario. */
+  treatment: string;
   /** "18 · Endodoncia monorradicular" */
   label: string;
+  /** Coincide con la búsqueda o los filtros; el backend las pone primero. */
+  matched?: boolean;
 };
 
 /** Filtros "pieza + tratamiento" (directorio y disponibles). */

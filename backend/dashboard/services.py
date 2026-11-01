@@ -9,6 +9,8 @@ from patients.models import PERIOD_DAYS, Patient
 from .scoping import DashboardScope
 
 DEFAULT_SERIES_DAYS = PERIOD_DAYS["1a"]
+# Sin filtro de fecha (idea de la rama feature/dashboard-metricas).
+ALL_TIME = "todos"
 MONTH_LABELS = (
     "",
     "Ene",
@@ -89,15 +91,22 @@ def _status_counts_by_month(queryset) -> dict[date, dict[str, int]]:
 
 
 def build_dashboard_series(period: str | None, scope: DashboardScope) -> dict:
-    start = _period_start(period)
-    start_date = _as_local_date(start)
+    """Series por mes. Sin período: último año; "todos": desde el primer
+    registro."""
     today = timezone.localdate()
-
-    patients = scope.patients.filter(created_at__gte=start)
-    assignments = scope.assignments.filter(created_at__gte=start)
+    patients = scope.patients
+    assignments = scope.assignments
+    if period != ALL_TIME:
+        start = _period_start(period)
+        patients = patients.filter(created_at__gte=start)
+        assignments = assignments.filter(created_at__gte=start)
 
     assignment_counts = _counts_by_month(assignments, "created_at")
     status_by_month = _status_counts_by_month(patients)
+    if period == ALL_TIME:
+        start_date = min([*status_by_month, *assignment_counts], default=today)
+    else:
+        start_date = _as_local_date(start)
     empty_status = {status: 0 for status in Patient.CaseStatus.values}
 
     months = []

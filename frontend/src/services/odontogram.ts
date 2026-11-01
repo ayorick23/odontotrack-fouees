@@ -2,7 +2,6 @@ import { api } from "./api";
 import {
   deriveOralMarks,
   emptyOralMarks,
-  emptyPractice,
   emptyTooth,
   isFdiToothNumber,
   type OdontogramSnapshot,
@@ -82,7 +81,6 @@ function toDomain(
         ...tooth,
         marks: tooth.marks ?? [],
         oralMarks: { ...emptyOralMarks(), ...tooth.oralMarks },
-        practice: { ...emptyPractice(), ...tooth.practice },
       },
     ];
   });

@@ -56,7 +56,7 @@ describe("useOdontogramData", () => {
     expect(result.current.isDirty).toBe(false);
   });
 
-  it("deshace los cambios no guardados", async () => {
+  it("descarta todos los cambios no guardados", async () => {
     const loaded = emptyOdontogram();
     loaded.oralMarks.placa = true;
     api.getOdontogram.mockResolvedValue(loaded);
@@ -86,5 +86,45 @@ describe("useOdontogramData", () => {
       sarro: false,
     });
     expect(result.current.editorKey).toBe(1);
+  });
+
+  it("deshace paso a paso y la pila se vacía al guardar", async () => {
+    const loaded = emptyOdontogram();
+    api.getOdontogram.mockResolvedValue(loaded);
+    api.saveOdontogram.mockImplementation(
+      async (_id: number, value: typeof loaded) => value,
+    );
+    const { result } = renderHook(() => useOdontogramData(7));
+    await waitFor(() => {
+      expect(result.current.loadStatus).toBe("ready");
+    });
+    expect(result.current.canUndo).toBe(false);
+
+    const step = (placa: boolean, sarro: boolean) =>
+      act(() => {
+        result.current.onChange({
+          ...result.current.value,
+          oralMarks: { placa, sangrado: false, sarro },
+        });
+      });
+    step(true, false);
+    step(true, true);
+
+    act(() => result.current.undo());
+    expect(result.current.value.oralMarks).toEqual({
+      placa: true,
+      sangrado: false,
+      sarro: false,
+    });
+    act(() => result.current.undo());
+    expect(result.current.value.oralMarks.placa).toBe(false);
+    expect(result.current.isDirty).toBe(false);
+    expect(result.current.canUndo).toBe(false);
+
+    step(true, false);
+    await act(async () => {
+      await result.current.save();
+    });
+    expect(result.current.canUndo).toBe(false);
   });
 });

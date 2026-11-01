@@ -92,21 +92,6 @@ WHOLE_TOOTH_STATUSES = frozenset(
     }
 )
 
-HECHO_STATUSES = frozenset(
-    {
-        ToothStatus.OBTURADO,
-        ToothStatus.SELLANTE,
-        ToothStatus.RESTAURACION_TEMPORAL,
-        ToothStatus.ENDODONCIA,
-        ToothStatus.PULPOTOMIA,
-        ToothStatus.CORONA,
-        ToothStatus.PUENTE,
-        ToothStatus.IMPLANTE,
-        ToothStatus.EXTRAIDO,
-    }
-)
-
-
 def is_fdi_permanent_tooth(number: int) -> bool:
     return number in FDI_TOOTH_NUMBER_SET
 
@@ -123,10 +108,6 @@ def empty_oral_marks() -> dict:
     return {"placa": False, "sangrado": False, "sarro": False}
 
 
-def empty_practice() -> dict:
-    return {"indicated": False, "clinicalArea": None, "clinicalTreatment": None}
-
-
 def normalize_oral_marks(raw: dict | None) -> dict:
     source = raw or {}
     return {
@@ -134,24 +115,6 @@ def normalize_oral_marks(raw: dict | None) -> dict:
         "sangrado": bool(source.get("sangrado")),
         "sarro": bool(source.get("sarro")),
     }
-
-
-def normalize_practice(raw: dict | None) -> dict:
-    source = raw or {}
-    indicated = bool(source.get("indicated"))
-    area = source.get("clinicalArea") or source.get("clinical_area")
-    if indicated and isinstance(area, str) and area.strip():
-        # Tratamiento específico del catálogo (p. ej. endodoncia
-        # monorradicular): es lo que el directorio muestra y filtra.
-        treatment = source.get("clinicalTreatment") or source.get("clinical_treatment")
-        if not (isinstance(treatment, str) and treatment.strip()):
-            treatment = None
-        return {
-            "indicated": True,
-            "clinicalArea": area.strip(),
-            "clinicalTreatment": treatment.strip() if treatment else None,
-        }
-    return empty_practice()
 
 
 def derive_oral_marks(teeth: list[dict]) -> dict:
@@ -170,16 +133,7 @@ def has_clinical_content(teeth: list[dict] | None) -> bool:
         oral = tooth.get("oralMarks") or {}
         if any(oral.get(key) for key in ("placa", "sangrado", "sarro")):
             return True
-        practice = tooth.get("practice") or {}
-        if practice.get("indicated"):
-            return True
     return False
-
-
-def default_layer_for_status(status: str) -> str:
-    if status in HECHO_STATUSES:
-        return ToothLayer.HECHO
-    return ToothLayer.HALLAZGO
 
 
 def combine_tooth_statuses(status: str, statuses: list[str] | None) -> list[str]:
@@ -218,23 +172,58 @@ def _unique_surfaces(surfaces: list[str] | None) -> list[str]:
     return [surface for surface in SURFACE_CODE_ORDER if surface in seen]
 
 
+# Capas en las que una marca lleva tratamiento del tarifario. En Plan es
+# lo que el estudiante va a practicar (y lo que lista el banco de
+# pacientes); en Hecho queda como historial de qué se hizo.
+TREATMENT_LAYERS = frozenset({ToothLayer.PLAN, ToothLayer.HECHO})
+
+
+def _treatment_slug(raw: dict) -> str | None:
+    value = raw.get("treatment")
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return None
+
+
 def normalize_tooth_mark(raw: dict) -> dict | None:
-    status = raw.get("status") or ToothStatus.SANO
+    """Una marca: capa + estado (símbolo) + superficies [+ tratamiento].
+
+    Con tratamiento, el estado puede faltar: el tratamiento no tiene
+    dibujo (diagnóstico, profilaxis...) y solo se lista. Sin tratamiento,
+    una marca sin estado o "sano" no aporta nada y se descarta.
+    """
+    status = raw.get("status") or None
     if status == ToothStatus.SANO:
-        return None
-    layer = raw.get("layer") or default_layer_for_status(status)
+        status = None
+    layer = raw.get("layer")
     if layer not in ToothLayer.values:
-        layer = default_layer_for_status(status)
+        layer = ToothLayer.HALLAZGO if status else ToothLayer.PLAN
+    treatment = _treatment_slug(raw) if layer in TREATMENT_LAYERS else None
+    if layer == ToothLayer.HECHO and treatment is None:
+        # "Hecho" es un tratamiento del plan ya realizado. Lo que el
+        # paciente trae de antes (una corona de otra clínica) es parte del
+        # diagnóstico: así no hay dos lugares para marcar lo mismo.
+        layer = ToothLayer.HALLAZGO
+    if status is None and treatment is None:
+        return None
     surfaces = (
         []
-        if status in WHOLE_TOOTH_STATUSES
+        if status is None or status in WHOLE_TOOTH_STATUSES
         else _unique_surfaces(raw.get("surfaces"))
     )
-    return {"layer": layer, "status": status, "surfaces": surfaces}
+    mark = {"layer": layer, "status": status, "surfaces": surfaces}
+    if treatment:
+        mark["treatment"] = treatment
+    return mark
 
 
-def _mark_key(mark: dict) -> tuple[str, str, tuple[str, ...]]:
-    return (mark["layer"], mark["status"], tuple(mark["surfaces"]))
+def _mark_key(mark: dict) -> tuple:
+    return (
+        mark["layer"],
+        mark["status"],
+        tuple(mark["surfaces"]),
+        mark.get("treatment"),
+    )
 
 
 def apply_layer_exclusivity(marks: list[dict]) -> list[dict]:
@@ -256,7 +245,7 @@ def apply_layer_exclusivity(marks: list[dict]) -> list[dict]:
 
 def normalize_tooth_marks(raw_marks: list[dict] | None) -> list[dict]:
     marks: list[dict] = []
-    seen: set[tuple[str, str, tuple[str, ...]]] = set()
+    seen: set[tuple] = set()
     for raw in raw_marks or []:
         mark = normalize_tooth_mark(raw)
         if mark is None:
@@ -278,7 +267,7 @@ def migrate_legacy_tooth(raw: dict) -> list[dict]:
     return normalize_tooth_marks(
         [
             {
-                "layer": default_layer_for_status(status),
+                "layer": ToothLayer.HALLAZGO,
                 "status": status,
                 "surfaces": [] if status in WHOLE_TOOTH_STATUSES else surfaces,
             }
@@ -302,7 +291,6 @@ def normalize_tooth(raw: dict) -> dict:
         "oralMarks": normalize_oral_marks(
             raw.get("oralMarks") or raw.get("oral_marks")
         ),
-        "practice": normalize_practice(raw.get("practice")),
     }
 
 
@@ -311,7 +299,6 @@ def empty_tooth(number: int) -> dict:
         "fdi": number,
         "marks": [],
         "oralMarks": empty_oral_marks(),
-        "practice": empty_practice(),
     }
 
 
@@ -332,4 +319,4 @@ def pad_teeth(teeth: list[dict]) -> list[dict]:
 
 
 def tooth_statuses(tooth: dict) -> list[str]:
-    return [mark["status"] for mark in tooth.get("marks") or []]
+    return [mark["status"] for mark in tooth.get("marks") or [] if mark["status"]]

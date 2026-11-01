@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -90,24 +90,13 @@ vi.mock("react-advanced-odontogram", () => ({
   OdontogramProvider: ({ children }: { children: ReactNode }) => (
     <div>{children}</div>
   ),
+  // Como la librería real: el clic en un diente solo lo selecciona.
   OdontogramChartSurface: () => (
-    <button
-      type="button"
-      onClick={() => {
-        engine.setChart({
-          version: 2.2,
-          teeth: {
-            "16": {
-              toothSelection: "tooth-base",
-              caries: ["caries-occlusal"],
-            },
-          },
-        });
-        engine.notify();
-      }}
-    >
-      Marcar diente 16
-    </button>
+    <div className="tooth-tile" data-tooth="16">
+      <button type="button" onClick={() => engine.notify()}>
+        Marcar diente 16
+      </button>
+    </div>
   ),
   PerioChart: ({ open }: { open?: boolean }) =>
     open ? <div>Carta periodontal</div> : null,
@@ -116,7 +105,6 @@ vi.mock("react-advanced-odontogram", () => ({
   getActiveDiagnoses: engine.getActiveDiagnoses,
   setPulpEndoForSelection: engine.setPulpEndoForSelection,
   setApicalDxForSelection: engine.setApicalDxForSelection,
-  setCalculusForSelection: engine.setCalculusForSelection,
   setModForSelection: engine.setModForSelection,
   setOrthoApplianceForSelection: engine.setOrthoApplianceForSelection,
   setOrthoDriftForSelection: engine.setOrthoDriftForSelection,
@@ -139,17 +127,9 @@ vi.mock("react-advanced-odontogram", () => ({
     engine.setChart(payload as Record<string, unknown>);
     engine.notify();
   },
-  getChartMode: engine.getChartMode,
   setChartMode: engine.setChartMode,
-  getPlanChanges: engine.getPlanChanges,
   getPlanChart: engine.getPlanChart,
   setPlanChart: engine.setPlanChart,
-  setToothSelectionForSelection: engine.setToothSelectionForSelection,
-  setRestorationForSelection: engine.setRestorationForSelection,
-  setCariesSurfaceForSelection: engine.setCariesSurfaceForSelection,
-  setFillingMaterialForSelection: engine.setFillingMaterialForSelection,
-  setFillingSurfaceForSelection: engine.setFillingSurfaceForSelection,
-  resetTooth: engine.resetTooth,
   setWisdomVisible: engine.setWisdomVisible,
   setShowBase: engine.setShowBase,
   setOcclusalVisible: engine.setOcclusalVisible,
@@ -164,26 +144,90 @@ vi.mock("react-advanced-odontogram/style.css", () => ({}));
 
 vi.mock("../../../../services/catalogs", () => ({
   listClinicalAreas: vi.fn(async () => [
-    { slug: "operatoria", name: "Operatoria", id: 1, is_active: true, sort_order: 1, treatments: [] },
+    {
+      slug: "endodoncia",
+      name: "Endodoncia",
+      id: 1,
+      is_active: true,
+      sort_order: 1,
+      treatments: [
+        {
+          id: 1,
+          slug: "endodoncia_monorradicular",
+          name: "Endodoncia monorradicular",
+          is_active: true,
+          sort_order: 1,
+          odontogram_status: "endodoncia",
+        },
+      ],
+    },
   ]),
 }));
 
-import { emptyOdontogram } from "../../types";
-import { applyToothLayer } from "./engine";
+// El Select de Radix no se puede operar en jsdom: un <select> nativo.
+vi.mock("./OdontogramFieldSelect", () => ({
+  OdontogramFieldSelect: ({
+    label,
+    value,
+    options = [],
+    onChange,
+  }: {
+    label: string;
+    value: string;
+    options?: Array<{ value: string; label: string }>;
+    onChange: (value: string) => void;
+  }) => (
+    <label>
+      {label}
+      <select value={value} onChange={(event) => onChange(event.target.value)}>
+        <option value="">—</option>
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  ),
+}));
+
+import { emptyOdontogram, type OdontogramValue } from "../../types";
 import { Odontogram } from "./Odontogram";
+
+/** Odontograma controlado, como en el expediente. */
+function Harness({
+  onChange,
+  initial,
+}: {
+  onChange?: (value: OdontogramValue) => void;
+  initial?: OdontogramValue;
+}) {
+  const [value, setValue] = useState(() => initial ?? emptyOdontogram());
+  return (
+    <Odontogram
+      value={value}
+      onChange={(next) => {
+        setValue(next);
+        onChange?.(next);
+      }}
+    />
+  );
+}
+
+function tooth16(value: OdontogramValue) {
+  return value.teeth.find((tooth) => tooth.fdi === 16);
+}
+
+function lastValue(onChange: ReturnType<typeof vi.fn>): OdontogramValue {
+  return onChange.mock.calls.at(-1)?.[0] as OdontogramValue;
+}
 
 describe("Odontogram wrapper", () => {
   beforeEach(() => {
     engine.listeners.length = 0;
     engine.setChart({ version: 2.2, teeth: {} });
-    applyToothLayer("hallazgo");
     engine.setChartMode("status");
     engine.setChartMode.mockClear();
-    engine.resetTooth.mockClear();
-    engine.setToothSelectionForSelection.mockClear();
-    engine.setCariesSurfaceForSelection.mockClear();
-    engine.setFillingMaterialForSelection.mockClear();
-    engine.getPlanChanges.mockReturnValue([]);
     engine.exportFhir.mockClear();
     engine.exportPdf.mockClear();
     engine.exportImage.mockClear();
@@ -201,57 +245,170 @@ describe("Odontogram wrapper", () => {
     expect(screen.getByRole("button", { name: "Oclusal" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Hueso" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Pulpa" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Hallazgo" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Plan" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Hecho" })).toBeInTheDocument();
+    // Dos vistas; "Hecho" ya no es una pestaña aparte.
+    expect(screen.getByRole("button", { name: "Diagnóstico" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: "Plan de tratamiento" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Hecho" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Exportar PNG" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "FHIR" })).not.toBeInTheDocument();
   });
 
   it("en solo lectura oculta el panel clínico y deja dientes y hallazgos", () => {
     const value = emptyOdontogram();
-    const tooth = value.teeth.find((item) => item.fdi === 16);
+    const tooth = tooth16(value);
     if (tooth) {
-      tooth.marks = [{ layer: "hecho", status: "implante", surfaces: [] }];
-      tooth.oralMarks = { placa: false, sangrado: false, sarro: false };
-      tooth.practice = { indicated: false, clinicalArea: null, clinicalTreatment: null };
+      tooth.marks = [
+        { layer: "hallazgo", status: "caries", surfaces: ["oclusal"] },
+        {
+          layer: "hecho",
+          status: "endodoncia",
+          surfaces: [],
+          treatment: "endodoncia_monorradicular",
+        },
+      ];
     }
 
     render(<Odontogram value={value} readOnly />);
 
-    expect(
-      screen.getByRole("button", { name: "Marcar diente 16" }),
-    ).toBeInTheDocument();
-    expect(screen.getByLabelText("Hallazgos del odontograma")).toHaveTextContent(
-      "16 Implante",
+    expect(screen.getByLabelText("Diagnóstico")).toHaveTextContent("16 Caries O");
+    // Lo realizado se lista dentro del plan.
+    expect(screen.getByLabelText("Plan de tratamiento")).toHaveTextContent(
+      /16 endodoncia/i,
     );
-    expect(screen.getByLabelText("Hecho")).toBeInTheDocument();
-    expect(screen.queryByRole("tab", { name: "Tratamiento" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Caries" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Exportar PNG" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Registros especializados")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Quitar/ })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Volver a pendiente/ }),
+    ).not.toBeInTheDocument();
   });
 
-  it("abre el panel de tratamiento al marcar un diente", async () => {
+  it("abre el panel de tratamiento al seleccionar un diente", async () => {
     const user = userEvent.setup();
     render(<Odontogram />);
     await user.click(screen.getByRole("button", { name: "Marcar diente 16" }));
+    expect(screen.getByText("Diente 16")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Caries" })).toBeInTheDocument();
-    expect(screen.getByText("Patología")).toBeInTheDocument();
-    expect(screen.getByText("Pieza")).toBeInTheDocument();
     expect(screen.getByLabelText("Superficies del diente")).toBeInTheDocument();
   });
 
-  it("cambia al modo plan de tratamiento", async () => {
+  it("seleccionar un diente no cuenta como cambio", async () => {
     const user = userEvent.setup();
-    render(<Odontogram />);
-    await user.click(screen.getByRole("button", { name: "Plan" }));
+    const onChange = vi.fn();
+    render(<Harness onChange={onChange} />);
+    await user.click(screen.getByRole("button", { name: "Marcar diente 16" }));
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("guarda el estado marcado y lo dibuja (endodoncia ya no se pierde)", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<Harness onChange={onChange} />);
+    await user.click(screen.getByRole("button", { name: "Marcar diente 16" }));
+    await user.click(screen.getByRole("button", { name: "Endodoncia" }));
+
+    expect(tooth16(lastValue(onChange))?.marks).toEqual([
+      { layer: "hallazgo", status: "endodoncia", surfaces: [] },
+    ]);
+    const drawn = (engine.getChart().teeth as Record<string, Record<string, unknown>>)["16"];
+    expect(drawn.endo).toBe("endo-filling");
+    expect(screen.getByRole("button", { name: "Endodoncia" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
+  it("caries y obturado conviven, cada uno con sus superficies", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<Harness onChange={onChange} />);
+    await user.click(screen.getByRole("button", { name: "Marcar diente 16" }));
+    await user.click(screen.getByRole("button", { name: "Caries" }));
+    await user.click(screen.getByRole("button", { name: "Obturado" }));
+
+    expect(tooth16(lastValue(onChange))?.marks.map((mark) => mark.status)).toEqual([
+      "caries",
+      "obturado",
+    ]);
+  });
+
+  it("en el plan agrega un tratamiento del tarifario y se marca como realizado", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<Harness onChange={onChange} />);
+    await user.click(screen.getByRole("button", { name: "Marcar diente 16" }));
+    await user.click(screen.getByRole("button", { name: "Plan de tratamiento" }));
     expect(engine.setChartMode).toHaveBeenCalledWith("plan");
+    expect(
+      screen.queryByRole("button", { name: "Indicado para práctica" }),
+    ).not.toBeInTheDocument();
+
+    await user.selectOptions(await screen.findByLabelText("Área clínica"), "endodoncia");
+    await user.selectOptions(screen.getByLabelText("Tratamiento"), "endodoncia_monorradicular");
+    await user.click(screen.getByRole("button", { name: "Agregar al plan" }));
+
+    expect(tooth16(lastValue(onChange))?.marks).toEqual([
+      {
+        layer: "plan",
+        status: "endodoncia",
+        surfaces: [],
+        treatment: "endodoncia_monorradicular",
+      },
+    ]);
+    expect(screen.getByLabelText("Plan de tratamiento")).toHaveTextContent(
+      "16 Endodoncia monorradicular",
+    );
+
+    const realizado = screen.getByRole("checkbox", { name: "Realizado" });
+    await user.click(realizado);
+    expect(tooth16(lastValue(onChange))?.marks[0].layer).toBe("hecho");
+    expect(screen.getByRole("checkbox", { name: "Realizado" })).toBeChecked();
+
+    // Desmarcar lo devuelve a pendiente (vuelve al banco).
+    await user.click(screen.getByRole("checkbox", { name: "Realizado" }));
+    expect(tooth16(lastValue(onChange))?.marks[0].layer).toBe("plan");
+  });
+
+  it("tocar una marca del plan abre la vista del plan", async () => {
+    const user = userEvent.setup();
+    const value = emptyOdontogram();
+    const tooth = tooth16(value);
+    if (tooth) {
+      tooth.marks = [
+        { layer: "plan", status: "endodoncia", surfaces: [], treatment: "endodoncia_monorradicular" },
+      ];
+    }
+    render(<Harness initial={value} onChange={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: /^16 endodoncia/i }));
+    expect(screen.getByRole("button", { name: "Plan de tratamiento" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(engine.setChartMode).toHaveBeenLastCalledWith("plan");
+  });
+
+  it("la × de un hallazgo quita solo esa marca", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<Harness onChange={onChange} />);
+    await user.click(screen.getByRole("button", { name: "Marcar diente 16" }));
+    await user.click(screen.getByRole("button", { name: "Caries" }));
+    await user.click(screen.getByRole("button", { name: "Corona" }));
+    await user.click(screen.getByRole("button", { name: "Quitar 16 Caries O" }));
+
+    expect(tooth16(lastValue(onChange))?.marks.map((mark) => mark.status)).toEqual([
+      "corona",
+    ]);
   });
 
   it("abre la carta periodontal y las cartas clínicas", async () => {
     const user = userEvent.setup();
     render(<Odontogram />);
 
+    // Plegados por defecto: no se usan en cada consulta.
+    expect(screen.queryByRole("tab", { name: "Endodoncia" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Registros especializados" }));
     await user.click(screen.getByRole("tab", { name: "Endodoncia" }));
     expect(screen.getByText("Estado pulpar / endodoncia")).toBeInTheDocument();
 
@@ -268,83 +425,16 @@ describe("Odontogram wrapper", () => {
     expect(screen.getByText("Añadir diagnóstico")).toBeInTheDocument();
   });
 
-  it("dispara onChange con el formato de dominio al marcar un diente", async () => {
-    const user = userEvent.setup();
-    const onChange = vi.fn();
-
-    render(<Odontogram onChange={onChange} />);
-    await user.click(screen.getByRole("button", { name: "Marcar diente 16" }));
-
-    expect(onChange).toHaveBeenCalled();
-    const value = onChange.mock.calls.at(-1)?.[0];
-    expect(value.teeth.find((tooth: { fdi: number }) => tooth.fdi === 16)).toEqual(
-      {
-        fdi: 16,
-        marks: [{ layer: "hallazgo", status: "caries", surfaces: ["oclusal"] }],
-        oralMarks: { placa: false, sangrado: false, sarro: false },
-        practice: { indicated: false, clinicalArea: null, clinicalTreatment: null },
-      },
-    );
-    expect(value.oralMarks).toEqual({
-      placa: false,
-      sangrado: false,
-      sarro: false,
-    });
-  });
-
-  it("aplica un estado FOUEES a la selección", async () => {
-    const user = userEvent.setup();
-    render(<Odontogram value={emptyOdontogram()} />);
-    await user.click(screen.getByRole("button", { name: "Marcar diente 16" }));
-    await user.click(screen.getByRole("button", { name: "Caries" }));
-    expect(engine.resetTooth).not.toHaveBeenCalled();
-    expect(engine.setToothSelectionForSelection).not.toHaveBeenCalled();
-    expect(engine.setCariesSurfaceForSelection).toHaveBeenCalledWith(
-      "caries-occlusal",
-      true,
-    );
-  });
-
-  it("aplica obturado con material para que se vea en la carta", async () => {
-    const user = userEvent.setup();
-    render(<Odontogram value={emptyOdontogram()} />);
-    await user.click(screen.getByRole("button", { name: "Marcar diente 16" }));
-    await user.click(screen.getByRole("button", { name: "Obturado" }));
-    expect(engine.setFillingMaterialForSelection).toHaveBeenCalledWith(
-      "composite",
-    );
-    expect(engine.setFillingSurfaceForSelection).toHaveBeenCalledWith(
-      "occlusal",
-      true,
-    );
-  });
-
-  it("puede sumar obturado sobre un diente con caries", async () => {
-    const user = userEvent.setup();
-    render(<Odontogram value={emptyOdontogram()} />);
-    await user.click(screen.getByRole("button", { name: "Marcar diente 16" }));
-    await user.click(screen.getByRole("button", { name: "Caries" }));
-    await user.click(screen.getByRole("button", { name: "Obturado" }));
-    expect(engine.setCariesSurfaceForSelection).toHaveBeenCalled();
-    expect(engine.setFillingMaterialForSelection).toHaveBeenCalledWith(
-      "composite",
-    );
-    expect(engine.setToothSelectionForSelection).not.toHaveBeenCalled();
-  });
-
   it("alterna marcas generales sin perder los dientes", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
-    const value = emptyOdontogram();
-
-    render(<Odontogram value={value} onChange={onChange} />);
+    render(<Harness onChange={onChange} />);
     await user.click(screen.getByRole("button", { name: "Marcar diente 16" }));
-    await user.click(screen.getByRole("button", { name: "Más opciones" }));
+    await user.click(screen.getByRole("button", { name: "Higiene: placa, sangrado, sarro" }));
     await user.click(screen.getByRole("button", { name: "Placa" }));
 
-    const next = onChange.mock.calls.at(-1)?.[0];
-    const tooth = next.teeth.find((item: { fdi: number }) => item.fdi === 16);
-    expect(tooth.oralMarks.placa).toBe(true);
+    const next = lastValue(onChange);
+    expect(tooth16(next)?.oralMarks.placa).toBe(true);
     expect(next.oralMarks.placa).toBe(true);
   });
 });

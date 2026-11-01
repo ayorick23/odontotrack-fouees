@@ -1,5 +1,11 @@
 import { lazy, Suspense } from "react";
-import { Navigate, Route, BrowserRouter, Routes } from "react-router-dom";
+import {
+  Navigate,
+  Route,
+  RouterProvider,
+  createBrowserRouter,
+  createRoutesFromElements,
+} from "react-router-dom";
 
 import { AppLayout } from "./components/AppLayout";
 import { Toaster } from "./components/ui/sonner";
@@ -24,48 +30,54 @@ const Calendar = lazy(() =>
   import("./pages/Calendar/Calendar").then((module) => ({ default: module.Calendar })),
 );
 
+// Router "de datos": hace falta para useBlocker (aviso de cambios sin
+// guardar al salir de una pantalla). Las rutas son las mismas de antes.
+const router = createBrowserRouter(
+  createRoutesFromElements(
+    <>
+      <Route path="/" element={<Navigate to="/login" replace />} />
+      <Route path="/login" element={<Login />} />
+      <Route element={<AppLayout />}>
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/patients" element={<PatientList />} />
+        {/* Antes vivía en Pacientes; se redirige por si alguien guardó el enlace. */}
+        <Route
+          path="/patients/available"
+          element={<Navigate to="/assignments" replace />}
+        />
+        <Route path="/patients/new" element={<PatientForm />} />
+        <Route path="/patients/:id/edit" element={<PatientForm />} />
+        <Route path="/patients/:id" element={<PatientDetail />} />
+        <Route path="/assignments" element={<AvailablePatients />} />
+        <Route
+          path="/calendar"
+          element={
+            <Suspense
+              fallback={<p className="text-sm text-slate-500">Cargando calendario…</p>}
+            >
+              <Calendar />
+            </Suspense>
+          }
+        />
+        <Route path="/supervision" element={<Supervision />} />
+        <Route path="/students" element={<Students />} />
+        <Route path="/users" element={<UserList />} />
+        <Route path="/roles" element={<RoleList />} />
+        <Route path="/catalogs" element={<CatalogList />} />
+        <Route path="/roles/:id/edit" element={<RoleForm />} />
+        <Route path="/roles/:id" element={<RoleForm />} />
+        <Route path="/support" element={<Support />} />
+      </Route>
+    </>,
+  ),
+);
+
 function App() {
   return (
     <ThemeProvider>
       <Toaster />
       <AuthProvider>
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Navigate to="/login" replace />} />
-            <Route path="/login" element={<Login />} />
-            <Route element={<AppLayout />}>
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/patients" element={<PatientList />} />
-              {/* Antes vivía en Pacientes; se redirige por si alguien guardó el enlace. */}
-              <Route
-                path="/patients/available"
-                element={<Navigate to="/assignments" replace />}
-              />
-              <Route path="/patients/new" element={<PatientForm />} />
-              <Route path="/patients/:id/edit" element={<PatientForm />} />
-              <Route path="/patients/:id" element={<PatientDetail />} />
-              <Route path="/assignments" element={<AvailablePatients />} />
-              <Route
-                path="/calendar"
-                element={
-                  <Suspense
-                    fallback={<p className="text-sm text-slate-500">Cargando calendario…</p>}
-                  >
-                    <Calendar />
-                  </Suspense>
-                }
-              />
-              <Route path="/supervision" element={<Supervision />} />
-              <Route path="/students" element={<Students />} />
-              <Route path="/users" element={<UserList />} />
-              <Route path="/roles" element={<RoleList />} />
-              <Route path="/catalogs" element={<CatalogList />} />
-              <Route path="/roles/:id/edit" element={<RoleForm />} />
-              <Route path="/roles/:id" element={<RoleForm />} />
-              <Route path="/support" element={<Support />} />
-            </Route>
-          </Routes>
-        </BrowserRouter>
+        <RouterProvider router={router} />
       </AuthProvider>
     </ThemeProvider>
   );

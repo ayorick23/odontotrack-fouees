@@ -1,19 +1,14 @@
 import { useState, type ReactNode } from "react";
-import { MousePointerClick } from "lucide-react";
+import { ChevronDown, MousePointerClick } from "lucide-react";
 
-import type { OdontogramValue, PracticeArea } from "../../types";
+import type { OdontogramValue, OdontogramView, PracticeArea } from "../../types";
 import { OdontogramClinicalFields } from "./OdontogramClinicalFields";
 import { OdontogramToolbar } from "./OdontogramToolbar";
 
-type ClinicalTab =
-  | "tratamiento"
-  | "endodoncia"
-  | "periodoncia"
-  | "ortodoncia"
-  | "diagnosticos";
+/** Registros que no se usan en cada consulta: van plegados. */
+type SpecialtyTab = "endodoncia" | "periodoncia" | "ortodoncia" | "diagnosticos";
 
-const TABS: Array<{ id: ClinicalTab; label: string }> = [
-  { id: "tratamiento", label: "Tratamiento" },
+const SPECIALTY_TABS: Array<{ id: SpecialtyTab; label: string }> = [
   { id: "endodoncia", label: "Endodoncia" },
   { id: "periodoncia", label: "Periodoncia" },
   { id: "ortodoncia", label: "Ortodoncia" },
@@ -22,107 +17,134 @@ const TABS: Array<{ id: ClinicalTab; label: string }> = [
 
 type OdontogramClinicalPanelProps = {
   value: OdontogramValue;
-  onOralMarksChange: (value: OdontogramValue) => void;
+  onChange: (value: OdontogramValue) => void;
   readOnly: boolean;
+  view: OdontogramView;
   onOpenPerio: () => void;
   focusedFdi?: number | null;
   clinicalAreas?: PracticeArea[];
+  treatmentNames?: Record<string, string>;
   onClearFocus?: () => void;
 };
 
+/**
+ * Panel derecho: arriba lo que se usa siempre (el diente seleccionado en la
+ * vista actual); abajo, plegados, los registros especializados.
+ */
 export function OdontogramClinicalPanel({
   value,
-  onOralMarksChange,
+  onChange,
   readOnly,
+  view,
   onOpenPerio,
   focusedFdi,
   clinicalAreas = [],
+  treatmentNames = {},
   onClearFocus,
 }: OdontogramClinicalPanelProps) {
-  const [tab, setTab] = useState<ClinicalTab>("tratamiento");
+  const [specialtyOpen, setSpecialtyOpen] = useState(false);
+  const [tab, setTab] = useState<SpecialtyTab>("endodoncia");
   const hasTooth = focusedFdi != null;
 
   return (
     <aside className="flex min-w-0 flex-col gap-4 overflow-visible rounded-2xl border border-slate-100 bg-slate-50/80 p-4 dark:border-white/10 dark:bg-slate-950/40">
-      <div
-        className="flex flex-wrap gap-1 rounded-xl bg-white p-1 ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700"
-        role="tablist"
-        aria-label="Paneles clínicos del odontograma"
-      >
-        {TABS.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            role="tab"
-            aria-selected={tab === item.id}
-            onClick={() => setTab(item.id)}
-            className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold transition ${
-              tab === item.id
-                ? "bg-teal-600 text-white"
-                : "text-slate-500 hover:bg-slate-50 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
-            }`}
-          >
-            {item.label}
-          </button>
-        ))}
+      <div className="min-w-0 overflow-visible">
+        {hasTooth ? (
+          <OdontogramToolbar
+            value={value}
+            onChange={onChange}
+            readOnly={readOnly}
+            view={view}
+            focusedFdi={focusedFdi}
+            clinicalAreas={clinicalAreas}
+            treatmentNames={treatmentNames}
+            onClearFocus={onClearFocus}
+          />
+        ) : (
+          <EmptyToothState />
+        )}
       </div>
 
-      <div className="min-w-0 overflow-visible">
-        {tab === "tratamiento" ? (
-          hasTooth ? (
-            <OdontogramToolbar
-              value={value}
-              onOralMarksChange={onOralMarksChange}
-              readOnly={readOnly}
-              focusedFdi={focusedFdi}
-              clinicalAreas={clinicalAreas}
-              onClearFocus={onClearFocus}
-            />
-          ) : (
-            <EmptyToothState />
-          )
-        ) : null}
-
-        {tab === "endodoncia" ? (
-          <ClinicalHint
-            title="Endodoncia"
-            body="Selecciona un diente para registrar pulpa, tratamiento endodóntico y diagnóstico apical."
-          >
-            <OdontogramClinicalFields kind="endodoncia" readOnly={readOnly} />
-          </ClinicalHint>
-        ) : null}
-
-        {tab === "periodoncia" ? (
-          <ClinicalHint
-            title="Periodoncia"
-            body="Sondaje de seis sitios, margen gingival, sangrado al sondaje y CAL. Los valores quedan en el expediente al guardar."
-          >
-            <button
-              type="button"
-              onClick={onOpenPerio}
-              className="inline-flex items-center justify-center rounded-full bg-teal-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-teal-700"
+      <div className="border-t border-slate-200 pt-3 dark:border-slate-800">
+        <button
+          type="button"
+          aria-expanded={specialtyOpen}
+          onClick={() => setSpecialtyOpen((open) => !open)}
+          className="flex w-full items-center justify-between text-xs font-semibold uppercase tracking-wide text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+        >
+          Registros especializados
+          <ChevronDown
+            className={`size-4 transition ${specialtyOpen ? "rotate-180" : ""}`}
+            aria-hidden="true"
+          />
+        </button>
+        {specialtyOpen ? (
+          <div className="mt-3 flex flex-col gap-4">
+            <div
+              className="flex flex-wrap gap-1 rounded-xl bg-white p-1 ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700"
+              role="tablist"
+              aria-label="Registros especializados del odontograma"
             >
-              Abrir carta periodontal
-            </button>
-          </ClinicalHint>
-        ) : null}
+              {SPECIALTY_TABS.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === item.id}
+                  onClick={() => setTab(item.id)}
+                  className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold transition ${
+                    tab === item.id
+                      ? "bg-teal-600 text-white"
+                      : "text-slate-500 hover:bg-slate-50 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
+                  }`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
 
-        {tab === "ortodoncia" ? (
-          <ClinicalHint
-            title="Ortodoncia"
-            body="Selecciona un diente presente para marcar brackets, bandas, drift, rotación o movimiento vertical."
-          >
-            <OdontogramClinicalFields kind="ortodoncia" readOnly={readOnly} />
-          </ClinicalHint>
-        ) : null}
+            {tab === "endodoncia" ? (
+              <ClinicalHint
+                title="Endodoncia"
+                body="Selecciona un diente para registrar pulpa, tratamiento endodóntico y diagnóstico apical."
+              >
+                <OdontogramClinicalFields kind="endodoncia" readOnly={readOnly} />
+              </ClinicalHint>
+            ) : null}
 
-        {tab === "diagnosticos" ? (
-          <ClinicalHint
-            title="Códigos ICD-10"
-            body="Los hallazgos del diente seleccionado se traducen a ICD-10. Puedes añadir o silenciar un diagnóstico."
-          >
-            <OdontogramClinicalFields kind="diagnosticos" readOnly={readOnly} />
-          </ClinicalHint>
+            {tab === "periodoncia" ? (
+              <ClinicalHint
+                title="Periodoncia"
+                body="Sondaje de seis sitios, margen gingival, sangrado al sondaje y CAL. Los valores quedan en el expediente al guardar."
+              >
+                <button
+                  type="button"
+                  onClick={onOpenPerio}
+                  className="inline-flex items-center justify-center rounded-full bg-teal-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-teal-700"
+                >
+                  Abrir carta periodontal
+                </button>
+              </ClinicalHint>
+            ) : null}
+
+            {tab === "ortodoncia" ? (
+              <ClinicalHint
+                title="Ortodoncia"
+                body="Selecciona un diente presente para marcar brackets, bandas, drift, rotación o movimiento vertical."
+              >
+                <OdontogramClinicalFields kind="ortodoncia" readOnly={readOnly} />
+              </ClinicalHint>
+            ) : null}
+
+            {tab === "diagnosticos" ? (
+              <ClinicalHint
+                title="Códigos ICD-10"
+                body="Los hallazgos del diente seleccionado se traducen a ICD-10. Puedes añadir o silenciar un diagnóstico."
+              >
+                <OdontogramClinicalFields kind="diagnosticos" readOnly={readOnly} />
+              </ClinicalHint>
+            ) : null}
+          </div>
         ) : null}
       </div>
     </aside>
@@ -140,8 +162,8 @@ function EmptyToothState() {
         Ningún diente seleccionado
       </p>
       <p className="text-sm text-slate-500 dark:text-slate-400">
-        Haz clic en un diente de la carta para registrar estado, superficies y
-        marcas.
+        Haz clic en un diente de la carta para registrar su diagnóstico o
+        planificar un tratamiento.
       </p>
     </div>
   );

@@ -1,13 +1,14 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ThemeProvider } from "../../context/ThemeContext";
+import type { DashboardOverview } from "../../services/dashboard";
 import { Dashboard } from "./Dashboard";
 
 const api = vi.hoisted(() => ({
-  getDashboardSummary: vi.fn(),
+  getDashboardOverview: vi.fn(),
   getDashboardSeries: vi.fn(),
 }));
 
@@ -17,62 +18,83 @@ vi.mock("../../services/dashboard", async () => {
   );
   return {
     ...actual,
-    getDashboardSummary: api.getDashboardSummary,
+    getDashboardOverview: api.getDashboardOverview,
     getDashboardSeries: api.getDashboardSeries,
   };
 });
 
-const summary = {
-  total_patients: 4,
-  total_assignments: 2,
-  total_clinical_records: 0,
-  patients_by_status: { pendiente: 1, en_proceso: 2, finalizado: 1 },
+const NONE: DashboardOverview = {
+  my_cases: null,
+  supervision: null,
+  bank: null,
+  faculty: null,
+  accounts: null,
 };
 
-const series = {
-  months: [
-    {
-      month: "2026-08",
-      label: "Ago 26",
-      patients: 2,
-      pendiente: 1,
-      en_proceso: 1,
-      finalizado: 0,
-      assignments: 1,
+const STUDENT: DashboardOverview = {
+  ...NONE,
+  my_cases: {
+    cases: [
+      { patient_id: 7, patient_name: "Ana Pronto", next_appointment: "2026-11-03T15:00:00Z" },
+      { patient_id: 8, patient_name: "Beto Sincita", next_appointment: null },
+    ],
+    upcoming_appointments: [
+      { id: 1, starts_at: "2026-11-03T15:00:00Z", patient_id: 7, patient_name: "Ana Pronto" },
+    ],
+    diagnoses_awaiting_validation: 2,
+    bank_available: 21,
+    done_treatments_in_my_cases: 3,
+  },
+};
+
+const indicator = { percent: 50, count: 1, total: 2 };
+
+const ADMIN: DashboardOverview = {
+  my_cases: null,
+  supervision: {
+    diagnoses_to_validate: 4,
+    cases_in_progress: 9,
+    students_with_active_cases: 3,
+    indicators: {
+      digitalization: indicator,
+      validated_diagnoses: indicator,
+      cases_with_validated_diagnosis: indicator,
     },
-    {
-      month: "2026-09",
-      label: "Sep 26",
-      patients: 2,
-      pendiente: 0,
-      en_proceso: 1,
-      finalizado: 1,
-      assignments: 1,
-    },
-  ],
-  by_status: [
-    { status: "pendiente" as const, label: "Pendiente", count: 1 },
-    { status: "en_proceso" as const, label: "En proceso", count: 2 },
-    { status: "finalizado" as const, label: "Finalizado", count: 1 },
-  ],
+  },
+  bank: {
+    unassigned: 21,
+    registered_this_month: 5,
+    today_appointments: [],
+    average_wait_days: 7.9,
+  },
+  faculty: {
+    by_area: [{ area: "Endodoncia", pendiente: 2, en_proceso: 1, finalizado: 0 }],
+    bank_demand: [
+      { treatment: "endo", name: "Endodoncia monorradicular", area: "Endodoncia", count: 3 },
+    ],
+  },
+  accounts: {
+    active_by_role: [{ role: "estudiante", label: "Estudiante", count: 2 }],
+    inactive: 1,
+  },
 };
 
 function renderDashboard() {
   return render(
-    <MemoryRouter>
-      <ThemeProvider>
+    <ThemeProvider>
+      <MemoryRouter>
         <Dashboard />
-      </ThemeProvider>
-    </MemoryRouter>,
+      </MemoryRouter>
+    </ThemeProvider>,
   );
 }
 
-describe("Dashboard", () => {
+describe("Dashboard por rol", () => {
   beforeEach(() => {
-    api.getDashboardSummary.mockReset();
+    api.getDashboardOverview.mockReset();
     api.getDashboardSeries.mockReset();
-    api.getDashboardSummary.mockResolvedValue(summary);
-    api.getDashboardSeries.mockResolvedValue(series);
+    api.getDashboardSeries.mockResolvedValue({ months: [], by_status: [] });
+    // jsdom no trae matchMedia (tema) ni ResizeObserver (gráficas).
     Object.defineProperty(window, "matchMedia", {
       writable: true,
       value: (query: string) => ({
@@ -90,31 +112,58 @@ describe("Dashboard", () => {
     vi.stubGlobal("ResizeObserver", ResizeObserverMock);
   });
 
-  it("carga KPIs y gráficos reales del período 1A", async () => {
+  it("el estudiante ve sus casos y enlaces directos, sin estadísticas", async () => {
+    api.getDashboardOverview.mockResolvedValue(STUDENT);
     renderDashboard();
 
-    expect(await screen.findByText("4")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Estadísticas" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Seguimiento de citas" })).toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", { name: "Estado actual de pacientes" }),
-    ).toBeInTheDocument();
-    expect(api.getDashboardSummary).toHaveBeenCalled();
-    expect(api.getDashboardSeries).toHaveBeenCalledWith({ period: "1a" });
-    expect(
-      screen.queryByText("Indicadores del banco de pacientes"),
-    ).not.toBeInTheDocument();
+    const block = await screen.findByRole("region", { name: "Mis casos" });
+    expect(within(block).getByRole("link", { name: /Disponibles en el banco/ })).toHaveAttribute(
+      "href",
+      "/assignments",
+    );
+    expect(within(block).getByRole("link", { name: /Beto Sincita/ })).toHaveAttribute(
+      "href",
+      "/patients/8",
+    );
+    expect(within(block).getByText("Sin cita agendada")).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Supervisión" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Facultad" })).not.toBeInTheDocument();
+    // Las series solo se piden para el bloque Facultad.
+    expect(api.getDashboardSeries).not.toHaveBeenCalled();
   });
 
-  it("pide series del último mes al elegir 1M", async () => {
+  it("el admin ve supervisión, banco, cuentas y facultad", async () => {
     const user = userEvent.setup();
+    api.getDashboardOverview.mockResolvedValue(ADMIN);
     renderDashboard();
-    await screen.findByText("4");
 
-    await user.click(screen.getByRole("button", { name: "1M" }));
+    const supervision = await screen.findByRole("region", { name: "Supervisión" });
+    expect(
+      within(supervision).getByRole("link", { name: /Diagnósticos por validar/ }),
+    ).toHaveAttribute("href", "/supervision");
+    expect(screen.getByRole("region", { name: "Banco y agenda" })).toHaveTextContent("7.9");
+    expect(screen.getByRole("region", { name: "Cuentas" })).toHaveTextContent("Desactivadas");
+    expect(screen.getByText("Tratamientos más demandados en el banco")).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Mis casos" })).not.toBeInTheDocument();
 
-    await waitFor(() => {
-      expect(api.getDashboardSeries).toHaveBeenCalledWith({ period: "1m" });
-    });
+    expect(api.getDashboardSeries).toHaveBeenLastCalledWith({ period: "1a" });
+    await user.click(screen.getByRole("button", { name: "Todos" }));
+    expect(api.getDashboardSeries).toHaveBeenLastCalledWith({ period: "todos" });
+  });
+
+  it("sin bloques muestra un mensaje en vez de una pantalla vacía", async () => {
+    api.getDashboardOverview.mockResolvedValue(NONE);
+    renderDashboard();
+    expect(
+      await screen.findByText(/Tu rol no tiene indicadores en el dashboard/),
+    ).toBeInTheDocument();
+  });
+
+  it("si falla la carga permite reintentar", async () => {
+    const user = userEvent.setup();
+    api.getDashboardOverview.mockRejectedValueOnce(new Error("x")).mockResolvedValue(STUDENT);
+    renderDashboard();
+    await user.click(await screen.findByRole("button", { name: "Reintentar" }));
+    expect(await screen.findByRole("region", { name: "Mis casos" })).toBeInTheDocument();
   });
 });
