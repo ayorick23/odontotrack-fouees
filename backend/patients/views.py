@@ -42,8 +42,14 @@ class PatientViewSet(viewsets.ModelViewSet):
                 .order_by("id")
             )
         params = self.request.query_params
+        queryset = Patient.objects.prefetch_related("assignments__student")
+        if self.action not in ("list", "export"):
+            # Solo la ficha muestra created_by_name y first_diagnosis_by.
+            queryset = queryset.select_related("created_by").prefetch_related(
+                "diagnoses__student"
+            )
         return (
-            Patient.objects.prefetch_related("assignments__student")
+            queryset
             .select_related("clinical_area", "clinical_treatment")
             .visible_to(self.request.user)
             .in_period(params.get("period"))
@@ -52,6 +58,9 @@ class PatientViewSet(viewsets.ModelViewSet):
             .by_assignee(params.get("assigned_to"))
             .order_by("id")
         )
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
 
     def get_serializer_class(self):
         if self.action == "list":

@@ -90,6 +90,10 @@ export type Patient = {
   assignment_note: string;
   /** El usuario actual puede agregar registros clínicos (caso abierto y, si es estudiante, suyo). */
   can_write_clinical: boolean;
+  /** Quién registró al paciente; null en pacientes anteriores a guardarlo. */
+  created_by_name: string | null;
+  /** Autor del diagnóstico más antiguo, si hay alguno. */
+  first_diagnosis_by: string | null;
   created_at: string;
   updated_at: string;
 };

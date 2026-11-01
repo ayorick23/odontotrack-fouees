@@ -66,6 +66,15 @@ class Tratamiento(models.Model):
         related_name="clinical_records_treatments",
         help_text="Tipo de tratamiento del catálogo FOUEES.",
     )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="registered_treatments",
+        editable=False,
+        help_text="Usuario que registró el tratamiento.",
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

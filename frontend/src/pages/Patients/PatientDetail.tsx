@@ -234,6 +234,15 @@ export function PatientDetail() {
                 {format(new Date(patient.created_at), "d 'de' MMMM 'de' yyyy", {
                   locale: es,
                 })}
+                {patient.created_by_name ? (
+                  <span className="font-normal text-slate-500">
+                    {" "}
+                    · por {patient.created_by_name}
+                  </span>
+                ) : null}
+              </Fact>
+              <Fact label="Primer diagnóstico">
+                {patient.first_diagnosis_by ?? emptyValue("Sin diagnóstico")}
               </Fact>
               {patient.assignment_note ? (
                 <Fact label="Nota de asignación" className="sm:col-span-2">

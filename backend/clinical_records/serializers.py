@@ -71,6 +71,7 @@ class TratamientoSerializer(serializers.ModelSerializer):
         source="clinical_treatment.name",
         read_only=True,
     )
+    created_by_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Tratamiento
@@ -81,9 +82,13 @@ class TratamientoSerializer(serializers.ModelSerializer):
             "clinical_area_name",
             "clinical_treatment",
             "clinical_treatment_name",
+            "created_by_name",
             "created_at",
             "updated_at",
         )
+
+    def get_created_by_name(self, obj: Tratamiento) -> str | None:
+        return user_display_name(obj.created_by)
 
     def validate(self, attrs):
         clinical_area = attrs.get("clinical_area") or getattr(

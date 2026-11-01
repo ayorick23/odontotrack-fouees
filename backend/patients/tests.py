@@ -578,6 +578,71 @@ class PatientCompleteFieldsTests(APITestCase):
         self.assertNotIn("phone_number", response.data)
 
 
+class PatientResponsibilityTests(APITestCase):
+    def setUp(self):
+        sync_acl()
+        self.recepcion = User.objects.create_user(
+            username="recepcion-resp",
+            password="pass12345",
+            role=User.Role.RECEPCION,
+            first_name="Rita",
+            last_name="Recepción",
+        )
+        self.client.force_authenticate(user=self.recepcion)
+
+    def test_create_records_who_registered_the_patient(self):
+        other = User.objects.create_user(
+            username="otro-resp", password="pass12345", role=User.Role.ADMIN
+        )
+        response = self.client.post(
+            "/api/patients/",
+            {
+                "first_name": "Ana",
+                "last_name": "Resp",
+                "dui": "02000001-1",
+                "created_by": other.id,
+                **CONTACT,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Patient.objects.get().created_by, self.recepcion)
+        self.assertEqual(response.json()["created_by_name"], "Rita Recepción")
+
+    def test_detail_shows_who_made_the_first_diagnosis(self):
+        from clinical_records.models import Diagnostico
+
+        first = User.objects.create_user(
+            username="primero", password="pass12345", role=User.Role.ESTUDIANTE
+        )
+        second = User.objects.create_user(
+            username="segundo", password="pass12345", role=User.Role.ESTUDIANTE
+        )
+        patient = Patient.objects.create(
+            first_name="Ana", last_name="Dx", dui="02000002-2", **CONTACT
+        )
+        response = self.client.get(f"/api/patients/{patient.id}/")
+        self.assertIsNone(response.json()["first_diagnosis_by"])
+        self.assertIsNone(response.json()["created_by_name"])
+
+        Diagnostico.objects.create(patient=patient, student=first, content="Caries")
+        Diagnostico.objects.create(patient=patient, student=second, content="Control")
+        response = self.client.get(f"/api/patients/{patient.id}/")
+        self.assertEqual(response.json()["first_diagnosis_by"], "primero")
+
+    def test_deleting_the_author_keeps_the_patient(self):
+        patient = Patient.objects.create(
+            first_name="Ana",
+            last_name="Huérfana",
+            dui="02000003-3",
+            created_by=self.recepcion,
+            **CONTACT,
+        )
+        self.recepcion.delete()
+        patient.refresh_from_db()
+        self.assertIsNone(patient.created_by)
+
+
 class PatientDocumentTests(APITestCase):
     def setUp(self):
         sync_acl()

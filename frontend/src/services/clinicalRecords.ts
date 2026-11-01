@@ -24,6 +24,8 @@ export type TreatmentRecord = {
   clinical_area_name: string;
   clinical_treatment: number;
   clinical_treatment_name: string;
+  /** Quién registró el tratamiento; null en registros anteriores a guardarlo. */
+  created_by_name: string | null;
   created_at: string;
   updated_at: string;
 };
