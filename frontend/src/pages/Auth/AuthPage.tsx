@@ -1,7 +1,7 @@
 import { useEffect, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
-import logoUees from "../../assets/logo-uees.png";
+import logoSello from "../../assets/logo-uees-sello.png";
 import { ThemeToggle } from "../../components/ThemeToggle";
 import { useAuth } from "../../hooks/useAuth";
 import { LoginForm } from "./LoginForm";
@@ -53,12 +53,14 @@ export function AuthPage() {
   }
 
   return (
-    <div className="relative flex min-h-svh items-center justify-center bg-slate-100 px-4 py-10 dark:bg-slate-950">
-      <div className="absolute right-4 top-4">
+    // Pantalla completa: formulario y panel ocupan media pantalla cada uno,
+    // de borde a borde (el marco redondeado del pin era solo la imagen).
+    <div className="relative min-h-svh overflow-hidden bg-white dark:bg-slate-900">
+      <div className="absolute right-5 top-5 z-30">
         <ThemeToggle />
       </div>
 
-      <div className="relative w-full max-w-5xl overflow-hidden rounded-[28px] bg-white p-3 shadow-[0_24px_80px_-24px_rgba(15,23,42,0.25)] md:h-[680px] dark:bg-slate-900 dark:shadow-none">
+      <div className="relative min-h-svh md:h-svh">
         {/* Encabezado en móvil (el panel deslizante es solo de escritorio). */}
         <div className="md:hidden">
           <BrandPanel mode={mode} compact />
@@ -73,7 +75,7 @@ export function AuthPage() {
 
         {/* Panel deslizante: a la derecha al ingresar, a la izquierda al registrarse. */}
         <div
-          className={`absolute inset-y-3 left-3 hidden w-[calc(50%-12px)] transition-transform duration-700 motion-reduce:transition-none md:block ${EASE} ${
+          className={`absolute inset-y-0 left-0 z-20 hidden w-1/2 transition-transform duration-700 motion-reduce:transition-none md:block ${EASE} ${
             isLogin ? "translate-x-full" : "translate-x-0"
           }`}
           aria-hidden="true"
@@ -100,8 +102,8 @@ function FormSlot({
     <section
       inert={!active}
       aria-hidden={!active}
-      className={`${active ? "flex" : "hidden md:flex"} items-center justify-center px-6 py-10 sm:px-12 md:absolute md:inset-y-3 md:w-[calc(50%-12px)] ${
-        side === "left" ? "md:left-3" : "md:right-3"
+      className={`${active ? "flex" : "hidden md:flex"} items-center justify-center px-6 py-10 sm:px-12 md:absolute md:inset-y-0 md:w-1/2 md:overflow-y-auto ${
+        side === "left" ? "md:left-0" : "md:right-0"
       } transition-[opacity,transform] duration-500 motion-reduce:transition-none ${EASE} ${
         active ? "translate-x-0 opacity-100 delay-200" : `pointer-events-none opacity-0 ${offset}`
       }`}
@@ -114,20 +116,20 @@ function FormSlot({
 function BrandPanel({ mode, compact = false }: { mode: AuthMode; compact?: boolean }) {
   return (
     <div
-      className={`relative isolate h-full overflow-hidden rounded-[22px] bg-teal-950 text-white ${
-        compact ? "px-6 py-6" : "p-10"
+      className={`relative isolate h-full overflow-hidden bg-teal-950 text-white ${
+        compact ? "px-6 py-6" : "p-12 lg:p-16"
       }`}
     >
       {/* Manchas de color difuminadas: el "degradado" del panel. */}
-      <div className="absolute -left-24 -top-24 -z-10 size-96 rounded-full bg-teal-400/70 blur-3xl" />
-      <div className="absolute -right-20 top-1/3 -z-10 size-80 rounded-full bg-cyan-300/50 blur-3xl" />
-      <div className="absolute -bottom-32 left-1/4 -z-10 size-[28rem] rounded-full bg-sky-600/70 blur-3xl" />
+      <div className="absolute -left-[10%] -top-[15%] -z-10 aspect-square w-[70%] rounded-full bg-teal-400/70 blur-[90px]" />
+      <div className="absolute -right-[15%] top-[30%] -z-10 aspect-square w-[55%] rounded-full bg-cyan-300/45 blur-[90px]" />
+      <div className="absolute -bottom-[25%] left-[15%] -z-10 aspect-square w-[75%] rounded-full bg-sky-600/70 blur-[100px]" />
       <div className="absolute inset-0 -z-10 bg-gradient-to-t from-teal-950/70 via-transparent to-transparent" />
 
       <div className={`flex h-full ${compact ? "items-center gap-4" : "flex-col justify-between"}`}>
         <div className="flex items-center gap-3">
-          <span className="grid size-14 place-items-center rounded-full bg-white/95 p-1.5 shadow-lg shadow-teal-950/30">
-            <img src={logoUees} alt="Universidad Evangélica de El Salvador" className="size-full object-contain" />
+          <span className="grid size-14 place-items-center rounded-full bg-white/95 p-2 shadow-lg shadow-teal-950/30">
+            <img src={logoSello} alt="Universidad Evangélica de El Salvador" className="size-full object-contain" />
           </span>
           <div>
             <p className="text-lg font-semibold tracking-tight">OdontoTrack</p>
@@ -139,7 +141,7 @@ function BrandPanel({ mode, compact = false }: { mode: AuthMode; compact?: boole
           // Se vuelve a montar al cambiar de modo para que el texto entre con fundido.
           <div key={mode} className="animate-in fade-in slide-in-from-bottom-2 duration-700 motion-reduce:animate-none">
             <p className="text-sm font-medium text-white/80">{PANEL_TEXT[mode].kicker}</p>
-            <p className="mt-3 max-w-sm text-3xl font-semibold leading-tight tracking-tight">
+            <p className="mt-3 max-w-md text-4xl font-semibold leading-tight tracking-tight">
               {PANEL_TEXT[mode].title}
             </p>
             <p className="mt-6 text-xs text-white/60">2026 © Sistema FOUEES — Facultad de Odontología UEES</p>

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  carneFromEmail,
+  cifFromEmail,
   passwordRules,
   registrationErrorMessage,
 } from "./registration";
@@ -12,9 +12,9 @@ const axiosError = (status: number, data: unknown = {}) => ({
 });
 
 describe("correo institucional", () => {
-  it("acepta el carné de 10 dígitos del dominio, sin importar mayúsculas", () => {
-    expect(carneFromEmail("2025010371@cvirtualuees.edu.sv")).toBe("2025010371");
-    expect(carneFromEmail("  2025010371@CVIRTUALUEES.EDU.SV ")).toBe("2025010371");
+  it("acepta el CIF de 10 dígitos del dominio, sin importar mayúsculas", () => {
+    expect(cifFromEmail("2025010371@cvirtualuees.edu.sv")).toBe("2025010371");
+    expect(cifFromEmail("  2025010371@CVIRTUALUEES.EDU.SV ")).toBe("2025010371");
   });
 
   it("rechaza otro largo, letras u otro dominio", () => {
@@ -25,7 +25,7 @@ describe("correo institucional", () => {
       "2025010371@gmail.com",
       "2025010371@uees.edu.sv",
     ]) {
-      expect(carneFromEmail(email), email).toBeNull();
+      expect(cifFromEmail(email), email).toBeNull();
     }
   });
 });
@@ -47,8 +47,8 @@ describe("reglas de contraseña", () => {
     expect(failing("SinNumerosAqui")).toEqual(["number"]);
   });
 
-  it("no puede contener el carné", () => {
-    expect(failing("Clave2025010371", "2025010371@cvirtualuees.edu.sv")).toEqual(["carne"]);
+  it("no puede contener el CIF", () => {
+    expect(failing("Clave2025010371", "2025010371@cvirtualuees.edu.sv")).toEqual(["cif"]);
   });
 });
 

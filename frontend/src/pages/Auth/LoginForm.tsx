@@ -40,7 +40,7 @@ export function LoginForm({ onSwitch }: { onSwitch: () => void }) {
   }
 
   return (
-    <div className="w-full max-w-sm">
+    <div className="w-full max-w-md">
       <h1 className="text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">
         Bienvenido de nuevo
       </h1>

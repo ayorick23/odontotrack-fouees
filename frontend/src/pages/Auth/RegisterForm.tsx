@@ -5,7 +5,7 @@ import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 
 import {
-  carneFromEmail,
+  cifFromEmail,
   INSTITUTIONAL_DOMAIN,
   normalizeEmail,
   passwordRules,
@@ -24,8 +24,8 @@ const registerSchema = z
       .string()
       .trim()
       .min(1, "Ingresa tu correo institucional")
-      .refine((value) => carneFromEmail(value) !== null, {
-        message: `Usa tu correo institucional: carné de 10 dígitos @${INSTITUTIONAL_DOMAIN}`,
+      .refine((value) => cifFromEmail(value) !== null, {
+        message: `Usa tu correo institucional: tu CIF de 10 dígitos @${INSTITUTIONAL_DOMAIN}`,
       }),
     password: z.string(),
     confirm: z.string(),
@@ -51,7 +51,7 @@ export function RegisterForm({ onSwitch }: { onSwitch: () => void }) {
   const [step, setStep] = useState<Step>({ kind: "form" });
 
   return (
-    <div className="w-full max-w-sm">
+    <div className="w-full max-w-md">
       {step.kind === "form" ? (
         <DataStep onSwitch={onSwitch} onSent={(email) => setStep({ kind: "verify", email })} />
       ) : null}

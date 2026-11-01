@@ -4,7 +4,7 @@ import { api } from "./api";
 
 /**
  * Registro de estudiantes con correo institucional (decisión 2026-11-01):
- * - Solo estudiantes, con el carné de 10 dígitos: 2025010371@cvirtualuees.edu.sv.
+ * - Solo estudiantes, con su CIF (10 dígitos): 2025010371@cvirtualuees.edu.sv.
  * - Se verifica el correo con un código y la cuenta queda pendiente hasta
  *   que administración la apruebe (y decida si la promueve de rol).
  *
@@ -23,8 +23,8 @@ export function normalizeEmail(value: string): string {
   return value.trim().toLowerCase();
 }
 
-/** El carné si el correo es institucional válido; si no, null. */
-export function carneFromEmail(value: string): string | null {
+/** El CIF (número de la UEES) si el correo es institucional válido; si no, null. */
+export function cifFromEmail(value: string): string | null {
   return INSTITUTIONAL_EMAIL.exec(normalizeEmail(value))?.[1] ?? null;
 }
 
@@ -34,7 +34,7 @@ export type PasswordRule = { id: string; label: string; ok: boolean };
 
 /** Requisitos de la contraseña, para validarla y mostrarlos en vivo. */
 export function passwordRules(password: string, email = ""): PasswordRule[] {
-  const carne = carneFromEmail(email);
+  const cif = cifFromEmail(email);
   return [
     {
       id: "length",
@@ -45,9 +45,9 @@ export function passwordRules(password: string, email = ""): PasswordRule[] {
     { id: "lower", label: "Una letra minúscula", ok: /[a-záéíóúñ]/.test(password) },
     { id: "number", label: "Un número", ok: /\d/.test(password) },
     {
-      id: "carne",
-      label: "No contiene tu carné",
-      ok: password.length > 0 && !(carne && password.includes(carne)),
+      id: "cif",
+      label: "No contiene tu CIF",
+      ok: password.length > 0 && !(cif && password.includes(cif)),
     },
   ];
 }
