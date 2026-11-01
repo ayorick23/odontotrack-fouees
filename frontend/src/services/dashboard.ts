@@ -10,6 +10,8 @@ export type DashboardSummary = {
 };
 
 export type SummaryPeriod = "1m" | "6m" | "1a";
+/** "todos" = sin filtro de fecha (solo series). */
+export type SeriesPeriod = SummaryPeriod | "todos";
 
 export type DashboardMonthPoint = {
   month: string;
@@ -42,7 +44,7 @@ export function getDashboardSummary(
 }
 
 export function getDashboardSeries(
-  params: { period?: SummaryPeriod } = {},
+  params: { period?: SeriesPeriod } = {},
 ): Promise<DashboardSeries> {
   const query = params.period ? { period: params.period } : undefined;
   return api
@@ -55,4 +57,75 @@ export function countByStatus(
   status: CaseStatus,
 ): number {
   return summary.patients_by_status[status] ?? 0;
+}
+
+// --- /dashboard/overview/: bloques según permisos (null = no aplica) ---
+
+export type DashboardCaseRow = {
+  patient_id: number;
+  patient_name: string;
+  next_appointment: string | null;
+};
+
+export type DashboardAppointmentRow = {
+  id: number;
+  starts_at: string;
+  patient_id: number;
+  patient_name: string;
+  student_name?: string;
+};
+
+export type DashboardIndicator = {
+  percent: number | null;
+  count: number;
+  total: number;
+};
+
+export type DashboardAreaStatus = { area: string } & Record<CaseStatus, number>;
+
+export type DashboardBankDemand = {
+  treatment: string;
+  name: string;
+  area: string;
+  count: number;
+};
+
+export type DashboardOverview = {
+  my_cases: {
+    cases: DashboardCaseRow[];
+    upcoming_appointments: DashboardAppointmentRow[];
+    diagnoses_awaiting_validation: number;
+    bank_available: number;
+    done_treatments_in_my_cases: number;
+  } | null;
+  supervision: {
+    diagnoses_to_validate: number;
+    cases_in_progress: number;
+    students_with_active_cases: number;
+    indicators: {
+      digitalization: DashboardIndicator | null;
+      validated_diagnoses: DashboardIndicator | null;
+      cases_with_validated_diagnosis: DashboardIndicator | null;
+    };
+  } | null;
+  bank: {
+    unassigned: number;
+    registered_this_month: number;
+    today_appointments: DashboardAppointmentRow[];
+    average_wait_days: number | null;
+  } | null;
+  faculty: {
+    by_area: DashboardAreaStatus[];
+    bank_demand: DashboardBankDemand[];
+  } | null;
+  accounts: {
+    active_by_role: Array<{ role: string; label: string; count: number }>;
+    inactive: number;
+  } | null;
+};
+
+export function getDashboardOverview(): Promise<DashboardOverview> {
+  return api
+    .get<DashboardOverview>("/dashboard/overview/")
+    .then((response) => response.data);
 }

@@ -7,9 +7,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .indicators import build_indicators
+from .overview import build_overview
 from .scoping import dashboard_scope_for
 from .serializers import (
     DashboardIndicatorsSerializer,
+    DashboardOverviewSerializer,
     DashboardSeriesSerializer,
     DashboardSummarySerializer,
 )
@@ -70,10 +72,10 @@ class DashboardSeriesView(APIView):
         parameters=[
             OpenApiParameter(
                 name="period",
-                description="Filtra series del último mes (1m), 6 meses (6m) o año (1a).",
+                description="Series del último mes (1m), 6 meses (6m), año (1a, por defecto) o todo el historial (todos).",
                 required=False,
                 type=str,
-                enum=["1m", "6m", "1a"],
+                enum=["1m", "6m", "1a", "todos"],
             ),
         ],
         responses=DashboardSeriesSerializer,
@@ -96,3 +98,15 @@ class DashboardIndicatorsView(APIView):
     @extend_schema(tags=["dashboard"], responses=DashboardIndicatorsSerializer)
     def get(self, request):
         return Response(build_indicators(dashboard_scope_for(request.user)))
+
+
+class DashboardOverviewView(APIView):
+    """Dashboard por rol: bloques según los permisos ACL del usuario
+    (ver dashboard/overview.py)."""
+
+    permission_classes = [IsAuthenticated, HasRequiredAcl]
+    acl_permission = "dashboard.view"
+
+    @extend_schema(tags=["dashboard"], responses=DashboardOverviewSerializer)
+    def get(self, request):
+        return Response(build_overview(request.user))

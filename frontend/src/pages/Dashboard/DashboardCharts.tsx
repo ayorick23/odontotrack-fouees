@@ -14,12 +14,13 @@ import {
   YAxis,
 } from "recharts";
 
-import { useTheme } from "../../hooks/useTheme";
-import type {
-  CaseStatus,
-  DashboardSeries,
-  SummaryPeriod,
-} from "../../services/dashboard";
+import type { DashboardSeries, SummaryPeriod } from "../../services/dashboard";
+import {
+  CASE_STATUS_LABELS,
+  CASE_STATUS_ORDER,
+  SINGLE_SERIES_COLOR,
+  useChartTheme,
+} from "./chartColors";
 
 export type PeriodFilter = SummaryPeriod | "todos";
 
@@ -30,27 +31,6 @@ const PERIOD_FILTERS: Array<{ value: PeriodFilter; label: string }> = [
   { value: "1a", label: "1A" },
 ];
 
-const SERIES_COLORS = {
-  patients: "#2ad4c5",
-  pendiente: "#8b5cf6",
-  en_proceso: "#5eead4",
-  finalizado: "#94a3b8",
-  assignments: "#2ad4c5",
-} as const;
-
-const BAR_SERIES = [
-  { key: "patients", label: "Registrados", color: SERIES_COLORS.patients },
-  { key: "pendiente", label: "Pendientes", color: SERIES_COLORS.pendiente },
-  { key: "en_proceso", label: "Asignados", color: SERIES_COLORS.en_proceso },
-  { key: "finalizado", label: "Finalizados", color: SERIES_COLORS.finalizado },
-] as const;
-
-const STATUS_META: Record<CaseStatus, { label: string; color: string }> = {
-  pendiente: { label: "Pendiente de asignación", color: "#8b5cf6" },
-  en_proceso: { label: "Asignado", color: "#2ad4c5" },
-  finalizado: { label: "Finalizado", color: "#94a3b8" },
-};
-
 export function DashboardCharts({
   series,
   period,
@@ -60,16 +40,16 @@ export function DashboardCharts({
   period: PeriodFilter;
   onPeriodChange: (period: PeriodFilter) => void;
 }) {
-  const { theme } = useTheme();
-  const axis = theme === "dark" ? "#94a3b8" : "#94a3b8";
-  const grid = theme === "dark" ? "#1e293b" : "#eef2f7";
-  const tooltipBg = theme === "dark" ? "#0f172a" : "#ffffff";
-  const tooltipBorder = theme === "dark" ? "#334155" : "#e2e8f0";
+  const { axis, grid, surface, cursor, status, tooltipStyle } = useChartTheme();
+  const legend = CASE_STATUS_ORDER.map((key) => ({
+    label: CASE_STATUS_LABELS[key],
+    color: status[key],
+  }));
   const slices = (series?.by_status ?? [])
     .filter((row) => row.count > 0)
     .map((row) => ({
       ...row,
-      label: STATUS_META[row.status].label,
+      label: CASE_STATUS_LABELS[row.status],
     }));
   const statusTotal = (series?.by_status ?? []).reduce(
     (sum, row) => sum + row.count,
@@ -77,18 +57,10 @@ export function DashboardCharts({
   );
   const monthCount = series?.months.length ?? 0;
 
-  const tooltipStyle = {
-    backgroundColor: tooltipBg,
-    border: `1px solid ${tooltipBorder}`,
-    borderRadius: 12,
-    color: axis,
-    fontSize: 12,
-  };
-
   return (
     <section className="grid gap-4 xl:grid-cols-2">
       <ChartCard
-        title="Estadísticas"
+        title="Pacientes registrados por mes"
         action={
           <PeriodFilters period={period} onPeriodChange={onPeriodChange} />
         }
@@ -120,30 +92,43 @@ export function DashboardCharts({
                     tick={{ fill: axis, fontSize: 11 }}
                   />
                   <Tooltip
-                    cursor={{ fill: theme === "dark" ? "#1e293b" : "#f8fafc" }}
+                    cursor={{ fill: cursor }}
                     contentStyle={tooltipStyle}
+                    labelFormatter={(label, payload) => {
+                      const total = payload.reduce(
+                        (sum, item) => sum + Number(item.value ?? 0),
+                        0,
+                      );
+                      return `${label} · ${total} registrados`;
+                    }}
                   />
-                  {BAR_SERIES.map((item) => (
+                  {/* Apiladas: la altura total es lo registrado ese mes. */}
+                  {CASE_STATUS_ORDER.map((key, index) => (
                     <Bar
-                      key={item.key}
-                      dataKey={item.key}
-                      name={item.label}
-                      fill={item.color}
-                      radius={[4, 4, 0, 0]}
-                      maxBarSize={16}
+                      key={key}
+                      dataKey={key}
+                      name={CASE_STATUS_LABELS[key]}
+                      stackId="estado"
+                      fill={status[key]}
+                      stroke={surface}
+                      strokeWidth={1}
+                      radius={
+                        index === CASE_STATUS_ORDER.length - 1 ? [4, 4, 0, 0] : 0
+                      }
+                      maxBarSize={18}
                     />
                   ))}
                 </BarChart>
               </ResponsiveContainer>
             </div>
-            <ChartLegend items={BAR_SERIES} />
+            <ChartLegend items={legend} />
           </div>
         ) : (
           <ChartPlaceholder />
         )}
       </ChartCard>
 
-      <ChartCard title="Seguimiento de citas">
+      <ChartCard title="Asignaciones por mes">
         {series ? (
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart
@@ -152,8 +137,8 @@ export function DashboardCharts({
             >
               <defs>
                 <linearGradient id="citasFill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={SERIES_COLORS.assignments} stopOpacity={0.35} />
-                  <stop offset="100%" stopColor={SERIES_COLORS.assignments} stopOpacity={0.04} />
+                  <stop offset="0%" stopColor={SINGLE_SERIES_COLOR} stopOpacity={0.3} />
+                  <stop offset="100%" stopColor={SINGLE_SERIES_COLOR} stopOpacity={0.04} />
                 </linearGradient>
               </defs>
               <CartesianGrid stroke={grid} strokeDasharray="3 3" vertical={false} />
@@ -176,10 +161,10 @@ export function DashboardCharts({
               <Area
                 type="monotone"
                 dataKey="assignments"
-                name="Citas"
-                stroke={SERIES_COLORS.assignments}
+                name="Asignaciones"
+                stroke={SINGLE_SERIES_COLOR}
                 fill="url(#citasFill)"
-                strokeWidth={2.5}
+                strokeWidth={2}
               />
             </AreaChart>
           </ResponsiveContainer>
@@ -204,7 +189,7 @@ export function DashboardCharts({
                     stroke="none"
                   >
                     {slices.map((slice) => (
-                      <Cell key={slice.status} fill={STATUS_META[slice.status].color} />
+                      <Cell key={slice.status} fill={status[slice.status]} />
                     ))}
                   </Pie>
                   <Tooltip contentStyle={tooltipStyle} />
@@ -212,21 +197,18 @@ export function DashboardCharts({
               </ResponsiveContainer>
             </div>
             <ul className="mt-4 flex flex-wrap justify-center gap-x-4 gap-y-1">
-              {series.by_status.map((row) => {
-                const meta = STATUS_META[row.status];
-                return (
-                  <li
-                    key={row.status}
-                    className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400"
-                  >
-                    <span
-                      className="size-2 rounded-full"
-                      style={{ backgroundColor: meta.color }}
-                    />
-                    {meta.label}
-                  </li>
-                );
-              })}
+              {series.by_status.map((row) => (
+                <li
+                  key={row.status}
+                  className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400"
+                >
+                  <span
+                    className="size-2 rounded-full"
+                    style={{ backgroundColor: status[row.status] }}
+                  />
+                  {CASE_STATUS_LABELS[row.status]} · {row.count}
+                </li>
+              ))}
             </ul>
           </div>
         ) : (
@@ -270,7 +252,7 @@ function PeriodFilters({
   );
 }
 
-function ChartLegend({
+export function ChartLegend({
   items,
 }: {
   items: ReadonlyArray<{ label: string; color: string }>;
@@ -290,16 +272,19 @@ function ChartLegend({
   );
 }
 
-function ChartCard({
+export function ChartCard({
   title,
   action,
   children,
   className = "",
+  bodyClassName = "h-72",
 }: {
   title: string;
   action?: ReactNode;
   children: ReactNode;
   className?: string;
+  /** Alto del área de la gráfica (clase de Tailwind). */
+  bodyClassName?: string;
 }) {
   return (
     <article
@@ -309,7 +294,7 @@ function ChartCard({
         <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">{title}</h2>
         {action}
       </div>
-      <div className="mt-3 h-72">{children}</div>
+      <div className={`mt-3 ${bodyClassName}`}>{children}</div>
     </article>
   );
 }
