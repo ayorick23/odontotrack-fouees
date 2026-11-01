@@ -166,9 +166,9 @@ export function Dashboard() {
             />
           </div>
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Tratamientos marcados como realizados en tus casos:{" "}
+            Tratamientos que marcaste como realizados:{" "}
             <span className="font-semibold text-slate-700 dark:text-slate-200">
-              {my_cases.done_treatments_in_my_cases}
+              {my_cases.my_done_treatments}
             </span>
           </p>
         </Block>

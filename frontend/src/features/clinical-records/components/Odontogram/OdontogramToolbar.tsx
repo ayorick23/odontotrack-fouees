@@ -76,6 +76,18 @@ const DIAGNOSIS_LAYER = "hallazgo";
 
 const MARKS = Object.keys(ORAL_GENERAL_MARK_LABELS) as OralGeneralMark[];
 
+const DONE_DATE = new Intl.DateTimeFormat("es-SV", {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+});
+
+/** "2026-11-01" → "1 nov 2026" (sin desfase de zona horaria). */
+function formatDoneAt(iso: string): string {
+  const [year, month, day] = iso.split("-").map(Number);
+  return DONE_DATE.format(new Date(year, month - 1, day));
+}
+
 type OdontogramToolbarProps = {
   value: OdontogramValue;
   onChange: (value: OdontogramValue) => void;
@@ -408,6 +420,17 @@ function PlanSection({
                   >
                     {formatToothMark(mark, treatmentNames) || "Sin tratamiento"}
                   </p>
+                  {done && mark.doneByName ? (
+                    <p className="mt-0.5 text-xs text-emerald-700 dark:text-emerald-300">
+                      Realizado por {mark.doneByName}
+                      {mark.doneAt ? ` · ${formatDoneAt(mark.doneAt)}` : ""}
+                    </p>
+                  ) : null}
+                  {done && !mark.doneByName ? (
+                    <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                      Se registra quién lo realizó al guardar.
+                    </p>
+                  ) : null}
                   {mark.treatment ? null : (
                     <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
                       Sin tratamiento del tarifario: no aparece en el banco. Quítalo y

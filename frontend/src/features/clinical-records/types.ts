@@ -193,6 +193,12 @@ export type ToothMark = {
   status: ToothStatus | null;
   surfaces: ToothSurface[];
   treatment?: string | null;
+  /** Solo en "hecho": quién lo marcó como realizado y cuándo. Lo pone el
+   * servidor al guardar; el cliente no los manda. */
+  doneBy?: number;
+  doneByName?: string;
+  /** Fecha ISO (AAAA-MM-DD). */
+  doneAt?: string;
 };
 
 export type PracticeTreatment = {

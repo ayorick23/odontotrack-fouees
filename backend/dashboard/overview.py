@@ -80,15 +80,16 @@ def takes_cases(user) -> bool:
     )
 
 
-def _done_treatments(odontograms) -> int:
-    """Tratamientos del plan marcados como realizados (capa hecho)."""
+def _done_by(odontograms, user) -> int:
+    """Tratamientos del plan que `user` marcó como realizados (doneBy)."""
     total = 0
     for teeth in odontograms.values_list("teeth", flat=True):
         for tooth in teeth or []:
             total += sum(
                 1
                 for mark in tooth.get("marks") or []
-                if mark.get("layer") == ToothLayer.HECHO and mark.get("treatment")
+                if mark.get("layer") == ToothLayer.HECHO
+                and mark.get("doneBy") == user.pk
             )
     return total
 
@@ -130,13 +131,8 @@ def my_cases(user) -> dict:
         )
     )
     week_end = now + timedelta(days=UPCOMING_DAYS)
-    own_patients = Assignment.objects.filter(
-        student=user,
-        status__in=[
-            Assignment.AssignmentStatus.ACTIVA,
-            Assignment.AssignmentStatus.FINALIZADA,
-        ],
-    ).values("patient_id")
+    # Cualquier paciente que tuvo: lo realizado cuenta aunque lo liberara.
+    own_patients = Assignment.objects.filter(student=user).values("patient_id")
     return {
         "cases": cases,
         "upcoming_appointments": [
@@ -148,10 +144,8 @@ def my_cases(user) -> dict:
             student=user, is_validated=False
         ).count(),
         "bank_available": Patient.objects.available().count(),
-        # El odontograma no guarda quién hizo cada tratamiento: se cuentan
-        # los realizados en sus casos, no "sus" prácticas.
-        "done_treatments_in_my_cases": _done_treatments(
-            Odontogram.objects.filter(patient_id__in=own_patients)
+        "my_done_treatments": _done_by(
+            Odontogram.objects.filter(patient_id__in=own_patients), user
         ),
     }
 

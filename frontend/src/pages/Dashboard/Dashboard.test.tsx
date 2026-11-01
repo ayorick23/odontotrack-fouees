@@ -43,7 +43,7 @@ const STUDENT: DashboardOverview = {
     ],
     diagnoses_awaiting_validation: 2,
     bank_available: 21,
-    done_treatments_in_my_cases: 3,
+    my_done_treatments: 3,
   },
 };
 

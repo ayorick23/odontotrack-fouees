@@ -206,9 +206,11 @@ export function setDone(
     return value;
   }
   const rest = marks.filter((_, position) => position !== index);
+  // El autor lo pone el servidor al guardar; al volver a pendiente se borra.
+  const { doneBy, doneByName, doneAt, ...plain } = mark;
   return withMarks(
     value,
     fdi,
-    addToLayer(rest, { ...mark, layer: done ? "hecho" : "plan" }),
+    addToLayer(rest, { ...plain, layer: done ? "hecho" : "plan" }),
   );
 }

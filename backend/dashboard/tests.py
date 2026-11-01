@@ -361,7 +361,10 @@ class DashboardOverviewTests(APITestCase):
             teeth=[
                 {"fdi": 16, "marks": [
                     {"layer": "hecho", "status": "obturado", "surfaces": ["oclusal"],
-                     "treatment": "resina"},
+                     "treatment": "resina", "doneBy": self.student.pk},
+                    # Lo hizo otro: no cuenta para ella.
+                    {"layer": "hecho", "status": "sellante", "surfaces": ["oclusal"],
+                     "treatment": "sellante", "doneBy": self.other.pk},
                     {"layer": "plan", "status": "endodoncia", "surfaces": [],
                      "treatment": "endo"},
                 ]},
@@ -422,7 +425,7 @@ class DashboardOverviewTests(APITestCase):
         self.assertEqual(block["upcoming_appointments"][0]["patient_id"], self.soon.id)
         self.assertEqual(block["diagnoses_awaiting_validation"], 1)
         self.assertEqual(block["bank_available"], 2)
-        self.assertEqual(block["done_treatments_in_my_cases"], 1)
+        self.assertEqual(block["my_done_treatments"], 1)
 
     def test_supervision_counts_the_validation_queue(self):
         block = self.get(self._user("doc-ov", User.Role.DOCENTE))["supervision"]

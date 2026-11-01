@@ -51,7 +51,7 @@ FINDINGS = ("caries", "obturado", "fractura", "sellante")
 TEETH = (16, 17, 18, 26, 27, 36, 37, 46, 47, 11, 21, 14, 24)
 
 
-def _mark_teeth(rng, plan_treatments, *, done_share=0.0):
+def _mark_teeth(rng, plan_treatments, *, done_share=0.0, student=None, day=None):
     """Odontograma con hallazgos y tratamientos del plan (algunos hechos)."""
     teeth = default_tooth_findings()
     by_fdi = {tooth["fdi"]: tooth for tooth in teeth}
@@ -62,14 +62,22 @@ def _mark_teeth(rng, plan_treatments, *, done_share=0.0):
         )
     for treatment in rng.sample(plan_treatments, rng.randint(1, 3)):
         status = treatment.odontogram_status or None
-        by_fdi[rng.choice(TEETH)]["marks"].append(
-            {
-                "layer": "hecho" if rng.random() < done_share else "plan",
-                "status": status,
-                "surfaces": ["oclusal"] if status in ("obturado", "sellante") else [],
-                "treatment": treatment.slug,
-            }
-        )
+        mark = {
+            "layer": "hecho" if rng.random() < done_share else "plan",
+            "status": status,
+            "surfaces": ["oclusal"] if status in ("obturado", "sellante") else [],
+            "treatment": treatment.slug,
+        }
+        if mark["layer"] == "hecho" and student is not None:
+            # Como lo haría stamp_done_marks al guardar.
+            mark.update(
+                {
+                    "doneBy": student.pk,
+                    "doneByName": student.get_full_name() or student.username,
+                    "doneAt": day.isoformat(),
+                }
+            )
+        by_fdi[rng.choice(TEETH)]["marks"].append(mark)
     return teeth
 
 
@@ -151,7 +159,11 @@ class Command(BaseCommand):
             Odontogram.objects.create(
                 patient=patient,
                 teeth=_mark_teeth(
-                    rng, treatments, done_share=1.0 if state == "finalizado" else 0.4
+                    rng,
+                    treatments,
+                    done_share=1.0 if state == "finalizado" else 0.4,
+                    student=student,
+                    day=timezone.localdate(assigned_at),
                 ),
                 updated_by=student,
             )

@@ -96,7 +96,7 @@ export type DashboardOverview = {
     upcoming_appointments: DashboardAppointmentRow[];
     diagnoses_awaiting_validation: number;
     bank_available: number;
-    done_treatments_in_my_cases: number;
+    my_done_treatments: number;
   } | null;
   supervision: {
     diagnoses_to_validate: number;
