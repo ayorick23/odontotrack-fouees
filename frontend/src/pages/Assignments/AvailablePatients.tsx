@@ -121,6 +121,18 @@ export function AvailablePatients() {
   }, [page, search, tooth, treatment, reloadToken]);
   const practiceTreatmentOptions = useMemo(() => treatmentOptions(areas), [areas]);
 
+  // Busca mientras se escribe, igual que el directorio (antes pedía Enter).
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      const nextSearch = searchInput.trim();
+      if (nextSearch !== search) {
+        setPage(1);
+        setSearch(nextSearch);
+      }
+    }, 300);
+    return () => window.clearTimeout(timeoutId);
+  }, [searchInput, search]);
+
   const pageCount =
     state.status === "ready" ? Math.max(Math.ceil(state.count / PAGE_SIZE), 1) : 1;
 
@@ -208,7 +220,7 @@ export function AvailablePatients() {
             <input
               value={searchInput}
               onChange={(event) => setSearchInput(event.target.value)}
-              placeholder="Buscar por nombre"
+              placeholder="Nombre, DUI o teléfono"
               aria-label="Buscar paciente disponible"
               className="w-full bg-transparent text-sm text-slate-700 outline-none dark:text-slate-100"
             />

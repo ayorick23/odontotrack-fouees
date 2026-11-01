@@ -37,6 +37,8 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    # Búsqueda sin acentos en el directorio (lookup __unaccent).
+    "django.contrib.postgres",
     # Librerías de terceros
     "rest_framework",
     "corsheaders",

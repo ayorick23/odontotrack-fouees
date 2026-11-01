@@ -12,7 +12,7 @@ from django.utils import timezone
 
 from .models import Patient
 from .practices import CatalogNames, indicated_practices
-from .serializers import assigned_student_name
+from .serializers import latest_assignment, student_name
 
 COLUMNS = (
     "Nombre",
@@ -57,7 +57,7 @@ def patient_row(patient: Patient, names: CatalogNames) -> list[str]:
         patient.clinical_treatment.name if patient.clinical_treatment else "",
         "; ".join(item["label"] for item in indicated_practices(patient, names)),
         patient.get_case_status_display(),
-        assigned_student_name(patient) or "",
+        student_name(latest_assignment(patient)) or "",
         timezone.localtime(patient.created_at).strftime("%Y-%m-%d"),
     ]
 

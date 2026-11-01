@@ -1,5 +1,5 @@
 from django.contrib.auth import get_user_model
-from rest_framework import filters, viewsets
+from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -9,6 +9,7 @@ from assignments.models import Assignment
 
 from .exports import patients_csv_response
 from .models import Patient
+from .filters import PatientSearchFilter
 from .permissions import EstudianteEditsOwnOrAvailablePatient
 from .serializers import PatientListSerializer, PatientSerializer
 
@@ -34,8 +35,8 @@ class PatientViewSet(viewsets.ModelViewSet):
         "export": "patients.export",
         "available": ("assignments.claim", "assignments.assign_student"),
     }
-    filter_backends = [filters.SearchFilter]
-    search_fields = ["first_name", "last_name"]
+    # Nombre sin acentos, documento, teléfono y pieza/tratamiento indicado.
+    filter_backends = [PatientSearchFilter]
 
     def get_queryset(self):
         # Lista aparte del directorio: un scoping futuro por rol no debe

@@ -435,7 +435,8 @@ class PatientListSerializer(serializers.ModelSerializer):
         )
 
     def get_assigned_to(self, patient: Patient) -> str | None:
-        return assigned_student_name(patient)
+        # Como la ficha: un caso finalizado conserva a quién lo atendió.
+        return student_name(latest_assignment(patient))
 
     def get_indicated_practices(self, patient: Patient) -> list[dict]:
         # El contexto es del serializer raíz: los nombres se cargan una
