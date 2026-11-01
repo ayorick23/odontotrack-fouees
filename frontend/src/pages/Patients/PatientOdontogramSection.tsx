@@ -1,4 +1,4 @@
-import { Save, Undo2 } from "lucide-react";
+import { RotateCcw, Save, Undo2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -38,6 +38,8 @@ export function PatientOdontogramSection({
     value,
     onChange,
     save,
+    undo,
+    canUndo,
     discard,
     reload,
     loadStatus,
@@ -94,16 +96,29 @@ export function PatientOdontogramSection({
       return;
     }
     function onKeyDown(event: KeyboardEvent) {
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
+      if (!(event.ctrlKey || event.metaKey)) {
+        return;
+      }
+      const key = event.key.toLowerCase();
+      if (key === "s") {
         event.preventDefault();
         if (isDirty && !isSaving && loadStatus === "ready") {
           void handleSave();
         }
+        return;
+      }
+      // En un campo de texto, Ctrl+Z es el deshacer del propio campo.
+      const target = event.target as HTMLElement | null;
+      const typing =
+        target?.closest("input, textarea, select, [contenteditable='true']") != null;
+      if (key === "z" && !event.shiftKey && !typing && viewingRevisionId == null) {
+        event.preventDefault();
+        undo();
       }
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [handleSave, isDirty, isSaving, loadStatus, readOnly]);
+  }, [handleSave, isDirty, isSaving, loadStatus, readOnly, undo, viewingRevisionId]);
 
   return (
     <section className={cardClass}>
@@ -165,14 +180,25 @@ export function PatientOdontogramSection({
               <button
                 type="button"
                 className={secondaryActionClass}
-                disabled={!isDirty || isSaving || loadStatus !== "ready"}
-                onClick={() => {
-                  discard();
-                  toast.message("Cambios deshechos.");
-                }}
+                title="Deshacer el último cambio (Ctrl+Z)"
+                disabled={!canUndo || isSaving || loadStatus !== "ready"}
+                onClick={undo}
               >
                 <Undo2 className="size-4" />
                 Deshacer
+              </button>
+              <button
+                type="button"
+                className={secondaryActionClass}
+                title="Volver a lo último guardado"
+                disabled={!isDirty || isSaving || loadStatus !== "ready"}
+                onClick={() => {
+                  discard();
+                  toast.message("Cambios descartados.");
+                }}
+              >
+                <RotateCcw className="size-4" />
+                Descartar cambios
               </button>
               <button
                 type="button"

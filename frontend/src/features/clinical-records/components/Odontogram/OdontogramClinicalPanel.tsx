@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { MousePointerClick } from "lucide-react";
 
-import type { OdontogramValue, PracticeArea } from "../../types";
+import type { OdontogramValue, PracticeArea, ToothLayer } from "../../types";
 import { OdontogramClinicalFields } from "./OdontogramClinicalFields";
 import { OdontogramToolbar } from "./OdontogramToolbar";
 
@@ -22,21 +22,25 @@ const TABS: Array<{ id: ClinicalTab; label: string }> = [
 
 type OdontogramClinicalPanelProps = {
   value: OdontogramValue;
-  onOralMarksChange: (value: OdontogramValue) => void;
+  onChange: (value: OdontogramValue) => void;
   readOnly: boolean;
+  layer: ToothLayer;
   onOpenPerio: () => void;
   focusedFdi?: number | null;
   clinicalAreas?: PracticeArea[];
+  treatmentNames?: Record<string, string>;
   onClearFocus?: () => void;
 };
 
 export function OdontogramClinicalPanel({
   value,
-  onOralMarksChange,
+  onChange,
   readOnly,
+  layer,
   onOpenPerio,
   focusedFdi,
   clinicalAreas = [],
+  treatmentNames = {},
   onClearFocus,
 }: OdontogramClinicalPanelProps) {
   const [tab, setTab] = useState<ClinicalTab>("tratamiento");
@@ -72,10 +76,12 @@ export function OdontogramClinicalPanel({
           hasTooth ? (
             <OdontogramToolbar
               value={value}
-              onOralMarksChange={onOralMarksChange}
+              onChange={onChange}
               readOnly={readOnly}
+              layer={layer}
               focusedFdi={focusedFdi}
               clinicalAreas={clinicalAreas}
+              treatmentNames={treatmentNames}
               onClearFocus={onClearFocus}
             />
           ) : (

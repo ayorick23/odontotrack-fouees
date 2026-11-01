@@ -172,31 +172,40 @@ export const TOOTH_STATUS_GROUPS: ReadonlyArray<{
   },
 ];
 
+/**
+ * Una marca de la pieza. Es la única fuente de verdad: el dibujo del
+ * motor SVG se genera a partir de las marcas y nunca al revés.
+ *
+ * En Plan la marca lleva `treatment` (slug del tarifario): es la práctica
+ * que el paciente necesita y lo que lista el banco de pacientes. En Hecho
+ * se conserva como historial. `status` es el símbolo; en Plan lo define el
+ * tarifario y es `null` si el tratamiento no tiene dibujo (diagnóstico...).
+ */
 export type ToothMark = {
   layer: ToothLayer;
-  status: ToothStatus;
+  status: ToothStatus | null;
   surfaces: ToothSurface[];
+  treatment?: string | null;
 };
 
-export type ToothPractice = {
-  indicated: boolean;
-  clinicalArea: string | null;
-  /** Tratamiento específico del catálogo (p. ej. endodoncia_monorradicular). */
-  clinicalTreatment: string | null;
+export type PracticeTreatment = {
+  slug: string;
+  name: string;
+  /** Símbolo con el que se dibuja; `null` si no tiene dibujo. */
+  odontogramStatus: ToothStatus | null;
 };
 
-/** Área clínica con sus tratamientos, para elegir la práctica de una pieza. */
+/** Área clínica con sus tratamientos, para planificar en una pieza. */
 export type PracticeArea = {
   slug: string;
   name: string;
-  treatments: Array<{ slug: string; name: string }>;
+  treatments: PracticeTreatment[];
 };
 
 export type ToothFinding = {
   fdi: FdiToothNumber;
   marks: ToothMark[];
   oralMarks: OralGeneralMarks;
-  practice: ToothPractice;
 };
 
 /**
@@ -241,16 +250,11 @@ export function emptyOralMarks(): OralGeneralMarks {
   return { placa: false, sangrado: false, sarro: false };
 }
 
-export function emptyPractice(): ToothPractice {
-  return { indicated: false, clinicalArea: null, clinicalTreatment: null };
-}
-
 export function emptyTooth(fdi: FdiToothNumber): ToothFinding {
   return {
     fdi,
     marks: [],
     oralMarks: emptyOralMarks(),
-    practice: emptyPractice(),
   };
 }
 
@@ -299,7 +303,7 @@ export function deriveOralMarks(teeth: ToothFinding[]): OralGeneralMarks {
 export function updateTooth(
   value: OdontogramValue,
   fdi: FdiToothNumber,
-  patch: Partial<Pick<ToothFinding, "oralMarks" | "practice" | "marks">>,
+  patch: Partial<Pick<ToothFinding, "oralMarks" | "marks">>,
 ): OdontogramValue {
   const teeth = value.teeth.map((tooth) =>
     tooth.fdi === fdi ? { ...tooth, ...patch } : tooth,
@@ -312,7 +316,7 @@ export function defaultLayerForStatus(status: ToothStatus): ToothLayer {
 }
 
 export function findingStatuses(finding: ToothFinding): ToothStatus[] {
-  return finding.marks.map((mark) => mark.status);
+  return finding.marks.flatMap((mark) => (mark.status ? [mark.status] : []));
 }
 
 export function primaryToothStatus(statuses: ToothStatus[]): ToothStatus {
@@ -330,8 +334,7 @@ export function markedTeeth(value: OdontogramValue): ToothFinding[] {
       tooth.marks.length > 0 ||
       tooth.oralMarks.placa ||
       tooth.oralMarks.sangrado ||
-      tooth.oralMarks.sarro ||
-      tooth.practice.indicated,
+      tooth.oralMarks.sarro,
   );
 }
 
@@ -341,11 +344,25 @@ export function surfaceCode(surfaces: ToothSurface[]): string {
     .join("");
 }
 
-export function formatToothMark(mark: ToothMark): string {
+/** "Caries MO", o el nombre del tratamiento si la marca lo tiene. */
+export function formatToothMark(
+  mark: ToothMark,
+  treatmentNames: Record<string, string> = {},
+): string {
   const surfaces = surfaceCode(mark.surfaces);
-  const status = TOOTH_STATUS_LABELS[mark.status];
-  if (!surfaces) {
-    return status;
-  }
-  return `${status} ${surfaces}`;
+  const label = mark.treatment
+    ? (treatmentNames[mark.treatment] ?? mark.treatment)
+    : mark.status
+      ? TOOTH_STATUS_LABELS[mark.status]
+      : "";
+  return surfaces ? `${label} ${surfaces}` : label;
 }
+
+/** Estados que se marcan por superficie (el resto ocupa la pieza o no
+ * tiene superficies). */
+export const SURFACE_STATUSES: readonly ToothStatus[] = [
+  "caries",
+  "obturado",
+  "sellante",
+  "restauracion_temporal",
+];

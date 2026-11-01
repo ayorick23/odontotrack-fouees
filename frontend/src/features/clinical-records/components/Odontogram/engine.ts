@@ -6,20 +6,13 @@ import {
   getActiveDiagnoses,
   getActiveOrtho,
   getActiveRootPerio,
-  getChartMode,
-  getPlanChanges,
   getPlanChart,
   getStatusChart,
   importStatus,
   onStateChange,
   removeDiagnosisFromSelection,
-  resetTooth,
   setApicalDxForSelection,
-  setCalculusForSelection,
-  setCariesSurfaceForSelection,
   setChartMode,
-  setFillingMaterialForSelection,
-  setFillingSurfaceForSelection,
   setHealthyPulpVisible,
   setModForSelection,
   setOrthoApplianceForSelection,
@@ -30,46 +23,21 @@ import {
   setPdfSettings,
   setPlanChart,
   setPulpEndoForSelection,
-  setRestorationForSelection,
   setShowBase,
-  setToothSelectionForSelection,
   setWisdomVisible,
 } from "react-advanced-odontogram";
 import { toast } from "sonner";
 
-import type { ToothLayer, ToothStatus, ToothSurface } from "../../types";
+import type { ToothLayer } from "../../types";
 
-let activeToothLayer: ToothLayer = "hallazgo";
-
-export function readActiveToothLayer(): ToothLayer {
-  return activeToothLayer;
-}
-
+/** Plan se ve en la carta del plan; Hallazgo y Hecho, en la del estado. */
 export function applyToothLayer(layer: ToothLayer): void {
-  activeToothLayer = layer;
   setChartMode(layer === "plan" ? "plan" : "status");
 }
-
-export type EngineChartMode = "status" | "plan";
-
-export type EnginePlanChange = {
-  toothNo: number;
-  axis: string;
-  from: string;
-  to: string;
-};
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
-
-const SURFACE_TO_ENGINE: Record<ToothSurface, string> = {
-  mesial: "mesial",
-  distal: "distal",
-  vestibular: "buccal",
-  lingual: "lingual",
-  oclusal: "occlusal",
-};
 
 export function subscribeEngine(onChange: () => void): () => void {
   return onStateChange(onChange);
@@ -85,15 +53,15 @@ export function readEngineChart(): unknown {
   return chart;
 }
 
-export function writeEngineChart(payload: unknown): void {
+/** Redibuja todo desde el payload de domainToChart, sin cambiar de capa. */
+export function writeEngineChart(payload: unknown, layer: ToothLayer): void {
   importStatus(payload);
   if (isRecord(payload) && payload.plan != null) {
     setPlanChart(payload.plan);
   } else {
     setPlanChart(getStatusChart());
   }
-  activeToothLayer = "hallazgo";
-  setChartMode("status");
+  applyToothLayer(layer);
   setWisdomVisible(true);
   setShowBase(true);
   setOcclusalVisible(true);
@@ -110,29 +78,6 @@ export function applyBoneVisible(on: boolean): void {
 
 export function applyPulpVisible(on: boolean): void {
   setHealthyPulpVisible(on);
-}
-
-export function readChartMode(): EngineChartMode {
-  return getChartMode();
-}
-
-export function applyChartMode(mode: EngineChartMode): void {
-  setChartMode(mode);
-}
-
-export function readPlanChanges(): EnginePlanChange[] {
-  const changes = getPlanChanges();
-  if (!Array.isArray(changes)) {
-    return [];
-  }
-  return changes.filter(
-    (change): change is EnginePlanChange =>
-      isRecord(change) &&
-      typeof change.toothNo === "number" &&
-      typeof change.axis === "string" &&
-      typeof change.from === "string" &&
-      typeof change.to === "string",
-  );
 }
 
 export function applyPdfPatientName(name: string): void {
@@ -185,49 +130,6 @@ function requireSelection(): boolean {
   }
   toast.error("Selecciona un diente en la carta primero.");
   return false;
-}
-
-export function applyStatusToSelection(status: ToothStatus): void {
-  if (!requireSelection()) {
-    return;
-  }
-  if (status === "sano") {
-    resetTooth();
-    return;
-  }
-  if (
-    status === "extraido" ||
-    status === "ausente_congenito" ||
-    status === "no_erupcionado" ||
-    status === "raiz_retenida"
-  ) {
-    setToothSelectionForSelection("none");
-    return;
-  }
-  if (status === "implante") {
-    setToothSelectionForSelection("implant");
-    return;
-  }
-  if (status === "puente") {
-    setRestorationForSelection("bridge");
-    return;
-  }
-  if (status === "corona") {
-    setRestorationForSelection("crown|zircon");
-    return;
-  }
-  if (status === "caries" || status === "fractura") {
-    setCariesSurfaceForSelection("caries-occlusal", true);
-    return;
-  }
-  if (
-    status === "endodoncia" ||
-    status === "pulpotomia"
-  ) {
-    return;
-  }
-  setFillingMaterialForSelection("composite");
-  setFillingSurfaceForSelection("occlusal", true);
 }
 
 export type EngineOption = {
@@ -376,13 +278,6 @@ export function applyApicalDxToSelection(value: string): void {
   setApicalDxForSelection(value);
 }
 
-export function applyCalculusToSelection(on: boolean): void {
-  if (!requireSelection()) {
-    return;
-  }
-  setCalculusForSelection(on);
-}
-
 export function applyModToSelection(id: string, on: boolean): void {
   if (!requireSelection()) {
     return;
@@ -430,23 +325,4 @@ export function clearDiagnosisFromSelection(key: string): void {
     return;
   }
   removeDiagnosisFromSelection(key);
-}
-
-export function applySurfaceToSelection(
-  surface: ToothSurface,
-  active: boolean,
-  mode: "caries" | "obturado",
-): void {
-  if (!requireSelection()) {
-    return;
-  }
-  const engineSurface = SURFACE_TO_ENGINE[surface];
-  if (mode === "caries") {
-    setCariesSurfaceForSelection(`caries-${engineSurface}`, active);
-    return;
-  }
-  if (active) {
-    setFillingMaterialForSelection("composite");
-  }
-  setFillingSurfaceForSelection(engineSurface, active);
 }

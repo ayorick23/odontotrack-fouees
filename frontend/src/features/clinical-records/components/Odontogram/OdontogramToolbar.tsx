@@ -1,28 +1,34 @@
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
 
 import {
   ORAL_GENERAL_MARK_LABELS,
+  SURFACE_STATUSES,
   TOOTH_STATUS_GROUPS,
   TOOTH_STATUS_LABELS,
   emptyOralMarks,
-  emptyPractice,
+  formatToothMark,
   isFdiToothNumber,
   updateTooth,
   type FdiToothNumber,
   type OralGeneralMark,
   type OdontogramValue,
   type PracticeArea,
+  type ToothLayer,
   type ToothStatus,
 } from "../../types";
+import { clearChartSelection } from "./engine";
 import {
-  applyStatusToSelection,
-  applySurfaceToSelection,
-  clearChartSelection,
-  readActiveToothLayer,
-} from "./engine";
+  addPlannedTreatment,
+  layerStatuses,
+  markDone,
+  removeMark,
+  setMarkSurface,
+  toggleStatus,
+  toggleSurface,
+} from "./edits";
 import { OdontogramFieldSelect } from "./OdontogramFieldSelect";
 import { OdontogramSurfaceDiagram } from "./OdontogramSurfaceDiagram";
+import { STATUS_SWATCH } from "./statusColors";
 
 const STATUS_BUTTON: Record<ToothStatus, string> = {
   sano: "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300",
@@ -56,92 +62,65 @@ const STATUS_BUTTON: Record<ToothStatus, string> = {
     "border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200",
 };
 
-const STATUS_SWATCH: Record<ToothStatus, string> = {
-  sano: "bg-slate-200 dark:bg-slate-600",
-  caries: "bg-amber-400",
-  fractura: "bg-red-400",
-  obturado: "bg-violet-500",
-  sellante: "bg-sky-400",
-  restauracion_temporal: "bg-orange-400",
-  endodoncia: "bg-rose-500",
-  pulpotomia: "bg-rose-300",
-  extraido: "bg-slate-500",
-  raiz_retenida: "bg-stone-500",
-  no_erupcionado: "bg-slate-400",
-  ausente_congenito: "bg-slate-300",
-  corona: "bg-teal-500",
-  puente: "bg-cyan-600",
-  implante: "bg-emerald-400",
+const PRESSED = "ring-2 ring-teal-500 ring-offset-1 dark:ring-offset-slate-900";
+
+const LAYER_HELP: Record<ToothLayer, string> = {
+  hallazgo:
+    "Lo que hay ahora en la pieza. Cada botón marca o desmarca; Sano limpia la capa.",
+  plan:
+    "Elige el tratamiento del tarifario: se dibuja solo y la pieza queda disponible en el banco de pacientes hasta marcarla como hecha.",
+  hecho:
+    "Trabajo ya realizado (antecedentes). Lo planificado pasa aquí con el botón Hecho.",
 };
 
 const MARKS = Object.keys(ORAL_GENERAL_MARK_LABELS) as OralGeneralMark[];
 
 type OdontogramToolbarProps = {
   value: OdontogramValue;
-  onOralMarksChange: (value: OdontogramValue) => void;
+  onChange: (value: OdontogramValue) => void;
   readOnly: boolean;
+  layer: ToothLayer;
   focusedFdi?: number | null;
   clinicalAreas?: PracticeArea[];
+  treatmentNames?: Record<string, string>;
   onClearFocus?: () => void;
 };
 
 export function OdontogramToolbar({
   value,
-  onOralMarksChange,
+  onChange,
   readOnly,
+  layer,
   focusedFdi,
   clinicalAreas = [],
+  treatmentNames = {},
   onClearFocus,
 }: OdontogramToolbarProps) {
-  const [surfaceMode, setSurfaceMode] = useState<"caries" | "obturado">(
-    "caries",
-  );
   const focused =
     focusedFdi != null && isFdiToothNumber(focusedFdi)
       ? value.teeth.find((tooth) => tooth.fdi === focusedFdi)
       : undefined;
   const focusedOral = focused?.oralMarks ?? emptyOralMarks();
-  const focusedPractice = focused?.practice ?? emptyPractice();
-  const focusedArea = clinicalAreas.find(
-    (area) => area.slug === focusedPractice.clinicalArea,
-  );
-  const extrasOpen =
-    focusedOral.placa ||
-    focusedOral.sangrado ||
-    focusedOral.sarro ||
-    focusedPractice.indicated;
+  const extrasOpen = focusedOral.placa || focusedOral.sangrado || focusedOral.sarro;
   const [moreOpen, setMoreOpen] = useState(extrasOpen);
 
   useEffect(() => {
     setMoreOpen(extrasOpen);
   }, [focusedFdi, extrasOpen]);
 
-  const layer = readActiveToothLayer();
-  const surfaceStatus: ToothStatus =
-    surfaceMode === "caries" ? "caries" : "obturado";
-  const activeSurfaces =
-    focused?.marks.find(
-      (mark) => mark.layer === layer && mark.status === surfaceStatus,
-    )?.surfaces ?? [];
-
-  function requireFocusedTooth(): FdiToothNumber | null {
-    if (focused && isFdiToothNumber(focused.fdi)) {
-      return focused.fdi;
-    }
-    toast.error("Selecciona un diente primero.");
+  if (!focused) {
     return null;
   }
+  const fdi = focused.fdi;
 
   return (
     <div className="flex h-full flex-col gap-5">
       <div>
         <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
-          {focused ? `Diente ${focused.fdi}` : "Tratamiento"}
+          Diente {fdi}
         </p>
         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-          Cada marca guarda diente, superficies y capa (hallazgo, plan o
-          hecho). Extraído e implante sustituyen al diente en esa capa.
-          Sano la limpia.
+          {LAYER_HELP[layer]}
         </p>
         {readOnly ? null : (
           <button
@@ -157,74 +136,24 @@ export function OdontogramToolbar({
         )}
       </div>
 
-      {TOOTH_STATUS_GROUPS.map((group) => (
-        <div key={group.id}>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
-            {group.label}
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {group.statuses.map((status) => (
-              <button
-                key={status}
-                type="button"
-                disabled={readOnly}
-                onClick={() => applyStatusToSelection(status)}
-                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${STATUS_BUTTON[status]}`}
-              >
-                <span
-                  className={`size-2 rounded-full ${STATUS_SWATCH[status]}`}
-                  aria-hidden="true"
-                />
-                {TOOTH_STATUS_LABELS[status]}
-              </button>
-            ))}
-          </div>
-        </div>
-      ))}
-
-      <div>
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
-          Superficies
-        </p>
-        <div className="mb-3 flex gap-1 rounded-full bg-white p-1 ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700">
-          <button
-            type="button"
-            disabled={readOnly}
-            aria-pressed={surfaceMode === "caries"}
-            aria-label="Modo superficie caries"
-            onClick={() => setSurfaceMode("caries")}
-            className={`flex-1 rounded-full px-2 py-1 text-xs font-semibold transition ${
-              surfaceMode === "caries"
-                ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200"
-                : "text-slate-500 dark:text-slate-400"
-            }`}
-          >
-            Caries
-          </button>
-          <button
-            type="button"
-            disabled={readOnly}
-            aria-pressed={surfaceMode === "obturado"}
-            aria-label="Modo superficie obturado"
-            onClick={() => setSurfaceMode("obturado")}
-            className={`flex-1 rounded-full px-2 py-1 text-xs font-semibold transition ${
-              surfaceMode === "obturado"
-                ? "bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-200"
-                : "text-slate-500 dark:text-slate-400"
-            }`}
-          >
-            Obturado
-          </button>
-        </div>
-        <OdontogramSurfaceDiagram
-          activeSurfaces={activeSurfaces}
-          disabled={readOnly}
-          mode={surfaceMode}
-          onToggle={(surface, nextActive) =>
-            applySurfaceToSelection(surface, nextActive, surfaceMode)
-          }
+      {layer === "plan" ? (
+        <PlanSection
+          value={value}
+          fdi={fdi}
+          onChange={onChange}
+          readOnly={readOnly}
+          clinicalAreas={clinicalAreas}
+          treatmentNames={treatmentNames}
         />
-      </div>
+      ) : (
+        <StatusSection
+          value={value}
+          fdi={fdi}
+          layer={layer}
+          onChange={onChange}
+          readOnly={readOnly}
+        />
+      )}
 
       <div>
         <button
@@ -236,135 +165,256 @@ export function OdontogramToolbar({
           {moreOpen ? "Ocultar opciones" : "Más opciones"}
         </button>
         {moreOpen ? (
-          <div className="mt-3 flex flex-col gap-4">
-            <div>
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
-                Marcas del diente {focused ? focused.fdi : ""}
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {MARKS.map((mark) => {
-                  const active = focusedOral[mark];
-                  return (
-                    <button
-                      key={mark}
-                      type="button"
-                      disabled={readOnly}
-                      aria-pressed={active}
-                      onClick={() => {
-                        const fdi = requireFocusedTooth();
-                        if (fdi == null) {
-                          return;
-                        }
-                        onOralMarksChange(
-                          updateTooth(value, fdi, {
-                            oralMarks: {
-                              ...focusedOral,
-                              [mark]: !active,
-                            },
-                          }),
-                        );
-                      }}
-                      className={`rounded-full border px-3 py-1.5 text-sm font-semibold transition disabled:opacity-50 ${
-                        active
-                          ? "border-teal-500 bg-teal-600 text-white"
-                          : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
-                      }`}
-                    >
-                      {ORAL_GENERAL_MARK_LABELS[mark]}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div>
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
-                Práctica
-              </p>
-              <button
-                type="button"
-                disabled={readOnly}
-                aria-pressed={focusedPractice.indicated}
-                onClick={() => {
-                  const fdi = requireFocusedTooth();
-                  if (fdi == null) {
-                    return;
-                  }
-                  onOralMarksChange(
-                    updateTooth(value, fdi, {
-                      practice: focusedPractice.indicated
-                        ? emptyPractice()
-                        : { ...focusedPractice, indicated: true },
-                    }),
-                  );
-                }}
-                className={`rounded-full border px-3 py-1.5 text-sm font-semibold transition disabled:opacity-50 ${
-                  focusedPractice.indicated
-                    ? "border-teal-500 bg-teal-600 text-white"
-                    : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
-                }`}
-              >
-                Indicado para práctica
-              </button>
-              {focusedPractice.indicated ? (
-                <div className="mt-2">
-                  <OdontogramFieldSelect
-                    label="Área clínica"
-                    placeholder="Seleccionar área"
+          <div className="mt-3">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+              Marcas del diente {fdi}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {MARKS.map((mark) => {
+                const active = focusedOral[mark];
+                return (
+                  <button
+                    key={mark}
+                    type="button"
                     disabled={readOnly}
-                    value={focusedPractice.clinicalArea ?? ""}
-                    options={clinicalAreas.map((area) => ({
-                      value: area.slug,
-                      label: area.name,
-                    }))}
-                    onChange={(next) => {
-                      const fdi = requireFocusedTooth();
-                      if (fdi == null) {
-                        return;
-                      }
-                      onOralMarksChange(
+                    aria-pressed={active}
+                    onClick={() =>
+                      onChange(
                         updateTooth(value, fdi, {
-                          // El tratamiento anterior era de otra área.
-                          practice: {
-                            indicated: true,
-                            clinicalArea: next || null,
-                            clinicalTreatment: null,
-                          },
+                          oralMarks: { ...focusedOral, [mark]: !active },
                         }),
-                      );
-                    }}
-                  />
-                  {focusedArea ? (
-                    <div className="mt-2">
-                      <OdontogramFieldSelect
-                        label="Tratamiento"
-                        placeholder="Seleccionar tratamiento"
-                        disabled={readOnly}
-                        value={focusedPractice.clinicalTreatment ?? ""}
-                        options={focusedArea.treatments.map((treatment) => ({
-                          value: treatment.slug,
-                          label: treatment.name,
-                        }))}
-                        onChange={(next) => {
-                          const fdi = requireFocusedTooth();
-                          if (fdi == null) {
-                            return;
-                          }
-                          onOralMarksChange(
-                            updateTooth(value, fdi, {
-                              practice: { ...focusedPractice, clinicalTreatment: next || null },
-                            }),
-                          );
-                        }}
-                      />
-                    </div>
-                  ) : null}
-                </div>
-              ) : null}
+                      )
+                    }
+                    className={`rounded-full border px-3 py-1.5 text-sm font-semibold transition disabled:opacity-50 ${
+                      active
+                        ? "border-teal-500 bg-teal-600 text-white"
+                        : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                    }`}
+                  >
+                    {ORAL_GENERAL_MARK_LABELS[mark]}
+                  </button>
+                );
+              })}
             </div>
           </div>
         ) : null}
       </div>
     </div>
+  );
+}
+
+type SectionProps = {
+  value: OdontogramValue;
+  fdi: FdiToothNumber;
+  onChange: (value: OdontogramValue) => void;
+  readOnly: boolean;
+};
+
+function StatusSection({
+  value,
+  fdi,
+  layer,
+  onChange,
+  readOnly,
+}: SectionProps & { layer: ToothLayer }) {
+  const [surfaceMode, setSurfaceMode] = useState<"caries" | "obturado">("caries");
+  const active = layerStatuses(value, fdi, layer);
+  const tooth = value.teeth.find((item) => item.fdi === fdi);
+  const activeSurfaces =
+    tooth?.marks.find(
+      (mark) => mark.layer === layer && mark.status === surfaceMode && !mark.treatment,
+    )?.surfaces ?? [];
+
+  return (
+    <>
+      {TOOTH_STATUS_GROUPS.map((group) => (
+        <div key={group.id}>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+            {group.label}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {group.statuses.map((status) => {
+              const pressed = active.includes(status);
+              return (
+                <button
+                  key={status}
+                  type="button"
+                  disabled={readOnly}
+                  aria-pressed={status === "sano" ? undefined : pressed}
+                  onClick={() => onChange(toggleStatus(value, fdi, layer, status))}
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${STATUS_BUTTON[status]} ${pressed ? PRESSED : ""}`}
+                >
+                  <span
+                    className={`size-2 rounded-full ${STATUS_SWATCH[status]}`}
+                    aria-hidden="true"
+                  />
+                  {TOOTH_STATUS_LABELS[status]}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+
+      <div>
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+          Superficies
+        </p>
+        <div className="mb-3 flex gap-1 rounded-full bg-white p-1 ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700">
+          {(["caries", "obturado"] as const).map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              disabled={readOnly}
+              aria-pressed={surfaceMode === mode}
+              aria-label={`Modo superficie ${mode}`}
+              onClick={() => setSurfaceMode(mode)}
+              className={`flex-1 rounded-full px-2 py-1 text-xs font-semibold transition ${
+                surfaceMode === mode
+                  ? mode === "caries"
+                    ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200"
+                    : "bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-200"
+                  : "text-slate-500 dark:text-slate-400"
+              }`}
+            >
+              {TOOTH_STATUS_LABELS[mode]}
+            </button>
+          ))}
+        </div>
+        <OdontogramSurfaceDiagram
+          activeSurfaces={activeSurfaces}
+          disabled={readOnly}
+          mode={surfaceMode}
+          onToggle={(surface, on) =>
+            onChange(toggleSurface(value, fdi, layer, surfaceMode, surface, on))
+          }
+        />
+      </div>
+    </>
+  );
+}
+
+function PlanSection({
+  value,
+  fdi,
+  onChange,
+  readOnly,
+  clinicalAreas,
+  treatmentNames,
+}: SectionProps & {
+  clinicalAreas: PracticeArea[];
+  treatmentNames: Record<string, string>;
+}) {
+  const [areaSlug, setAreaSlug] = useState("");
+  const [treatmentSlug, setTreatmentSlug] = useState("");
+  const area = clinicalAreas.find((item) => item.slug === areaSlug);
+  const treatment = area?.treatments.find((item) => item.slug === treatmentSlug);
+  const marks = value.teeth.find((item) => item.fdi === fdi)?.marks ?? [];
+  const planned = marks
+    .map((mark, index) => ({ mark, index }))
+    .filter(({ mark }) => mark.layer === "plan");
+
+  return (
+    <>
+      <div className="flex flex-col gap-2">
+        <OdontogramFieldSelect
+          label="Área clínica"
+          placeholder="Seleccionar área"
+          disabled={readOnly}
+          value={areaSlug}
+          options={clinicalAreas.map((item) => ({ value: item.slug, label: item.name }))}
+          onChange={(next) => {
+            setAreaSlug(next);
+            setTreatmentSlug("");
+          }}
+        />
+        {area ? (
+          <OdontogramFieldSelect
+            label="Tratamiento"
+            placeholder="Seleccionar tratamiento"
+            disabled={readOnly}
+            value={treatmentSlug}
+            options={area.treatments.map((item) => ({
+              value: item.slug,
+              label: item.odontogramStatus ? item.name : `${item.name} (sin dibujo)`,
+            }))}
+            onChange={setTreatmentSlug}
+          />
+        ) : null}
+        <button
+          type="button"
+          disabled={readOnly || !treatment}
+          onClick={() => {
+            if (treatment) {
+              onChange(addPlannedTreatment(value, fdi, treatment));
+              setTreatmentSlug("");
+            }
+          }}
+          className="w-fit rounded-full bg-sky-600 px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Agregar al plan
+        </button>
+      </div>
+
+      <div>
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+          Planificado en el diente {fdi}
+        </p>
+        {planned.length === 0 ? (
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Nada planificado en esta pieza.
+          </p>
+        ) : (
+          <ul className="flex flex-col gap-3">
+            {planned.map(({ mark, index }) => (
+              <li
+                key={`${index}-${mark.treatment ?? mark.status}`}
+                className="rounded-xl bg-white p-3 ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700"
+              >
+                <p className="text-sm font-semibold text-slate-700 dark:text-slate-100">
+                  {formatToothMark(mark, treatmentNames) || "Sin tratamiento"}
+                </p>
+                {mark.treatment ? null : (
+                  <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
+                    Sin tratamiento del tarifario: no aparece en el banco. Quítalo y
+                    agrega el tratamiento.
+                  </p>
+                )}
+                {mark.status && SURFACE_STATUSES.includes(mark.status) ? (
+                  <div className="mt-2">
+                    <OdontogramSurfaceDiagram
+                      activeSurfaces={mark.surfaces}
+                      disabled={readOnly}
+                      mode="obturado"
+                      onToggle={(surface, on) =>
+                        onChange(setMarkSurface(value, fdi, index, surface, on))
+                      }
+                    />
+                  </div>
+                ) : null}
+                {readOnly ? null : (
+                  <div className="mt-2 flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => onChange(markDone(value, fdi, index))}
+                      className="text-xs font-semibold text-teal-700 hover:underline dark:text-teal-300"
+                    >
+                      Marcar como hecho
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onChange(removeMark(value, fdi, index))}
+                      className="text-xs font-semibold text-red-700 hover:underline dark:text-red-300"
+                    >
+                      Quitar
+                    </button>
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </>
   );
 }

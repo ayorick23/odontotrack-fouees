@@ -7,6 +7,8 @@ export type ClinicalTreatmentRecord = {
   is_active: boolean;
   sort_order: number;
   area?: number;
+  /** Símbolo en el odontograma al planificarlo; "" si no tiene dibujo. */
+  odontogram_status?: string;
 };
 
 export type ClinicalAreaRecord = {
@@ -62,7 +64,10 @@ export function createClinicalTreatment(payload: {
 export function updateClinicalTreatment(
   id: number,
   payload: Partial<
-    Pick<ClinicalTreatmentRecord, "name" | "is_active" | "sort_order">
+    Pick<
+      ClinicalTreatmentRecord,
+      "name" | "is_active" | "sort_order" | "odontogram_status"
+    >
   >,
 ): Promise<ClinicalTreatmentRecord> {
   return api

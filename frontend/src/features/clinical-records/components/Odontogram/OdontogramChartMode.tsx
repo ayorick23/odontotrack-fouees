@@ -1,15 +1,4 @@
-import { useEffect, useState } from "react";
-
-import {
-  TOOTH_LAYER_LABELS,
-  type ToothLayer,
-} from "../../types";
-import {
-  applyToothLayer,
-  readActiveToothLayer,
-  readPlanChanges,
-  subscribeEngine,
-} from "./engine";
+import { TOOTH_LAYER_LABELS, type ToothLayer } from "../../types";
 
 const LAYERS: Array<{ id: ToothLayer; hint: string }> = [
   {
@@ -18,7 +7,7 @@ const LAYERS: Array<{ id: ToothLayer; hint: string }> = [
   },
   {
     id: "plan",
-    hint: "Tratamiento propuesto, aún no hecho",
+    hint: "Tratamientos por hacer: quedan disponibles en el banco de pacientes",
   },
   {
     id: "hecho",
@@ -27,22 +16,19 @@ const LAYERS: Array<{ id: ToothLayer; hint: string }> = [
 ];
 
 type OdontogramChartModeProps = {
+  layer: ToothLayer;
+  onLayerChange: (layer: ToothLayer) => void;
+  /** Marcas de la capa Plan, para el resumen. */
+  planCount: number;
   readOnly: boolean;
 };
 
-export function OdontogramChartMode({ readOnly }: OdontogramChartModeProps) {
-  const [layer, setLayer] = useState<ToothLayer>("hallazgo");
-  const [changeCount, setChangeCount] = useState(0);
-
-  useEffect(() => {
-    const sync = () => {
-      setLayer(readActiveToothLayer());
-      setChangeCount(readPlanChanges().length);
-    };
-    sync();
-    return subscribeEngine(sync);
-  }, []);
-
+export function OdontogramChartMode({
+  layer,
+  onLayerChange,
+  planCount,
+  readOnly,
+}: OdontogramChartModeProps) {
   return (
     <div className="flex flex-wrap items-center gap-2">
       <div
@@ -58,7 +44,7 @@ export function OdontogramChartMode({ readOnly }: OdontogramChartModeProps) {
               type="button"
               title={button.hint}
               aria-pressed={active}
-              onClick={() => applyToothLayer(button.id)}
+              onClick={() => onLayerChange(button.id)}
               className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
                 active
                   ? "bg-white text-teal-800 shadow-sm dark:bg-slate-900 dark:text-teal-200"
@@ -74,8 +60,8 @@ export function OdontogramChartMode({ readOnly }: OdontogramChartModeProps) {
         {readOnly
           ? `${TOOTH_LAYER_LABELS[layer]}.`
           : LAYERS.find((item) => item.id === layer)?.hint}
-        {layer === "plan" && changeCount > 0
-          ? ` ${changeCount} ${changeCount === 1 ? "diferencia" : "diferencias"} respecto al estado.`
+        {layer === "plan" && planCount > 0
+          ? ` ${planCount} ${planCount === 1 ? "tratamiento planificado" : "tratamientos planificados"}.`
           : ""}
       </p>
     </div>

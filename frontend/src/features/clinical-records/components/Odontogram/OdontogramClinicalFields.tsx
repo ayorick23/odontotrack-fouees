@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 
 import {
   applyApicalDxToSelection,
-  applyCalculusToSelection,
   applyDiagnosisToSelection,
   applyModToSelection,
   applyOrthoApplianceToSelection,
@@ -128,14 +127,6 @@ function EndoFields({ readOnly }: { readOnly: boolean }) {
           options={state.apicalOptions}
           disabled={readOnly || state.apicalDisabled}
           onChange={applyApicalDxToSelection}
-        />
-      ) : null}
-      {state.calculusVisible ? (
-        <ToggleChip
-          label="Cálculo"
-          pressed={state.calculusChecked}
-          disabled={readOnly}
-          onClick={() => applyCalculusToSelection(!state.calculusChecked)}
         />
       ) : null}
       {state.mods

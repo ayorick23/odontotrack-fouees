@@ -1,3 +1,5 @@
+import { Check, X } from "lucide-react";
+
 import {
   ORAL_GENERAL_MARK_LABELS,
   TOOTH_LAYER_LABELS,
@@ -6,27 +8,9 @@ import {
   type FdiToothNumber,
   type OdontogramValue,
   type ToothLayer,
-  type ToothPractice,
-  type ToothStatus,
 } from "../../types";
-
-const STATUS_SWATCH: Record<ToothStatus, string> = {
-  sano: "bg-slate-200 dark:bg-slate-600",
-  caries: "bg-amber-400",
-  fractura: "bg-red-400",
-  obturado: "bg-violet-500",
-  sellante: "bg-sky-400",
-  restauracion_temporal: "bg-orange-400",
-  endodoncia: "bg-rose-500",
-  pulpotomia: "bg-rose-300",
-  corona: "bg-teal-500",
-  puente: "bg-cyan-600",
-  implante: "bg-emerald-400",
-  extraido: "bg-slate-500",
-  raiz_retenida: "bg-stone-500",
-  no_erupcionado: "bg-slate-400",
-  ausente_congenito: "bg-slate-300",
-};
+import { markDone, removeMark } from "./edits";
+import { NO_SYMBOL_SWATCH, STATUS_SWATCH } from "./statusColors";
 
 const LAYER_CHIP: Record<ToothLayer, string> = {
   hallazgo:
@@ -42,21 +26,26 @@ type FindingChip = {
   fdi: FdiToothNumber;
   swatch: string;
   text: string;
+  /** Posición de la marca en la pieza; null en placa/sangrado/sarro. */
+  markIndex: number | null;
 };
 
 type OdontogramFindingsProps = {
   value: OdontogramValue;
-  /** Nombre por slug de área o tratamiento, para la etiqueta de la práctica. */
-  practiceNames?: Record<string, string>;
+  /** Nombre por slug de tratamiento, para las marcas con tratamiento. */
+  treatmentNames?: Record<string, string>;
   focusedFdi?: number | null;
   onFocusTooth?: (fdi: FdiToothNumber) => void;
+  /** Sin esto la lista es de solo lectura (sin ×). */
+  onChange?: (value: OdontogramValue) => void;
 };
 
 export function OdontogramFindings({
   value,
-  practiceNames = {},
+  treatmentNames = {},
   focusedFdi,
   onFocusTooth,
+  onChange,
 }: OdontogramFindingsProps) {
   const findings = markedTeeth(value);
 
@@ -75,41 +64,29 @@ export function OdontogramFindings({
   };
 
   for (const tooth of findings) {
-    const extras = [
-      ...Object.entries(tooth.oralMarks)
-        .filter(([, active]) => active)
-        .map(
-          ([mark]) =>
-            ORAL_GENERAL_MARK_LABELS[mark as keyof typeof ORAL_GENERAL_MARK_LABELS],
-        ),
-      tooth.practice.indicated ? practiceLabel(tooth.practice, practiceNames) : null,
-    ].filter((item): item is string => item != null);
-
-    if (tooth.marks.length === 0) {
-      groups.hallazgo.push({
-        key: `${tooth.fdi}-meta`,
-        fdi: tooth.fdi,
-        swatch: "bg-teal-500",
-        text: extras.length > 0 ? `${tooth.fdi} ${extras.join(" · ")}` : `${tooth.fdi}`,
-      });
-      continue;
-    }
-
-    for (const mark of tooth.marks) {
+    tooth.marks.forEach((mark, index) => {
       groups[mark.layer].push({
-        key: `${tooth.fdi}-${mark.layer}-${mark.status}-${mark.surfaces.join("-")}`,
+        key: `${tooth.fdi}-${index}-${mark.layer}-${mark.status}-${mark.treatment ?? ""}`,
         fdi: tooth.fdi,
-        swatch: STATUS_SWATCH[mark.status],
-        text: `${tooth.fdi} ${formatToothMark(mark)}`,
+        swatch: mark.status ? STATUS_SWATCH[mark.status] : NO_SYMBOL_SWATCH,
+        text: `${tooth.fdi} ${formatToothMark(mark, treatmentNames)}`,
+        markIndex: index,
       });
-    }
+    });
 
-    if (extras.length > 0) {
+    const oral = Object.entries(tooth.oralMarks)
+      .filter(([, active]) => active)
+      .map(
+        ([mark]) =>
+          ORAL_GENERAL_MARK_LABELS[mark as keyof typeof ORAL_GENERAL_MARK_LABELS],
+      );
+    if (oral.length > 0) {
       groups.hallazgo.push({
-        key: `${tooth.fdi}-extras`,
+        key: `${tooth.fdi}-oral`,
         fdi: tooth.fdi,
         swatch: "bg-teal-500",
-        text: `${tooth.fdi} ${extras.join(" · ")}`,
+        text: `${tooth.fdi} ${oral.join(" · ")}`,
+        markIndex: null,
       });
     }
   }
@@ -128,15 +105,18 @@ export function OdontogramFindings({
             </p>
             <ul className="flex flex-wrap gap-1.5">
               {chips.map((row) => (
-                <li key={row.key}>
+                <li
+                  key={row.key}
+                  className={`inline-flex items-center rounded-full text-xs font-medium ring-1 transition ${
+                    focusedFdi === row.fdi
+                      ? "bg-teal-50 text-teal-800 ring-teal-300 dark:bg-teal-950/60 dark:text-teal-200 dark:ring-teal-800"
+                      : LAYER_CHIP[layer]
+                  }`}
+                >
                   <button
                     type="button"
                     onClick={() => onFocusTooth?.(row.fdi)}
-                    className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ring-1 transition ${
-                      focusedFdi === row.fdi
-                        ? "bg-teal-50 text-teal-800 ring-teal-300 dark:bg-teal-950/60 dark:text-teal-200 dark:ring-teal-800"
-                        : LAYER_CHIP[layer]
-                    }`}
+                    className="inline-flex items-center gap-1.5 py-1 pl-2.5 pr-2"
                   >
                     <span
                       className={`size-1.5 rounded-full ${row.swatch}`}
@@ -144,6 +124,28 @@ export function OdontogramFindings({
                     />
                     {row.text}
                   </button>
+                  {onChange && row.markIndex != null && layer === "plan" ? (
+                    <button
+                      type="button"
+                      title="Marcar como hecho"
+                      aria-label={`Marcar como hecho: ${row.text}`}
+                      onClick={() => onChange(markDone(value, row.fdi, row.markIndex!))}
+                      className="rounded-full p-1 hover:bg-black/5 dark:hover:bg-white/10"
+                    >
+                      <Check className="size-3" aria-hidden="true" />
+                    </button>
+                  ) : null}
+                  {onChange && row.markIndex != null ? (
+                    <button
+                      type="button"
+                      title="Quitar"
+                      aria-label={`Quitar ${row.text}`}
+                      onClick={() => onChange(removeMark(value, row.fdi, row.markIndex!))}
+                      className="mr-1 rounded-full p-1 hover:bg-black/5 dark:hover:bg-white/10"
+                    >
+                      <X className="size-3" aria-hidden="true" />
+                    </button>
+                  ) : null}
                 </li>
               ))}
             </ul>
@@ -152,10 +154,4 @@ export function OdontogramFindings({
       })}
     </div>
   );
-}
-
-function practiceLabel(practice: ToothPractice, names: Record<string, string>): string {
-  const slug = practice.clinicalTreatment ?? practice.clinicalArea;
-  const name = slug ? names[slug] : undefined;
-  return name ? `Práctica: ${name}` : "Práctica";
 }

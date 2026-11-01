@@ -6,6 +6,9 @@ import { emptyOdontogram, type OdontogramValue } from "../types";
 
 type LoadStatus = "loading" | "ready" | "error";
 
+/** Pasos de deshacer que se recuerdan. */
+const UNDO_LIMIT = 100;
+
 function cloneOdontogram(value: OdontogramValue): OdontogramValue {
   return JSON.parse(JSON.stringify(value)) as OdontogramValue;
 }
@@ -23,7 +26,30 @@ export function useOdontogramData(patientId: number) {
   const [isSaving, setIsSaving] = useState(false);
   const [savedKey, setSavedKey] = useState(domainKey(emptyOdontogram()));
   const [editorKey, setEditorKey] = useState(0);
+  const [undoCount, setUndoCount] = useState(0);
   const requestIdRef = useRef(0);
+  // Refs y no estado: varias ediciones seguidas (antes de re-renderizar)
+  // deben apilarse cada una sobre la anterior.
+  const valueRef = useRef(value);
+  const pastRef = useRef<OdontogramValue[]>([]);
+
+  /** Reemplaza el valor; `history` decide qué pasa con la pila de deshacer. */
+  const commit = useCallback(
+    (next: OdontogramValue, history: "push" | "keep" | "clear") => {
+      if (history === "push") {
+        pastRef.current = [
+          ...pastRef.current.slice(-(UNDO_LIMIT - 1)),
+          valueRef.current,
+        ];
+      } else if (history === "clear") {
+        pastRef.current = [];
+      }
+      valueRef.current = next;
+      setValue(next);
+      setUndoCount(pastRef.current.length);
+    },
+    [],
+  );
 
   const rememberSaved = useCallback((next: OdontogramValue) => {
     const saved = cloneOdontogram(next);
@@ -41,8 +67,7 @@ export function useOdontogramData(patientId: number) {
         if (requestId !== requestIdRef.current) {
           return;
         }
-        const cloned = rememberSaved(loaded);
-        setValue(cloned);
+        commit(rememberSaved(loaded), "clear");
         setLoadStatus("ready");
       })
       .catch(() => {
@@ -50,7 +75,7 @@ export function useOdontogramData(patientId: number) {
           setLoadStatus("error");
         }
       });
-  }, [patientId, rememberSaved]);
+  }, [patientId, rememberSaved, commit]);
 
   useEffect(() => {
     load();
@@ -59,26 +84,38 @@ export function useOdontogramData(patientId: number) {
     };
   }, [load]);
 
-  const onChange = useCallback((next: OdontogramValue) => {
-    setValue(next);
-  }, []);
+  const onChange = useCallback(
+    (next: OdontogramValue) => commit(next, "push"),
+    [commit],
+  );
+
+  /** Un paso atrás (Ctrl+Z). */
+  const undo = useCallback(() => {
+    const previous = pastRef.current.at(-1);
+    if (!previous) {
+      return;
+    }
+    pastRef.current = pastRef.current.slice(0, -1);
+    commit(previous, "keep");
+  }, [commit]);
 
   const save = useCallback(async () => {
     setIsSaving(true);
     try {
-      const saved = await saveOdontogram(patientId, value);
+      const saved = await saveOdontogram(patientId, valueRef.current);
       const cloned = rememberSaved(saved);
-      setValue(cloned);
+      commit(cloned, "clear");
       return cloned;
     } finally {
       setIsSaving(false);
     }
-  }, [patientId, rememberSaved, value]);
+  }, [patientId, rememberSaved, commit]);
 
+  /** Descarta todos los cambios sin guardar. */
   const discard = useCallback(() => {
-    setValue(cloneOdontogram(savedValue));
+    commit(cloneOdontogram(savedValue), "clear");
     setEditorKey((key) => key + 1);
-  }, [savedValue]);
+  }, [savedValue, commit]);
 
   // Un odontograma nunca guardado llega sin snapshot y el editor genera uno
   // al dibujarlo; eso solo no cuenta como cambio sin guardar.
@@ -90,6 +127,8 @@ export function useOdontogramData(patientId: number) {
     value,
     onChange,
     save,
+    undo,
+    canUndo: undoCount > 0,
     discard,
     reload: load,
     loadStatus,
