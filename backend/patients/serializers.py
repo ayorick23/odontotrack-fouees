@@ -1,5 +1,6 @@
+import re
+
 from rest_framework import serializers
-from rest_framework.validators import UniqueValidator
 
 from accounts.models import User
 from assignments.models import Assignment
@@ -11,6 +12,29 @@ MAX_PHOTO_BYTES = 2 * 1024 * 1024
 ALLOWED_PHOTO_CONTENT_TYPES = frozenset(
     {"image/jpeg", "image/jpg", "image/png", "image/webp"}
 )
+
+DUI_PATTERN = re.compile(r"^(\d{8})-?(\d)$")
+PASSPORT_PATTERN = re.compile(r"^[A-Z0-9]{5,20}$")
+DUI_FORMAT_ERROR = "El DUI debe tener el formato 00000000-0 (solo números)."
+
+# Observación de la demo: no guardar sin contacto ni contacto de
+# emergencia. WhatsApp y correo quedan opcionales (no todos los
+# pacientes tienen).
+REQUIRED_CONTACT_FIELDS = {
+    "phone_number": "El teléfono es obligatorio.",
+    "address": "La dirección es obligatoria.",
+    "emergency_contact_name": "El nombre del contacto de emergencia es obligatorio.",
+    "emergency_contact_phone": "El teléfono del contacto de emergencia es obligatorio.",
+    "emergency_contact_relationship": "El parentesco del contacto de emergencia es obligatorio.",
+}
+
+
+def normalize_dui(value: str) -> str | None:
+    """00000000-0 o 9 dígitos seguidos → 00000000-0; None si no es un DUI."""
+    match = DUI_PATTERN.match(value.strip())
+    if match is None:
+        return None
+    return f"{match.group(1)}-{match.group(2)}"
 
 
 class StrippedCharField(serializers.CharField):
@@ -98,15 +122,18 @@ class PatientSerializer(serializers.ModelSerializer):
         max_length=100,
         error_messages={"blank": "El apellido es obligatorio."},
     )
+    # Sin UniqueValidator: con dui=None (menores) buscaría IS NULL y
+    # chocaría con cualquier otro menor. La unicidad va en validate.
     dui = StrippedCharField(
         max_length=30,
-        error_messages={"blank": "El DUI es obligatorio."},
-        validators=[
-            UniqueValidator(
-                queryset=Patient.objects.all(),
-                message="Ya existe un paciente con este DUI.",
-            )
-        ],
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+    )
+    guardian_dui = StrippedCharField(
+        max_length=10,
+        required=False,
+        allow_blank=True,
     )
     whatsapp_number = StrippedCharField(
         max_length=20,
@@ -152,7 +179,9 @@ class PatientSerializer(serializers.ModelSerializer):
             "id",
             "first_name",
             "last_name",
+            "document_type",
             "dui",
+            "guardian_dui",
             "date_of_birth",
             "phone_number",
             "whatsapp_number",
@@ -212,8 +241,66 @@ class PatientSerializer(serializers.ModelSerializer):
             return True
         return assignment.student_id == user.id
 
+    def _current(self, attrs: dict, field: str):
+        """Valor que quedará guardado: el que llega o el de la instancia."""
+        if field in attrs:
+            return attrs[field]
+        return getattr(self.instance, field, None) if self.instance else None
+
+    def _check_document(self, attrs: dict) -> None:
+        document_type = self._current(attrs, "document_type") or Patient.DocumentType.DUI
+        number = (self._current(attrs, "dui") or "").strip()
+        guardian = (self._current(attrs, "guardian_dui") or "").strip()
+
+        if document_type == Patient.DocumentType.MENOR:
+            normalized_guardian = normalize_dui(guardian)
+            if not guardian:
+                raise serializers.ValidationError(
+                    {"guardian_dui": "El DUI del responsable es obligatorio."}
+                )
+            if normalized_guardian is None:
+                raise serializers.ValidationError({"guardian_dui": DUI_FORMAT_ERROR})
+            attrs["dui"] = None
+            attrs["guardian_dui"] = normalized_guardian
+            return
+
+        attrs["guardian_dui"] = ""
+        if not number:
+            raise serializers.ValidationError(
+                {"dui": "El número de documento es obligatorio."}
+            )
+        if document_type == Patient.DocumentType.DUI:
+            normalized = normalize_dui(number)
+            if normalized is None:
+                raise serializers.ValidationError({"dui": DUI_FORMAT_ERROR})
+        else:
+            normalized = number.upper()
+            if not PASSPORT_PATTERN.match(normalized):
+                raise serializers.ValidationError(
+                    {"dui": "El pasaporte debe tener de 5 a 20 letras o números."}
+                )
+        duplicates = Patient.objects.filter(dui=normalized)
+        if self.instance is not None:
+            duplicates = duplicates.exclude(pk=self.instance.pk)
+        if duplicates.exists():
+            raise serializers.ValidationError(
+                {"dui": "Ya existe un paciente con este documento."}
+            )
+        attrs["dui"] = normalized
+
+    def _check_contacts(self, attrs: dict) -> None:
+        errors = {
+            field: message
+            for field, message in REQUIRED_CONTACT_FIELDS.items()
+            if not (self._current(attrs, field) or "").strip()
+        }
+        if errors:
+            raise serializers.ValidationError(errors)
+
     def validate(self, attrs):
         attrs = super().validate(attrs)
+        self._check_document(attrs)
+        self._check_contacts(attrs)
         area = (
             attrs["clinical_area"]
             if "clinical_area" in attrs
@@ -270,7 +357,9 @@ class PatientListSerializer(serializers.ModelSerializer):
             "id",
             "first_name",
             "last_name",
+            "document_type",
             "dui",
+            "guardian_dui",
             "phone_number",
             "photo",
             "clinical_area",

@@ -21,6 +21,7 @@ import {
 } from "../../services/catalogs";
 import {
   listAvailablePatients,
+  patientDocumentLabel,
   patientFullName,
   patientInitials,
   type PatientListItem,
@@ -238,7 +239,7 @@ export function AvailablePatients() {
                       <p className="font-medium text-slate-800 dark:text-slate-100">
                         {patientFullName(patient)}
                       </p>
-                      <p className="text-xs text-slate-500">{patient.dui}</p>
+                      <p className="text-xs text-slate-500">{patientDocumentLabel(patient)}</p>
                     </div>
                   </div>
                 ),

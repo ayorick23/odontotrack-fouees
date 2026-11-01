@@ -19,6 +19,15 @@ from patients.models import Patient
 
 PAGE_SIZE = settings.REST_FRAMEWORK["PAGE_SIZE"]
 
+# Contacto mínimo obligatorio al guardar por la API.
+CONTACT = {
+    "phone_number": "7000-1111",
+    "address": "San Salvador",
+    "emergency_contact_name": "Marta López",
+    "emergency_contact_phone": "7000-3333",
+    "emergency_contact_relationship": Patient.EmergencyContactRelationship.MADRE,
+}
+
 
 def clinical_area(slug: str) -> ClinicalArea:
     return ClinicalArea.objects.get(slug=slug)
@@ -501,6 +510,7 @@ class PatientCompleteFieldsTests(APITestCase):
             "last_name": "Completa",
             "dui": "04512345-6",
             "phone_number": "7000-1111",
+            "address": "Santa Tecla",
             "whatsapp_number": "7000-2222",
             "emergency_contact_name": "Marta Completa",
             "emergency_contact_phone": "7000-3333",
@@ -519,18 +529,138 @@ class PatientCompleteFieldsTests(APITestCase):
         )
         self.assertFalse(patient.photo)
 
-    def test_new_contact_fields_are_optional(self):
+    def test_contact_and_emergency_contact_are_required(self):
         response = self.client.post(
             "/api/patients/",
-            {"first_name": "Luis", "last_name": "Minimo", "dui": "MIN-001"},
+            {"first_name": "Luis", "last_name": "Minimo", "dui": "04512345-7"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        for field in CONTACT:
+            self.assertIn(field, response.data)
+        self.assertFalse(Patient.objects.filter(dui="04512345-7").exists())
+
+    def test_whatsapp_and_email_stay_optional(self):
+        response = self.client.post(
+            "/api/patients/",
+            {"first_name": "Luis", "last_name": "Minimo", "dui": "04512345-7", **CONTACT},
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        patient = Patient.objects.get(dui="MIN-001")
+        patient = Patient.objects.get(dui="04512345-7")
         self.assertEqual(patient.whatsapp_number, "")
-        self.assertEqual(patient.emergency_contact_name, "")
-        self.assertEqual(patient.emergency_contact_phone, "")
-        self.assertEqual(patient.emergency_contact_relationship, "")
+        self.assertEqual(patient.email, "")
+
+    def test_patch_cannot_blank_a_required_contact(self):
+        patient = Patient.objects.create(
+            first_name="Ana", last_name="Lima", dui="04512345-8", **CONTACT
+        )
+        response = self.client.patch(
+            f"/api/patients/{patient.id}/",
+            {"emergency_contact_phone": "  "},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("emergency_contact_phone", response.data)
+
+    def test_patch_on_incomplete_patient_asks_for_missing_contact(self):
+        # Pacientes registrados antes de la regla: al editarlos hay que completarlos.
+        patient = Patient.objects.create(
+            first_name="Ana", last_name="Vieja", dui="04512345-9"
+        )
+        response = self.client.patch(
+            f"/api/patients/{patient.id}/",
+            {"phone_number": "7000-0000"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("address", response.data)
+        self.assertNotIn("phone_number", response.data)
+
+
+class PatientDocumentTests(APITestCase):
+    def setUp(self):
+        sync_acl()
+        self.admin = User.objects.create_user(
+            username="admin-doc",
+            password="pass12345",
+            role=User.Role.ADMIN,
+        )
+        self.client.force_authenticate(user=self.admin)
+
+    def create(self, **fields):
+        return self.client.post(
+            "/api/patients/",
+            {"first_name": "Ana", "last_name": "Doc", **CONTACT, **fields},
+            format="json",
+        )
+
+    def test_dui_rejects_letters(self):
+        response = self.create(dui="0123456A-8")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("dui", response.data)
+
+    def test_dui_without_dash_is_normalized(self):
+        response = self.create(dui="012345678")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.json()["dui"], "01234567-8")
+
+    def test_same_dui_written_differently_is_duplicate(self):
+        self.assertEqual(self.create(dui="01234567-8").status_code, 201)
+        response = self.create(dui="012345678")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("dui", response.data)
+
+    def test_passport_accepts_letters_and_is_uppercased(self):
+        response = self.create(document_type="pasaporte", dui="ab123456")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.json()["dui"], "AB123456")
+
+    def test_passport_rejects_symbols(self):
+        response = self.create(document_type="pasaporte", dui="AB-12/34")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("dui", response.data)
+
+    def test_minor_needs_guardian_dui(self):
+        response = self.create(document_type="menor")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("guardian_dui", response.data)
+
+    def test_minors_have_no_document_and_do_not_collide(self):
+        # Dos hermanos con el mismo responsable.
+        first = self.create(document_type="menor", guardian_dui="012345678", dui="x")
+        second = self.create(document_type="menor", guardian_dui="01234567-8")
+        self.assertEqual(first.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(second.status_code, status.HTTP_201_CREATED)
+        self.assertIsNone(first.json()["dui"])
+        self.assertEqual(first.json()["guardian_dui"], "01234567-8")
+
+    def test_guardian_dui_is_cleared_for_adults(self):
+        response = self.create(dui="01234567-8", guardian_dui="09999999-9")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.json()["guardian_dui"], "")
+
+    def test_minor_turning_adult_needs_own_dui(self):
+        patient = Patient.objects.create(
+            first_name="Leo",
+            last_name="Menor",
+            document_type=Patient.DocumentType.MENOR,
+            guardian_dui="01234567-8",
+            **CONTACT,
+        )
+        response = self.client.patch(
+            f"/api/patients/{patient.id}/",
+            {"document_type": "dui"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("dui", response.data)
+
+    def test_export_labels_minor_document(self):
+        self.create(first_name="Leo", document_type="menor", guardian_dui="01234567-8")
+        response = self.client.get("/api/patients/export/")
+        content = response.content.decode("utf-8-sig")
+        self.assertIn("Menor (resp. 01234567-8)", content)
 
 
 class RecepcionPatientPermissionTests(APITestCase):
@@ -554,12 +684,14 @@ class RecepcionPatientPermissionTests(APITestCase):
         self.unassigned = Patient.objects.create(
             first_name="Ana",
             last_name="Libre",
-            dui="LIB-001",
+            dui="01000001-1",
+            **CONTACT,
         )
         self.assigned = Patient.objects.create(
             first_name="Luis",
             last_name="Asignado",
-            dui="ASG-002",
+            dui="01000002-2",
+            **CONTACT,
         )
         Assignment.objects.create(patient=self.assigned, student=self.student)
         self.client.force_authenticate(user=self.recepcion)
@@ -615,6 +747,7 @@ class PatientWriteTests(APITestCase):
                 "first_name": "  Ana  ",
                 "last_name": "López",
                 "dui": "01234567-8",
+                **CONTACT,
                 "phone_number": "7777-7777",
                 "clinical_area": "operatoria",
                 "case_status": Patient.CaseStatus.FINALIZADO,
@@ -655,13 +788,21 @@ class PatientWriteTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("first_name", response.data)
         self.assertIn("last_name", response.data)
+
+        # El documento se revisa en validate(), cuando los campos ya pasaron.
+        response = self.client.post(
+            "/api/patients/",
+            {"first_name": "Ana", "last_name": "Cruz", "dui": "", **CONTACT},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("dui", response.data)
 
     def test_update_keeps_case_status(self):
         patient = Patient.objects.create(
             first_name="Carlos",
             last_name="Ruiz",
-            dui="UPD-001",
+            dui="01000003-3",
             case_status=Patient.CaseStatus.EN_PROCESO,
         )
         self.client.force_authenticate(user=self.admin)
@@ -670,7 +811,8 @@ class PatientWriteTests(APITestCase):
             {
                 "first_name": "Carlos",
                 "last_name": "Ruiz",
-                "dui": "UPD-001",
+                "dui": "01000003-3",
+                **CONTACT,
                 "date_of_birth": "1990-05-12",
                 "phone_number": "7000-1111",
                 "email": "carlos@example.com",
@@ -719,7 +861,8 @@ class PatientWriteTests(APITestCase):
             {
                 "first_name": "Ana",
                 "last_name": "López",
-                "dui": "REC-001",
+                "dui": "01000004-4",
+                **CONTACT,
                 "whatsapp_number": "7777-8888",
                 "emergency_contact_name": "Marta López",
                 "emergency_contact_phone": "7000-3333",
@@ -743,7 +886,8 @@ class PatientWriteTests(APITestCase):
             {
                 "first_name": "Ana",
                 "last_name": "Foto",
-                "dui": "FOTO-001",
+                "dui": "01000005-5",
+                **CONTACT,
                 "photo": _jpeg_upload(),
             },
             format="multipart",
@@ -796,7 +940,8 @@ class PatientWriteTests(APITestCase):
             {
                 "first_name": "Ana",
                 "last_name": "Dx",
-                "dui": "DX-001",
+                "dui": "01000006-6",
+                **CONTACT,
                 "clinical_area": "diagnostico",
                 "clinical_subcategory": "diagnostico_con_rx_panoramica",
             },
@@ -816,7 +961,8 @@ class PatientWriteTests(APITestCase):
             {
                 "first_name": "Ana",
                 "last_name": "Cruz",
-                "dui": "SUB-BAD",
+                "dui": "01000007-7",
+                **CONTACT,
                 "clinical_area": "operatoria",
                 "clinical_subcategory": "endodoncia_monorradicular",
             },
@@ -831,7 +977,8 @@ class PatientWriteTests(APITestCase):
             {
                 "first_name": "Ana",
                 "last_name": "Cruz",
-                "dui": "SUB-NOAREA",
+                "dui": "01000008-8",
+                **CONTACT,
                 "clinical_subcategory": "ameloplastia_adulto",
             },
             format="json",
@@ -843,7 +990,8 @@ class PatientWriteTests(APITestCase):
         patient = Patient.objects.create(
             first_name="Carlos",
             last_name="Ruiz",
-            dui="SUB-PATCH",
+            dui="01000009-9",
+            **CONTACT,
             clinical_area=clinical_area("operatoria"),
             clinical_treatment=clinical_treatment("ameloplastia_adulto"),
         )

@@ -25,6 +25,8 @@ import { useAuth } from "../../hooks/useAuth";
 import { primaryActionClass, secondaryActionClass } from "../../lib/actions";
 import {
   CASE_STATUS_LABELS,
+  DOCUMENT_TYPE_LABELS,
+  DOCUMENT_TYPES,
   EMERGENCY_RELATIONSHIP_LABELS,
   EMERGENCY_RELATIONSHIPS,
   createPatient,
@@ -34,6 +36,7 @@ import {
   patientInitials,
   updatePatient,
   type CaseStatus,
+  type DocumentType,
   type Patient,
   type PatientFieldName,
   type PatientWritePayload,
@@ -45,9 +48,9 @@ import {
 
 const AREA_NONE = "sin-area";
 const SUBCATEGORY_NONE = "sin-tratamiento";
-const RELATIONSHIP_NONE = "sin-parentesco";
 const DUI_PATTERN = /^\d{8}-\d$/;
-const PASSPORT_PATTERN = /^[A-Za-z][A-Za-z0-9-]{4,29}$/;
+const PASSPORT_PATTERN = /^[A-Z0-9]{5,20}$/;
+const DUI_FORMAT_ERROR = "Usa el formato 00000000-0";
 const MAX_PHOTO_BYTES = 2 * 1024 * 1024;
 const ALLOWED_PHOTO_TYPES = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
 const cardClass =
@@ -67,14 +70,9 @@ const STATUS_ICONS: Record<CaseStatus, LucideIcon> = {
 const patientFormSchema = z.object({
   first_name: z.string().trim().min(1, "El nombre es obligatorio").max(100),
   last_name: z.string().trim().min(1, "El apellido es obligatorio").max(100),
-  dui: z
-    .string()
-    .trim()
-    .min(1, "El DUI es obligatorio")
-    .refine(
-      (value) => DUI_PATTERN.test(value) || PASSPORT_PATTERN.test(value),
-      "Usa el formato 00000000-0 o un pasaporte de al menos 5 caracteres",
-    ),
+  document_type: z.enum(["dui", "pasaporte", "menor"]),
+  dui: z.string().trim(),
+  guardian_dui: z.string().trim(),
   date_of_birth: z
     .string()
     .refine(
@@ -91,7 +89,11 @@ const patientFormSchema = z.object({
       today.setHours(0, 0, 0, 0);
       return birth <= today;
     }, "La fecha de nacimiento no puede ser futura"),
-  phone_number: z.string().trim().max(20, "El teléfono no puede superar 20 caracteres"),
+  phone_number: z
+    .string()
+    .trim()
+    .min(1, "El teléfono es obligatorio")
+    .max(20, "El teléfono no puede superar 20 caracteres"),
   whatsapp_number: z
     .string()
     .trim()
@@ -103,21 +105,60 @@ const patientFormSchema = z.object({
       (value) => value === "" || z.email().safeParse(value).success,
       "Correo no válido",
     ),
-  address: z.string().trim().max(255, "La dirección no puede superar 255 caracteres"),
+  address: z
+    .string()
+    .trim()
+    .min(1, "La dirección es obligatoria")
+    .max(255, "La dirección no puede superar 255 caracteres"),
   emergency_contact_name: z
     .string()
     .trim()
+    .min(1, "El contacto de emergencia es obligatorio")
     .max(150, "El contacto no puede superar 150 caracteres"),
   emergency_contact_phone: z
     .string()
     .trim()
+    .min(1, "El teléfono de emergencia es obligatorio")
     .max(20, "El teléfono de emergencia no puede superar 20 caracteres"),
   emergency_contact_relationship: z.union([
     z.literal(""),
     z.enum(["madre", "padre", "hermano_a", "conyuge", "hijo_a", "otro"]),
-  ]),
+  ]).refine((value) => value.length > 0, "El parentesco es obligatorio"),
   clinical_area: z.string(),
   clinical_subcategory: z.string(),
+}).superRefine((values, context) => {
+  // Mismas reglas que PatientSerializer._check_document en el backend.
+  if (values.document_type === "menor") {
+    if (!DUI_PATTERN.test(values.guardian_dui)) {
+      context.addIssue({
+        code: "custom",
+        path: ["guardian_dui"],
+        message: values.guardian_dui
+          ? DUI_FORMAT_ERROR
+          : "El DUI del responsable es obligatorio",
+      });
+    }
+    return;
+  }
+  if (!values.dui) {
+    context.addIssue({
+      code: "custom",
+      path: ["dui"],
+      message: "El número de documento es obligatorio",
+    });
+    return;
+  }
+  const pattern = values.document_type === "dui" ? DUI_PATTERN : PASSPORT_PATTERN;
+  if (!pattern.test(values.dui)) {
+    context.addIssue({
+      code: "custom",
+      path: ["dui"],
+      message:
+        values.document_type === "dui"
+          ? DUI_FORMAT_ERROR
+          : "El pasaporte debe tener de 5 a 20 letras o números",
+    });
+  }
 });
 
 type PatientFormValues = z.infer<typeof patientFormSchema>;
@@ -125,7 +166,9 @@ type PatientFormValues = z.infer<typeof patientFormSchema>;
 const EMPTY_VALUES: PatientFormValues = {
   first_name: "",
   last_name: "",
+  document_type: "dui",
   dui: "",
+  guardian_dui: "",
   date_of_birth: "",
   phone_number: "",
   whatsapp_number: "",
@@ -174,6 +217,7 @@ export function PatientForm() {
     defaultValues: EMPTY_VALUES,
   });
   const selectedArea = watch("clinical_area");
+  const documentType = watch("document_type");
   const selectedAreaRecord = areas.find((area) => area.slug === selectedArea);
   const subcategoryOptions = (selectedAreaRecord?.treatments ?? []).filter(
     (treatment) =>
@@ -444,31 +488,92 @@ export function PatientForm() {
                 />
               </Field>
               <Field
-                label="DUI"
-                error={errors.dui?.message}
+                label="Tipo de documento"
+                error={errors.document_type?.message}
                 required
               >
                 <Controller
-                  name="dui"
+                  name="document_type"
                   control={control}
                   render={({ field }) => (
-                    <input
-                      autoComplete="off"
-                      disabled={!canWrite}
-                      placeholder="00000000-0"
-                      maxLength={30}
-                      className={inputClass}
-                      name={field.name}
-                      ref={field.ref}
+                    <Select
                       value={field.value}
-                      onBlur={field.onBlur}
-                      onChange={(event) =>
-                        field.onChange(formatDocumentId(event.target.value))
-                      }
-                    />
+                      onValueChange={(value) => {
+                        field.onChange(value);
+                        setValue("dui", "");
+                        setValue("guardian_dui", "");
+                      }}
+                      disabled={!canWrite}
+                    >
+                      <SelectTrigger aria-label="Tipo de documento" className={selectClass}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className={selectMenuClass}>
+                        {DOCUMENT_TYPES.map((type) => (
+                          <SelectItem key={type} value={type}>
+                            {DOCUMENT_TYPE_LABELS[type]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   )}
                 />
               </Field>
+              {documentType === "menor" ? (
+                <Field
+                  label="DUI del responsable"
+                  error={errors.guardian_dui?.message}
+                  required
+                >
+                  <Controller
+                    name="guardian_dui"
+                    control={control}
+                    render={({ field }) => (
+                      <input
+                        autoComplete="off"
+                        inputMode="numeric"
+                        disabled={!canWrite}
+                        placeholder="00000000-0"
+                        maxLength={10}
+                        className={inputClass}
+                        name={field.name}
+                        ref={field.ref}
+                        value={field.value}
+                        onBlur={field.onBlur}
+                        onChange={(event) => field.onChange(formatDui(event.target.value))}
+                      />
+                    )}
+                  />
+                </Field>
+              ) : (
+                <Field
+                  label={documentType === "pasaporte" ? "Número de pasaporte" : "DUI"}
+                  error={errors.dui?.message}
+                  required
+                >
+                  <Controller
+                    name="dui"
+                    control={control}
+                    render={({ field }) => (
+                      <input
+                        autoComplete="off"
+                        inputMode={documentType === "dui" ? "numeric" : "text"}
+                        disabled={!canWrite}
+                        placeholder={documentType === "dui" ? "00000000-0" : "A1234567"}
+                        maxLength={documentType === "dui" ? 10 : 20}
+                        className={inputClass}
+                        name={field.name}
+                        ref={field.ref}
+                        value={field.value}
+                        onBlur={field.onBlur}
+                        onChange={(event) =>
+                          field.onChange(formatDocument(event.target.value, documentType))
+                        }
+                      />
+                    )}
+                  />
+                </Field>
+              )}
               <Field
                 label="Área clínica"
                 error={errors.clinical_area?.message}
@@ -578,7 +683,7 @@ export function PatientForm() {
             description="Teléfono, WhatsApp y correo para localizar al paciente."
           />
           <div className="grid gap-4 md:grid-cols-2">
-            <Field label="Teléfono" error={errors.phone_number?.message}>
+            <Field label="Teléfono" error={errors.phone_number?.message} required>
               <input
                 type="tel"
                 autoComplete="tel"
@@ -608,7 +713,7 @@ export function PatientForm() {
                 {...register("email")}
               />
             </Field>
-            <Field label="Dirección" error={errors.address?.message}>
+            <Field label="Dirección" error={errors.address?.message} required>
               <input
                 autoComplete="street-address"
                 disabled={!canWrite}
@@ -629,6 +734,7 @@ export function PatientForm() {
             <Field
               label="Nombre"
               error={errors.emergency_contact_name?.message}
+              required
             >
               <input
                 autoComplete="off"
@@ -640,6 +746,7 @@ export function PatientForm() {
             <Field
               label="Teléfono"
               error={errors.emergency_contact_phone?.message}
+              required
             >
               <input
                 type="tel"
@@ -653,32 +760,28 @@ export function PatientForm() {
             <Field
               label="Parentesco"
               error={errors.emergency_contact_relationship?.message}
+              required
             >
               <Controller
                 name="emergency_contact_relationship"
                 control={control}
                 render={({ field }) => (
                   <Select
-                    value={field.value === "" ? RELATIONSHIP_NONE : field.value}
-                    onValueChange={(value) =>
-                      field.onChange(value === RELATIONSHIP_NONE ? "" : value)
-                    }
+                    value={field.value}
+                    onValueChange={field.onChange}
                     disabled={!canWrite}
                   >
                     <SelectTrigger
                       aria-label="Parentesco del contacto de emergencia"
                       className={selectClass}
                     >
-                      <SelectValue placeholder="Sin parentesco" />
+                      <SelectValue placeholder="Selecciona el parentesco" />
                     </SelectTrigger>
                     <SelectContent
                       position="popper"
                       align="start"
                       className={selectMenuClass}
                     >
-                      <SelectItem value={RELATIONSHIP_NONE}>
-                        Sin parentesco
-                      </SelectItem>
                       {EMERGENCY_RELATIONSHIPS.map((relationship) => (
                         <SelectItem key={relationship} value={relationship}>
                           {EMERGENCY_RELATIONSHIP_LABELS[relationship]}
@@ -811,7 +914,9 @@ function toFormValues(patient: Patient): PatientFormValues {
   return {
     first_name: patient.first_name,
     last_name: patient.last_name,
-    dui: formatDocumentId(patient.dui),
+    document_type: patient.document_type,
+    dui: patient.dui ?? "",
+    guardian_dui: patient.guardian_dui,
     date_of_birth: patient.date_of_birth ?? "",
     phone_number: patient.phone_number,
     whatsapp_number: patient.whatsapp_number,
@@ -829,7 +934,9 @@ function toPayload(values: PatientFormValues): PatientWritePayload {
   return {
     first_name: values.first_name,
     last_name: values.last_name,
-    dui: values.dui,
+    document_type: values.document_type,
+    dui: values.document_type === "menor" ? "" : values.dui,
+    guardian_dui: values.document_type === "menor" ? values.guardian_dui : "",
     date_of_birth: values.date_of_birth || null,
     phone_number: values.phone_number,
     whatsapp_number: values.whatsapp_number,
@@ -843,10 +950,15 @@ function toPayload(values: PatientFormValues): PatientWritePayload {
   };
 }
 
-function formatDocumentId(value: string): string {
-  if (/[A-Za-z]/.test(value)) {
-    return value.replace(/[^A-Za-z0-9-]/g, "").slice(0, 30);
+function formatDocument(value: string, documentType: DocumentType): string {
+  if (documentType === "pasaporte") {
+    return value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 20);
   }
+  return formatDui(value);
+}
+
+/** Solo dígitos (las letras se descartan al teclear) con el guion en su lugar. */
+function formatDui(value: string): string {
   const digits = value.replace(/\D/g, "").slice(0, 9);
   if (digits.length <= 8) {
     return digits;

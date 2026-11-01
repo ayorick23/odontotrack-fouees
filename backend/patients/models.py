@@ -90,12 +90,34 @@ class Patient(models.Model):
         HIJO_A = "hijo_a", "Hijo/a"
         OTRO = "otro", "Otro"
 
+    class DocumentType(models.TextChoices):
+        DUI = "dui", "DUI"
+        PASAPORTE = "pasaporte", "Pasaporte"
+        # Menores de 18 años: aún no tienen DUI propio.
+        MENOR = "menor", "Menor sin documento"
+
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
+    document_type = models.CharField(
+        max_length=20,
+        choices=DocumentType.choices,
+        default=DocumentType.DUI,
+    )
+    # Se llama `dui` por historia, pero guarda el número del documento
+    # que indique document_type. Vacío (NULL) solo para menores; Postgres
+    # admite varios NULL en una columna unique.
     dui = models.CharField(
         max_length=30,
         unique=True,
-        help_text="Documento Único de Identidad del paciente.",
+        null=True,
+        blank=True,
+        help_text="Número del documento del paciente (DUI o pasaporte).",
+    )
+    guardian_dui = models.CharField(
+        max_length=10,
+        blank=True,
+        default="",
+        help_text="DUI del responsable, solo para menores sin documento.",
     )
     date_of_birth = models.DateField(null=True, blank=True)
     phone_number = models.CharField(max_length=20, blank=True)
@@ -148,7 +170,7 @@ class Patient(models.Model):
         ordering = ["last_name", "first_name"]
 
     def __str__(self):
-        return f"{self.first_name} {self.last_name} ({self.dui})"
+        return f"{self.first_name} {self.last_name} ({self.dui or 'menor'})"
 
     def clean(self):
         super().clean()

@@ -10,11 +10,24 @@ export const CASE_STATUS_LABELS: Record<CaseStatus, string> = {
   finalizado: "Finalizado",
 };
 
+export type DocumentType = "dui" | "pasaporte" | "menor";
+
+export const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
+  dui: "DUI",
+  pasaporte: "Pasaporte",
+  menor: "Menor sin documento",
+};
+
+export const DOCUMENT_TYPES = Object.keys(DOCUMENT_TYPE_LABELS) as DocumentType[];
+
 export type PatientListItem = {
   id: number;
   first_name: string;
   last_name: string;
-  dui: string;
+  document_type: DocumentType;
+  /** Número del documento; null en menores sin documento. */
+  dui: string | null;
+  guardian_dui: string;
   phone_number: string;
   photo: string | null;
   clinical_area: string;
@@ -52,7 +65,11 @@ export type Patient = {
   id: number;
   first_name: string;
   last_name: string;
-  dui: string;
+  document_type: DocumentType;
+  /** Número del documento; null en menores sin documento. */
+  dui: string | null;
+  /** DUI del responsable, solo en menores. */
+  guardian_dui: string;
   date_of_birth: string | null;
   phone_number: string;
   whatsapp_number: string;
@@ -80,7 +97,9 @@ export type Patient = {
 export type PatientWritePayload = {
   first_name: string;
   last_name: string;
+  document_type: DocumentType;
   dui: string;
+  guardian_dui: string;
   date_of_birth: string | null;
   phone_number: string;
   whatsapp_number: string;
@@ -249,6 +268,19 @@ export async function deletePatient(id: number): Promise<void> {
   await api.delete(`/patients/${id}/`);
 }
 
+/** Documento para mostrar: "01234567-8", "Pasaporte AB123" o "Menor (resp. 01234567-8)". */
+export function patientDocumentLabel(
+  patient: Pick<PatientListItem, "document_type" | "dui" | "guardian_dui">,
+): string {
+  if (patient.document_type === "menor") {
+    return `Menor (resp. ${patient.guardian_dui})`;
+  }
+  if (patient.document_type === "pasaporte") {
+    return `Pasaporte ${patient.dui ?? ""}`;
+  }
+  return patient.dui ?? "";
+}
+
 export type PatientMutationError = {
   message: string;
   fields: Partial<Record<PatientFieldName, string>>;
@@ -257,7 +289,9 @@ export type PatientMutationError = {
 const PATIENT_FIELDS = new Set<PatientFieldName>([
   "first_name",
   "last_name",
+  "document_type",
   "dui",
+  "guardian_dui",
   "date_of_birth",
   "phone_number",
   "whatsapp_number",
