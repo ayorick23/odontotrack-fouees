@@ -649,6 +649,24 @@ class TreatmentApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(Tratamiento.objects.count(), 1)
 
+    def test_treatment_records_who_registered_it(self):
+        other = User.objects.create_user(
+            username="otro-tx", password="pass12345", role=User.Role.ESTUDIANTE
+        )
+        response = self.client.post(
+            self.url,
+            {
+                "patient": self.patient.id,
+                "clinical_area": self.area.id,
+                "clinical_treatment": self.treatment.id,
+                # El autor sale de la sesión, no del payload.
+                "created_by": other.id,
+            },
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Tratamiento.objects.get().created_by, self.student)
+        self.assertEqual(response.json()["created_by_name"], "estudiante-tx")
+
     def test_rejects_treatment_from_a_different_area(self):
         response = self.client.post(
             self.url,

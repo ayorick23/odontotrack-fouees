@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Q
@@ -161,6 +162,16 @@ class Patient(models.Model):
         default=CaseStatus.PENDIENTE,
     )
 
+    # Responsabilidad: quién registró al paciente. SET_NULL para que borrar
+    # una cuenta no se lleve el expediente.
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="registered_patients",
+        editable=False,
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

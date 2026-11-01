@@ -114,6 +114,7 @@ class TreatmentViewSet(ClinicalScopeMixin, ModelViewSet):
     queryset = Tratamiento.objects.select_related(
         "clinical_area",
         "clinical_treatment",
+        "created_by",
     )
     serializer_class = TratamientoSerializer
     permission_classes = [IsAuthenticated, HasRequiredAcl]
@@ -131,7 +132,7 @@ class TreatmentViewSet(ClinicalScopeMixin, ModelViewSet):
         assert_can_write_clinical(self.request.user, patient)
         # Diagnóstico y evolución ya lo exigen al resolver el estudiante.
         assert_case_open(patient)
-        serializer.save()
+        serializer.save(created_by=self.request.user)
 
 
 class ClinicalEvolutionViewSet(ClinicalScopeMixin, ModelViewSet):

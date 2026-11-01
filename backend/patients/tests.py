@@ -520,9 +520,9 @@ class PatientCompleteFieldsTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
         patient = Patient.objects.get(dui="04512345-6")
-        self.assertEqual(patient.whatsapp_number, "7000-2222")
+        self.assertEqual(patient.whatsapp_number, "+503 7000-2222")
         self.assertEqual(patient.emergency_contact_name, "Marta Completa")
-        self.assertEqual(patient.emergency_contact_phone, "7000-3333")
+        self.assertEqual(patient.emergency_contact_phone, "+503 7000-3333")
         self.assertEqual(
             patient.emergency_contact_relationship,
             Patient.EmergencyContactRelationship.MADRE,
@@ -576,6 +576,132 @@ class PatientCompleteFieldsTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("address", response.data)
         self.assertNotIn("phone_number", response.data)
+
+
+class PatientResponsibilityTests(APITestCase):
+    def setUp(self):
+        sync_acl()
+        self.recepcion = User.objects.create_user(
+            username="recepcion-resp",
+            password="pass12345",
+            role=User.Role.RECEPCION,
+            first_name="Rita",
+            last_name="Recepción",
+        )
+        self.client.force_authenticate(user=self.recepcion)
+
+    def test_create_records_who_registered_the_patient(self):
+        other = User.objects.create_user(
+            username="otro-resp", password="pass12345", role=User.Role.ADMIN
+        )
+        response = self.client.post(
+            "/api/patients/",
+            {
+                "first_name": "Ana",
+                "last_name": "Resp",
+                "dui": "02000001-1",
+                "created_by": other.id,
+                **CONTACT,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Patient.objects.get().created_by, self.recepcion)
+        self.assertEqual(response.json()["created_by_name"], "Rita Recepción")
+
+    def test_detail_shows_who_made_the_first_diagnosis(self):
+        from clinical_records.models import Diagnostico
+
+        first = User.objects.create_user(
+            username="primero", password="pass12345", role=User.Role.ESTUDIANTE
+        )
+        second = User.objects.create_user(
+            username="segundo", password="pass12345", role=User.Role.ESTUDIANTE
+        )
+        patient = Patient.objects.create(
+            first_name="Ana", last_name="Dx", dui="02000002-2", **CONTACT
+        )
+        response = self.client.get(f"/api/patients/{patient.id}/")
+        self.assertIsNone(response.json()["first_diagnosis_by"])
+        self.assertIsNone(response.json()["created_by_name"])
+
+        Diagnostico.objects.create(patient=patient, student=first, content="Caries")
+        Diagnostico.objects.create(patient=patient, student=second, content="Control")
+        response = self.client.get(f"/api/patients/{patient.id}/")
+        self.assertEqual(response.json()["first_diagnosis_by"], "primero")
+
+    def test_deleting_the_author_keeps_the_patient(self):
+        patient = Patient.objects.create(
+            first_name="Ana",
+            last_name="Huérfana",
+            dui="02000003-3",
+            created_by=self.recepcion,
+            **CONTACT,
+        )
+        self.recepcion.delete()
+        patient.refresh_from_db()
+        self.assertIsNone(patient.created_by)
+
+
+class PatientPhoneTests(APITestCase):
+    def setUp(self):
+        sync_acl()
+        self.admin = User.objects.create_user(
+            username="admin-tel",
+            password="pass12345",
+            role=User.Role.ADMIN,
+        )
+        self.client.force_authenticate(user=self.admin)
+
+    def create(self, **fields):
+        return self.client.post(
+            "/api/patients/",
+            {"first_name": "Ana", "last_name": "Tel", "dui": "03000001-1", **CONTACT, **fields},
+            format="json",
+        )
+
+    def test_phones_are_saved_with_country_code(self):
+        response = self.create(
+            phone_number="+503 70001111",
+            whatsapp_number="+1 5551234567",
+            emergency_contact_phone="+52 5512345678",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        body = response.json()
+        self.assertEqual(body["phone_number"], "+503 7000-1111")
+        self.assertEqual(body["whatsapp_number"], "+1 (555) 123-4567")
+        self.assertEqual(body["emergency_contact_phone"], "+52 55 1234 5678")
+
+    def test_number_without_code_is_from_el_salvador(self):
+        response = self.create(phone_number="70001111")
+        self.assertEqual(response.json()["phone_number"], "+503 7000-1111")
+
+    def test_phone_rejects_letters_and_symbols(self):
+        for value in ("7000-ABCD", "7000*1111", "503+70001111"):
+            response = self.create(phone_number=value)
+            self.assertEqual(response.status_code, 400, value)
+            self.assertIn("phone_number", response.data)
+
+    def test_phone_needs_the_country_length(self):
+        # 7 dígitos no es un número de El Salvador, pero sí de Belice.
+        self.assertEqual(self.create(phone_number="+503 7000111").status_code, 400)
+        response = self.create(phone_number="+501 6001111")
+        self.assertEqual(response.json()["phone_number"], "+501 600-1111")
+
+    def test_unlisted_country_code_is_rejected(self):
+        response = self.create(phone_number="+34 612345678")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("phone_number", response.data)
+
+    def test_whatsapp_can_stay_empty(self):
+        response = self.create(whatsapp_number="")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.json()["whatsapp_number"], "")
+
+    def test_export_protects_phone_from_excel_formulas(self):
+        self.create()
+        content = self.client.get("/api/patients/export/").content.decode("utf-8-sig")
+        self.assertIn("'+503 7000-1111", content)
 
 
 class PatientDocumentTests(APITestCase):
@@ -704,7 +830,7 @@ class RecepcionPatientPermissionTests(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.unassigned.refresh_from_db()
-        self.assertEqual(self.unassigned.phone_number, "7777-7777")
+        self.assertEqual(self.unassigned.phone_number, "+503 7777-7777")
 
     def test_recepcion_cannot_edit_assigned_patient(self):
         response = self.client.patch(
@@ -824,7 +950,7 @@ class PatientWriteTests(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         body = response.json()
-        self.assertEqual(body["phone_number"], "7000-1111")
+        self.assertEqual(body["phone_number"], "+503 7000-1111")
         self.assertEqual(body["clinical_area"], "endodoncia")
         self.assertEqual(body["case_status"], Patient.CaseStatus.EN_PROCESO)
         self.assertEqual(body["date_of_birth"], "1990-05-12")
@@ -872,9 +998,9 @@ class PatientWriteTests(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         body = response.json()
-        self.assertEqual(body["whatsapp_number"], "7777-8888")
+        self.assertEqual(body["whatsapp_number"], "+503 7777-8888")
         self.assertEqual(body["emergency_contact_name"], "Marta López")
-        self.assertEqual(body["emergency_contact_phone"], "7000-3333")
+        self.assertEqual(body["emergency_contact_phone"], "+503 7000-3333")
         self.assertEqual(
             body["emergency_contact_relationship"],
             Patient.EmergencyContactRelationship.MADRE,

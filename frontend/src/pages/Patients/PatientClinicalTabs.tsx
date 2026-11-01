@@ -336,6 +336,7 @@ function TreatmentsTab({
               </p>
               <p className="mt-1 text-xs text-slate-400">
                 {item.clinical_area_name} · {formatDateTime(item.created_at)}
+                {item.created_by_name ? ` · ${item.created_by_name}` : ""}
               </p>
             </li>
           ))}

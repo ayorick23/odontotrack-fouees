@@ -16,6 +16,7 @@ import { PatientClinicalTabs, hasClinicalTabs } from "./PatientClinicalTabs";
 import { useAuth } from "../../hooks/useAuth";
 import { useTheme } from "../../hooks/useTheme";
 import { primaryActionClass } from "../../lib/actions";
+import { phoneHref } from "../../lib/phones";
 import {
   areaLabel,
   listClinicalAreas,
@@ -234,6 +235,15 @@ export function PatientDetail() {
                 {format(new Date(patient.created_at), "d 'de' MMMM 'de' yyyy", {
                   locale: es,
                 })}
+                {patient.created_by_name ? (
+                  <span className="font-normal text-slate-500">
+                    {" "}
+                    · por {patient.created_by_name}
+                  </span>
+                ) : null}
+              </Fact>
+              <Fact label="Primer diagnóstico">
+                {patient.first_diagnosis_by ?? emptyValue("Sin diagnóstico")}
               </Fact>
               {patient.assignment_note ? (
                 <Fact label="Nota de asignación" className="sm:col-span-2">
@@ -351,7 +361,7 @@ function PhoneLink({ value }: { value: string }) {
   }
   return (
     <a
-      href={`tel:${trimmed}`}
+      href={phoneHref(trimmed)}
       className="text-teal-700 hover:underline dark:text-teal-400"
     >
       {trimmed}

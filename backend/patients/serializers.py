@@ -7,6 +7,7 @@ from assignments.models import Assignment
 from catalogs.models import ClinicalArea, ClinicalTreatment
 
 from .models import Patient
+from .phones import normalize_phone
 
 MAX_PHOTO_BYTES = 2 * 1024 * 1024
 ALLOWED_PHOTO_CONTENT_TYPES = frozenset(
@@ -42,6 +43,32 @@ class StrippedCharField(serializers.CharField):
         if isinstance(data, str):
             data = data.strip()
         return super().to_internal_value(data)
+
+
+class PhoneField(StrippedCharField):
+    """Teléfono con código de país, guardado como '+503 7000-1111'.
+
+    Vacío se acepta aquí; si el campo es obligatorio lo dice
+    REQUIRED_CONTACT_FIELDS.
+    """
+
+    def __init__(self, **kwargs):
+        kwargs.setdefault("max_length", 20)
+        kwargs.setdefault("required", False)
+        kwargs.setdefault("allow_blank", True)
+        super().__init__(**kwargs)
+
+    def to_internal_value(self, data):
+        value = super().to_internal_value(data)
+        if not value:
+            return value
+        normalized = normalize_phone(value)
+        if normalized is None:
+            raise serializers.ValidationError(
+                "Teléfono no válido: usa solo números y la cantidad de "
+                "dígitos del país."
+            )
+        return normalized
 
 
 class OptionalSlugRelatedField(serializers.SlugRelatedField):
@@ -98,6 +125,12 @@ def student_name(assignment: Assignment | None) -> str | None:
     return student.get_full_name() or student.username
 
 
+def user_name(user: User | None) -> str | None:
+    if user is None:
+        return None
+    return user.get_full_name() or user.username
+
+
 def assigned_student_name(patient: Patient) -> str | None:
     return student_name(active_assignment(patient))
 
@@ -135,21 +168,14 @@ class PatientSerializer(serializers.ModelSerializer):
         required=False,
         allow_blank=True,
     )
-    whatsapp_number = StrippedCharField(
-        max_length=20,
-        required=False,
-        allow_blank=True,
-    )
+    phone_number = PhoneField()
+    whatsapp_number = PhoneField()
     emergency_contact_name = StrippedCharField(
         max_length=150,
         required=False,
         allow_blank=True,
     )
-    emergency_contact_phone = StrippedCharField(
-        max_length=20,
-        required=False,
-        allow_blank=True,
-    )
+    emergency_contact_phone = PhoneField()
     photo = PatientPhotoField(required=False, allow_null=True)
     has_active_assignment = serializers.SerializerMethodField()
     # Para finalizar el caso desde la ficha (/assignments/{id}/finalize/).
@@ -159,6 +185,10 @@ class PatientSerializer(serializers.ModelSerializer):
     # Si la ficha muestra los formularios clínicos; misma regla que
     # assert_can_write_clinical + assert_case_open en clinical_records.
     can_write_clinical = serializers.SerializerMethodField()
+    # Responsabilidad (observación de la demo): quién registró al paciente
+    # y quién hizo el primer diagnóstico.
+    created_by_name = serializers.SerializerMethodField()
+    first_diagnosis_by = serializers.SerializerMethodField()
     clinical_area = OptionalSlugRelatedField(
         slug_field="slug",
         queryset=ClinicalArea.objects.all(),
@@ -199,6 +229,8 @@ class PatientSerializer(serializers.ModelSerializer):
             "assigned_to",
             "assignment_note",
             "can_write_clinical",
+            "created_by_name",
+            "first_diagnosis_by",
             "created_at",
             "updated_at",
         )
@@ -230,6 +262,18 @@ class PatientSerializer(serializers.ModelSerializer):
     def get_active_assignment_id(self, patient: Patient) -> int | None:
         assignment = active_assignment(patient)
         return assignment.pk if assignment else None
+
+    def get_created_by_name(self, patient: Patient) -> str | None:
+        return user_name(patient.created_by)
+
+    def get_first_diagnosis_by(self, patient: Patient) -> str | None:
+        # Recorre el prefetch de diagnoses en vez de otra consulta.
+        first = min(
+            patient.diagnoses.all(),
+            key=lambda diagnosis: diagnosis.created_at,
+            default=None,
+        )
+        return user_name(first.student) if first else None
 
     def get_can_write_clinical(self, patient: Patient) -> bool:
         assignment = active_assignment(patient)
