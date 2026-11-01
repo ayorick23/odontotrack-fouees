@@ -1432,12 +1432,14 @@ class IndicatedPracticeTests(APITestCase):
                 teeth=[
                     {
                         "fdi": fdi,
-                        "marks": [],
-                        "practice": {
-                            "indicated": True,
-                            "clinicalArea": "endodoncia",
-                            "clinicalTreatment": treatment,
-                        },
+                        "marks": [
+                            {
+                                "layer": "plan",
+                                "status": "endodoncia",
+                                "surfaces": [],
+                                "treatment": treatment,
+                            }
+                        ],
                     }
                     for fdi, treatment in practices
                 ],
@@ -1497,6 +1499,36 @@ class IndicatedPracticeTests(APITestCase):
         self.assertIn(
             "18 · Endodoncia monorradicular; 27 · Endodoncia multirradicular", content
         )
+
+    def test_done_or_untreated_marks_are_not_practices(self):
+        """Pasar a Hecho saca la pieza del banco; un Plan sin tratamiento
+        no entra (no hay qué practicar)."""
+        odontogram = self.only_27.odontogram
+        odontogram.teeth = [
+            {
+                "fdi": 27,
+                "marks": [
+                    {
+                        "layer": "hecho",
+                        "status": "endodoncia",
+                        "surfaces": [],
+                        "treatment": "endodoncia_monorradicular",
+                    },
+                    {"layer": "plan", "status": "obturado", "surfaces": ["oclusal"]},
+                ],
+            }
+        ]
+        odontogram.save()
+        self.assertEqual(self.ids(tooth="27"), {self.mixed.id})
+        self.assertNotIn(
+            self.only_27.id, self.ids(treatment="endodoncia_monorradicular")
+        )
+        row = next(
+            row
+            for row in self.client.get("/api/patients/").json()["results"]
+            if row["id"] == self.only_27.id
+        )
+        self.assertEqual(row["indicated_practices"], [])
 
 
 class DirectorySearchTests(APITestCase):
@@ -1559,11 +1591,14 @@ class DirectoryPracticeSearchTests(APITestCase):
         )
         self.client.force_authenticate(user=self.student)
 
-        def practice(fdi, area, treatment):
+        def practice(fdi, _area, treatment, layer="plan"):
+            # `_area` queda para leer el caso: la marca guarda solo el
+            # tratamiento y el área sale del tarifario.
             return {
                 "fdi": fdi,
-                "marks": [],
-                "practice": {"indicated": True, "clinicalArea": area, "clinicalTreatment": treatment},
+                "marks": [
+                    {"layer": layer, "status": None, "surfaces": [], "treatment": treatment}
+                ],
             }
 
         # Dos piezas con tratamientos distintos en el mismo paciente.

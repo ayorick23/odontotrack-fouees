@@ -17,6 +17,7 @@ class ClinicalTreatmentSerializer(serializers.ModelSerializer):
             "is_active",
             "sort_order",
             "area",
+            "odontogram_status",
         )
         read_only_fields = ("id", "slug")
 
@@ -30,7 +31,14 @@ class ClinicalTreatmentSerializer(serializers.ModelSerializer):
 class NestedTreatmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = ClinicalTreatment
-        fields = ("id", "slug", "name", "is_active", "sort_order")
+        fields = (
+            "id",
+            "slug",
+            "name",
+            "is_active",
+            "sort_order",
+            "odontogram_status",
+        )
         read_only_fields = fields
 
 

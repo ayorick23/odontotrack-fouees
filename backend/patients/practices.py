@@ -1,13 +1,16 @@
-"""Prácticas indicadas por pieza (columna "pieza + tratamiento" del directorio).
+"""Prácticas planificadas por pieza (columna "pieza + tratamiento" del
+directorio y del CSV).
 
-Salen del odontograma: cada pieza marcada "indicada para práctica" con
-su área y tratamiento del catálogo. Observación de la demo: el estudiante
-busca pacientes por la pieza y el tratamiento que necesita practicar.
+Salen de las marcas Plan del odontograma que llevan tratamiento del
+tarifario. Observación de la demo: el estudiante busca pacientes por la
+pieza y el tratamiento que necesita practicar. Al pasar a Hecho la marca
+deja de listarse.
 """
 
 from dataclasses import dataclass
 
-from catalogs.models import ClinicalArea, ClinicalTreatment
+from catalogs.models import ClinicalTreatment
+from clinical_records.catalog import ToothLayer
 from clinical_records.models import Odontogram
 
 from .models import Patient
@@ -15,14 +18,12 @@ from .models import Patient
 
 @dataclass(frozen=True)
 class CatalogNames:
-    areas: dict[str, str]
     treatments: dict[str, str]
 
     @classmethod
     def load(cls) -> "CatalogNames":
-        """Dos consultas para toda la respuesta, no una por fila."""
+        """Una consulta para toda la respuesta, no una por fila."""
         return cls(
-            areas=dict(ClinicalArea.objects.values_list("slug", "name")),
             treatments=dict(ClinicalTreatment.objects.values_list("slug", "name")),
         )
 
@@ -36,18 +37,16 @@ def indicated_practices(patient: Patient, names: CatalogNames) -> list[dict]:
         return []
     practices = []
     for tooth in teeth:
-        practice = tooth.get("practice") or {}
-        if not practice.get("indicated"):
-            continue
-        treatment = practice.get("clinicalTreatment")
-        area = practice.get("clinicalArea")
-        # Piezas guardadas antes de elegir tratamiento: se ve el área.
-        name = names.treatments.get(treatment) or names.areas.get(area) or ""
-        practices.append(
-            {
-                "tooth": tooth["fdi"],
-                "treatment": treatment,
-                "label": f"{tooth['fdi']} · {name}".rstrip(" ·"),
-            }
-        )
+        for mark in tooth.get("marks") or []:
+            treatment = mark.get("treatment")
+            if mark.get("layer") != ToothLayer.PLAN or not treatment:
+                continue
+            name = names.treatments.get(treatment, treatment)
+            practices.append(
+                {
+                    "tooth": tooth["fdi"],
+                    "treatment": treatment,
+                    "label": f"{tooth['fdi']} · {name}",
+                }
+            )
     return sorted(practices, key=lambda item: item["tooth"])

@@ -222,55 +222,73 @@ class OdontogramApiTests(APITestCase):
         saved = self.client.put(self.url, self._payload(placa=True), format="json")
         self.assertEqual(saved.status_code, status.HTTP_200_OK)
 
-    def _practice_payload(self, area, treatment):
+    def _marks_payload(self, *marks):
         payload = self._payload()
-        payload["teeth"] = [
-            {
-                "fdi": 18,
-                "marks": [],
-                "practice": {
-                    "indicated": True,
-                    "clinicalArea": area,
-                    "clinicalTreatment": treatment,
-                },
-            }
-        ]
+        payload["teeth"] = [{"fdi": 18, "marks": list(marks)}]
         return payload
 
     def _tooth(self, response, fdi):
         return next(t for t in response.json()["teeth"] if t["fdi"] == fdi)
 
-    def test_practice_saves_specific_treatment(self):
+    def _put_marks(self, *marks):
         self.client.force_authenticate(user=self.student)
-        response = self.client.put(
-            self.url,
-            self._practice_payload("endodoncia", "endodoncia_monorradicular"),
-            format="json",
+        return self.client.put(self.url, self._marks_payload(*marks), format="json")
+
+    def test_plan_mark_keeps_treatment_and_symbol_comes_from_catalog(self):
+        # El cliente manda otro símbolo: manda el tarifario.
+        response = self._put_marks(
+            {"layer": "plan", "status": "caries", "treatment": "endodoncia_monorradicular"}
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(
-            self._tooth(response, 18)["practice"]["clinicalTreatment"],
-            "endodoncia_monorradicular",
+            self._tooth(response, 18)["marks"],
+            [
+                {
+                    "layer": "plan",
+                    "status": "endodoncia",
+                    "surfaces": [],
+                    "treatment": "endodoncia_monorradicular",
+                }
+            ],
         )
 
-    def test_practice_treatment_must_match_area_and_exist(self):
-        self.client.force_authenticate(user=self.student)
-        for area, treatment in (
-            ("operatoria", "endodoncia_monorradicular"),
-            ("endodoncia", "no_existe"),
-        ):
-            response = self.client.put(
-                self.url, self._practice_payload(area, treatment), format="json"
-            )
-            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, treatment)
-
-    def test_practice_with_only_area_still_works(self):
-        self.client.force_authenticate(user=self.student)
-        response = self.client.put(
-            self.url, self._practice_payload("endodoncia", None), format="json"
+    def test_treatment_without_symbol_is_saved_without_drawing(self):
+        response = self._put_marks(
+            {"layer": "plan", "treatment": "diagnostico_con_rx_panoramica"}
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertIsNone(self._tooth(response, 18)["practice"]["clinicalTreatment"])
+        mark = self._tooth(response, 18)["marks"][0]
+        self.assertIsNone(mark["status"])
+        self.assertEqual(mark["treatment"], "diagnostico_con_rx_panoramica")
+
+    def test_unknown_treatment_is_rejected(self):
+        response = self._put_marks({"layer": "plan", "treatment": "no_existe"})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_done_keeps_treatment_and_finding_drops_it(self):
+        response = self._put_marks(
+            {"layer": "hecho", "status": "endodoncia", "treatment": "endodoncia_monorradicular"},
+            {"layer": "hallazgo", "status": "caries", "surfaces": ["oclusal"],
+             "treatment": "resina_una_superficie_adulto"},
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        marks = {mark["layer"]: mark for mark in self._tooth(response, 18)["marks"]}
+        self.assertEqual(marks["hecho"]["treatment"], "endodoncia_monorradicular")
+        self.assertNotIn("treatment", marks["hallazgo"])
+
+    def test_planned_extraction_takes_the_whole_tooth_in_plan(self):
+        response = self._put_marks(
+            {"layer": "plan", "status": "obturado", "surfaces": ["oclusal"],
+             "treatment": "resina_una_superficie_adulto"},
+            {"layer": "plan", "treatment": "exodoncia_simple_diente_permanente"},
+            {"layer": "hallazgo", "status": "caries", "surfaces": ["oclusal"]},
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        marks = self._tooth(response, 18)["marks"]
+        self.assertEqual(
+            [(mark["layer"], mark["status"]) for mark in marks],
+            [("hallazgo", "caries"), ("plan", "extraido")],
+        )
 
     def test_student_cannot_view_patient_of_another_student(self):
         other = User.objects.create_user(
@@ -356,10 +374,6 @@ class OdontogramApiTests(APITestCase):
         for finding in teeth:
             if finding["fdi"] == 51:
                 finding["oralMarks"] = {"placa": True, "sangrado": False, "sarro": True}
-                finding["practice"] = {
-                    "indicated": True,
-                    "clinicalArea": "operatoria",
-                }
         response = self.client.put(
             self.url,
             {
@@ -375,8 +389,6 @@ class OdontogramApiTests(APITestCase):
         self.assertEqual(len(body["teeth"]), 52)
         tooth_51 = next(item for item in body["teeth"] if item["fdi"] == 51)
         self.assertTrue(tooth_51["oralMarks"]["placa"])
-        self.assertTrue(tooth_51["practice"]["indicated"])
-        self.assertEqual(tooth_51["practice"]["clinicalArea"], "operatoria")
         self.assertTrue(body["placa"])
         self.assertTrue(body["sarro"])
 
@@ -973,3 +985,75 @@ class DiagnosisNotificationTests(APITestCase):
         )
         self.assertEqual(pending.count(), 2)
 
+
+
+class PracticeToPlanMigrationTests(SimpleTestCase):
+    """Migración 0006: la práctica por pieza pasa a marca Plan."""
+
+    def _convert(self, teeth):
+        from importlib import import_module
+
+        module = import_module("clinical_records.migrations.0006_practice_to_plan_marks")
+        statuses = {
+            "endodoncia_monorradicular": "endodoncia",
+            "exodoncia_simple_diente_permanente": "extraido",
+            "diagnostico_con_rx_panoramica": "",
+        }
+        dropped = module._convert(teeth, statuses)
+        return teeth, dropped
+
+    def _tooth(self, practice, marks=None):
+        return {"fdi": 18, "marks": marks or [], "practice": practice}
+
+    def test_practice_becomes_plan_mark_with_catalog_symbol(self):
+        teeth, dropped = self._convert(
+            [
+                self._tooth(
+                    {"indicated": True, "clinicalArea": "endodoncia",
+                     "clinicalTreatment": "endodoncia_monorradicular"},
+                    [{"layer": "hallazgo", "status": "caries", "surfaces": ["oclusal"]}],
+                ),
+                {**self._tooth({"indicated": True, "clinicalArea": "diagnostico",
+                                "clinicalTreatment": "diagnostico_con_rx_panoramica"}),
+                 "fdi": 27},
+            ]
+        )
+        self.assertEqual(dropped, 0)
+        self.assertEqual(
+            teeth[0],
+            {
+                "fdi": 18,
+                "marks": [
+                    {"layer": "hallazgo", "status": "caries", "surfaces": ["oclusal"]},
+                    {"layer": "plan", "status": "endodoncia", "surfaces": [],
+                     "treatment": "endodoncia_monorradicular"},
+                ],
+            },
+        )
+        self.assertIsNone(teeth[1]["marks"][0]["status"])
+
+    def test_extraction_replaces_other_plan_marks(self):
+        teeth, _ = self._convert(
+            [
+                self._tooth(
+                    {"indicated": True, "clinicalArea": "cirugia",
+                     "clinicalTreatment": "exodoncia_simple_diente_permanente"},
+                    [{"layer": "plan", "status": "obturado", "surfaces": ["oclusal"]}],
+                )
+            ]
+        )
+        self.assertEqual(
+            [(mark["layer"], mark["status"]) for mark in teeth[0]["marks"]],
+            [("plan", "extraido")],
+        )
+
+    def test_area_only_or_not_indicated_is_dropped_without_mark(self):
+        teeth, dropped = self._convert(
+            [
+                self._tooth({"indicated": True, "clinicalArea": "endodoncia",
+                             "clinicalTreatment": None}),
+                {**self._tooth({"indicated": False}), "fdi": 17},
+            ]
+        )
+        self.assertEqual(dropped, 1)
+        self.assertEqual(teeth, [{"fdi": 18, "marks": []}, {"fdi": 17, "marks": []}])

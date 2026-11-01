@@ -1,6 +1,8 @@
 from django.db import models
 from django.utils.text import slugify
 
+from clinical_records.catalog import ToothStatus
+
 
 def unique_slug(model, name: str, exclude_pk: int | None = None) -> str:
     base = slugify(name, allow_unicode=False) or "item"
@@ -43,6 +45,15 @@ class ClinicalTreatment(models.Model):
     name = models.CharField(max_length=200)
     is_active = models.BooleanField(default=True)
     sort_order = models.PositiveSmallIntegerField(default=0)
+    # Símbolo con el que se dibuja en el odontograma al planificarlo en
+    # una pieza. Vacío: el tratamiento no tiene dibujo (diagnóstico,
+    # profilaxis...) y solo aparece en la lista de hallazgos.
+    odontogram_status = models.CharField(
+        max_length=30,
+        choices=[c for c in ToothStatus.choices if c[0] != ToothStatus.SANO],
+        blank=True,
+        default="",
+    )
 
     class Meta:
         ordering = ["sort_order", "name"]

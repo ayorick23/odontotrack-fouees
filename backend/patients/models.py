@@ -8,7 +8,9 @@ from django.utils import timezone
 
 from accounts.models import User
 from assignments.models import Assignment
+from catalogs.models import ClinicalTreatment
 from clinical_records.catalog import is_fdi_tooth
+from clinical_records.queries import planned_practice_q
 
 PERIOD_DAYS = {
     "1m": 30,
@@ -61,35 +63,36 @@ class PatientQuerySet(models.QuerySet):
         return self
 
     def by_clinical_area(self, clinical_area: str | None):
-        """Área de la ficha (la que registra recepción) o de alguna pieza
-        indicada para práctica en el odontograma."""
+        """Área de la ficha (la que registra recepción) o de algún
+        tratamiento planificado en el odontograma."""
         if not clinical_area:
             return self
-        practice = {"practice": {"indicated": True, "clinicalArea": clinical_area}}
+        treatments = ClinicalTreatment.objects.filter(
+            area__slug=clinical_area
+        ).values_list("slug", flat=True)
         return self.filter(
             Q(clinical_area__slug=clinical_area)
-            | Q(odontogram__teeth__contains=[practice])
+            | planned_practice_q(treatments=list(treatments))
         )
 
     def by_indicated_practice(self, tooth: str | None, treatment: str | None):
-        """Pacientes con una pieza indicada para práctica.
-
-        Con pieza y tratamiento, deben ser la misma pieza: la contención
-        JSON de Postgres busca un elemento de `teeth` con todas las claves.
-        """
-        practice: dict = {"indicated": True}
-        if treatment:
-            practice["clinicalTreatment"] = treatment
-        item: dict = {"practice": practice}
+        """Pacientes con una práctica planificada (marca Plan con
+        tratamiento) en el odontograma. Con pieza y tratamiento, deben
+        coincidir en la misma pieza."""
         try:
             number = int(tooth or "")
         except ValueError:
             number = None
-        if number is not None and is_fdi_tooth(number):
-            item["fdi"] = number
-        if len(item) == 1 and len(practice) == 1:
+        if number is not None and not is_fdi_tooth(number):
+            number = None
+        if number is None and not treatment:
             return self
-        return self.filter(odontogram__teeth__contains=[item])
+        return self.filter(
+            planned_practice_q(
+                tooth=number,
+                treatments=[treatment] if treatment else None,
+            )
+        )
 
     def by_assignee(self, assigned_to: str | None):
         if assigned_to == "unassigned":
