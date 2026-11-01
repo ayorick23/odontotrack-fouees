@@ -53,8 +53,8 @@ export function AuthPage() {
   }
 
   return (
-    // Pantalla completa: formulario y panel ocupan media pantalla cada uno,
-    // de borde a borde (el marco redondeado del pin era solo la imagen).
+    // Pantalla completa: formulario y panel ocupan media pantalla cada uno;
+    // el panel deja un margen leve y tiene esquinas redondeadas.
     <div className="relative min-h-svh overflow-hidden bg-white dark:bg-slate-900">
       <div className="absolute right-5 top-5 z-30">
         <ThemeToggle />
@@ -62,7 +62,7 @@ export function AuthPage() {
 
       <div className="relative min-h-svh md:h-svh">
         {/* Encabezado en móvil (el panel deslizante es solo de escritorio). */}
-        <div className="md:hidden">
+        <div className="p-3 md:hidden">
           <BrandPanel mode={mode} compact />
         </div>
 
@@ -75,7 +75,7 @@ export function AuthPage() {
 
         {/* Panel deslizante: a la derecha al ingresar, a la izquierda al registrarse. */}
         <div
-          className={`absolute inset-y-0 left-0 z-20 hidden w-1/2 transition-transform duration-700 motion-reduce:transition-none md:block ${EASE} ${
+          className={`absolute inset-y-0 left-0 z-20 hidden w-1/2 p-3 transition-transform duration-700 motion-reduce:transition-none md:block ${EASE} ${
             isLogin ? "translate-x-full" : "translate-x-0"
           }`}
           aria-hidden="true"
@@ -116,7 +116,7 @@ function FormSlot({
 function BrandPanel({ mode, compact = false }: { mode: AuthMode; compact?: boolean }) {
   return (
     <div
-      className={`relative isolate h-full overflow-hidden bg-teal-950 text-white ${
+      className={`relative isolate h-full overflow-hidden rounded-[28px] bg-teal-950 text-white ${
         compact ? "px-6 py-6" : "p-12 lg:p-16"
       }`}
     >
