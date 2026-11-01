@@ -2,6 +2,7 @@ import { RotateCcw, Save, Undo2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
+import { UnsavedChangesGuard } from "../../components/UnsavedChangesGuard";
 import { Odontogram } from "../../features/clinical-records/components/Odontogram";
 import { OdontogramExportButtons } from "../../features/clinical-records/components/Odontogram/OdontogramExportButtons";
 import { useOdontogramData } from "../../features/clinical-records/hooks/useOdontogramData";
@@ -79,16 +80,22 @@ export function PatientOdontogramSection({
     .filter(([, active]) => active)
     .map(([mark]) => ORAL_GENERAL_MARK_LABELS[mark]);
 
-  const handleSave = useCallback(async () => {
+  /** Devuelve false si no se pudo guardar (el aviso de salida lo usa). */
+  const handleSave = useCallback(async (): Promise<boolean> => {
     try {
       await save();
-      const items = await listOdontogramHistory(patientId);
-      setRevisions(items);
-      setViewingRevisionId(null);
-      toast.success("Odontograma guardado.");
     } catch {
       toast.error("No se pudo guardar el odontograma.");
+      return false;
     }
+    toast.success("Odontograma guardado.");
+    try {
+      setRevisions(await listOdontogramHistory(patientId));
+    } catch {
+      // El guardado ya se hizo; el historial se refresca al volver.
+    }
+    setViewingRevisionId(null);
+    return true;
   }, [patientId, save]);
 
   useEffect(() => {
@@ -122,6 +129,11 @@ export function PatientOdontogramSection({
 
   return (
     <section className={cardClass}>
+      <UnsavedChangesGuard
+        when={isDirty && !readOnly && loadStatus === "ready"}
+        subject="el odontograma"
+        onSave={handleSave}
+      />
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-base font-semibold text-slate-800 dark:text-slate-100">

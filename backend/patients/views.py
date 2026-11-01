@@ -11,6 +11,7 @@ from .exports import patients_csv_response
 from .models import Patient
 from .filters import PatientSearchFilter
 from .permissions import EstudianteEditsOwnOrAvailablePatient
+from .practices import PracticeMatch
 from .serializers import PatientListSerializer, PatientSerializer
 
 User = get_user_model()
@@ -67,6 +68,16 @@ class PatientViewSet(viewsets.ModelViewSet):
             .by_indicated_practice(params.get("tooth"), params.get("treatment"))
             .order_by("id")
         )
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        if self.action in ("list", "available"):
+            # Para poner primero las prácticas que coinciden con lo buscado.
+            context["practice_match"] = PracticeMatch.from_request(
+                self.request.query_params,
+                PatientSearchFilter().get_search_terms(self.request),
+            )
+        return context
 
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)

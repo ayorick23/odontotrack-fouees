@@ -1636,6 +1636,43 @@ class DirectoryPracticeSearchTests(APITestCase):
         row = next(r for r in rows if r["id"] == self.two_teeth.id)
         self.assertEqual([p["tooth"] for p in row["indicated_practices"]], [17, 18])
 
+    def practices(self, path="/api/patients/", **params):
+        rows = self.client.get(path, params).json()["results"]
+        row = next(r for r in rows if r["id"] == self.two_teeth.id)
+        return [(p["tooth"], p["matched"]) for p in row["indicated_practices"]]
+
+    def test_without_search_nothing_is_highlighted(self):
+        self.assertEqual(self.practices(), [(17, False), (18, False)])
+
+    def test_searched_practice_goes_first(self):
+        # La 18 iría después de la 17 por FDI; la búsqueda la sube.
+        for term in ("endo", "18", "monorradicular"):
+            self.assertEqual(
+                self.practices(search=term), [(18, True), (17, False)], term
+            )
+        self.assertEqual(self.practices(search="ameloplastia"), [(17, True), (18, False)])
+
+    def test_filters_also_put_the_match_first(self):
+        self.assertEqual(self.practices(tooth="18"), [(18, True), (17, False)])
+        self.assertEqual(
+            self.practices(treatment="endodoncia_monorradicular"),
+            [(18, True), (17, False)],
+        )
+        self.assertEqual(
+            self.practices(clinical_area="endodoncia"), [(18, True), (17, False)]
+        )
+        # Pieza y tratamiento juntos deben coincidir en la misma pieza.
+        self.assertEqual(
+            self.practices(tooth="18", treatment="endodoncia_monorradicular"),
+            [(18, True), (17, False)],
+        )
+
+    def test_bank_puts_the_match_first_too(self):
+        self.assertEqual(
+            self.practices("/api/patients/available/", search="endo"),
+            [(18, True), (17, False)],
+        )
+
     def test_area_filter_includes_practices_in_that_area(self):
         self.assertEqual(self.ids(clinical_area="operatoria"), {self.two_teeth.id})
 

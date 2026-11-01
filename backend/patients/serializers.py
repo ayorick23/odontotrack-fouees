@@ -8,7 +8,7 @@ from catalogs.models import ClinicalArea, ClinicalTreatment
 
 from .models import Patient
 from .phones import normalize_phone
-from .practices import CatalogNames, indicated_practices
+from .practices import NO_MATCH, CatalogNames, indicated_practices
 
 MAX_PHOTO_BYTES = 2 * 1024 * 1024
 ALLOWED_PHOTO_CONTENT_TYPES = frozenset(
@@ -444,7 +444,9 @@ class PatientListSerializer(serializers.ModelSerializer):
         names = self.context.get("catalog_names")
         if names is None:
             names = self.context["catalog_names"] = CatalogNames.load()
-        return indicated_practices(patient, names)
+        return indicated_practices(
+            patient, names, self.context.get("practice_match", NO_MATCH)
+        )
 
     def to_representation(self, instance):
         return empty_catalog_slugs(super().to_representation(instance))

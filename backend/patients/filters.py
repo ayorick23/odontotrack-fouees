@@ -17,17 +17,30 @@ CONTACT_FIELDS = ("dui", "guardian_dui", "phone_number")
 MIN_CONTACT_TERM = 4
 
 
+def tooth_in_term(term: str) -> int | None:
+    """El término como número de pieza FDI ("18"), si lo es."""
+    if term.isdigit() and is_fdi_tooth(int(term)):
+        return int(term)
+    return None
+
+
+def treatments_matching(term: str) -> list[str]:
+    """Slugs de los tratamientos cuyo nombre o área contiene `term`
+    ("endo", "monorra"), sin acentos."""
+    return list(
+        ClinicalTreatment.objects.filter(
+            Q(name__unaccent__icontains=term) | Q(area__name__unaccent__icontains=term)
+        ).values_list("slug", flat=True)
+    )
+
+
 def practice_q(term: str) -> Q:
     """Pacientes con una práctica planificada que coincide con `term`: el
-    número de pieza ("18") o parte del nombre del tratamiento o de su área
-    ("endo", "monorra"), sin acentos."""
-    conditions = []
-    if term.isdigit() and is_fdi_tooth(int(term)):
-        conditions.append(planned_practice_q(tooth=int(term)))
-    treatments = ClinicalTreatment.objects.filter(
-        Q(name__unaccent__icontains=term) | Q(area__name__unaccent__icontains=term)
-    ).values_list("slug", flat=True)
-    conditions.append(planned_practice_q(treatments=list(treatments)))
+    número de pieza o un tratamiento (ver `treatments_matching`)."""
+    conditions = [planned_practice_q(treatments=treatments_matching(term))]
+    tooth = tooth_in_term(term)
+    if tooth is not None:
+        conditions.append(planned_practice_q(tooth=tooth))
     return reduce(or_, conditions)
 
 

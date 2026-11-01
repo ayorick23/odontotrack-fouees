@@ -19,6 +19,14 @@ PERIOD_DAYS = {
 }
 
 
+def parse_fdi(value: str | None) -> int | None:
+    """Número de pieza FDI de un parámetro de la URL; None si no es válido."""
+    try:
+        number = int(value or "")
+    except ValueError:
+        return None
+    return number if is_fdi_tooth(number) else None
+
 class PatientQuerySet(models.QuerySet):
     def in_period(self, period: str | None):
         days = PERIOD_DAYS.get(period or "")
@@ -79,12 +87,7 @@ class PatientQuerySet(models.QuerySet):
         """Pacientes con una práctica planificada (marca Plan con
         tratamiento) en el odontograma. Con pieza y tratamiento, deben
         coincidir en la misma pieza."""
-        try:
-            number = int(tooth or "")
-        except ValueError:
-            number = None
-        if number is not None and not is_fdi_tooth(number):
-            number = None
+        number = parse_fdi(tooth)
         if number is None and not treatment:
             return self
         return self.filter(
