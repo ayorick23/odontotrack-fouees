@@ -49,7 +49,8 @@ def patient_row(patient: Patient) -> list[str]:
         safe_text(patient.first_name),
         safe_text(patient.last_name),
         document_label(patient),
-        patient.phone_number,
+        # Empieza con "+": Excel lo tomaría como fórmula.
+        safe_text(patient.phone_number),
         patient.clinical_area.name if patient.clinical_area else "",
         patient.clinical_treatment.name if patient.clinical_treatment else "",
         patient.get_case_status_display(),

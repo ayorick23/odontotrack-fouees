@@ -7,6 +7,7 @@ from assignments.models import Assignment
 from catalogs.models import ClinicalArea, ClinicalTreatment
 
 from .models import Patient
+from .phones import normalize_phone
 
 MAX_PHOTO_BYTES = 2 * 1024 * 1024
 ALLOWED_PHOTO_CONTENT_TYPES = frozenset(
@@ -42,6 +43,32 @@ class StrippedCharField(serializers.CharField):
         if isinstance(data, str):
             data = data.strip()
         return super().to_internal_value(data)
+
+
+class PhoneField(StrippedCharField):
+    """Teléfono con código de país, guardado como '+503 7000-1111'.
+
+    Vacío se acepta aquí; si el campo es obligatorio lo dice
+    REQUIRED_CONTACT_FIELDS.
+    """
+
+    def __init__(self, **kwargs):
+        kwargs.setdefault("max_length", 20)
+        kwargs.setdefault("required", False)
+        kwargs.setdefault("allow_blank", True)
+        super().__init__(**kwargs)
+
+    def to_internal_value(self, data):
+        value = super().to_internal_value(data)
+        if not value:
+            return value
+        normalized = normalize_phone(value)
+        if normalized is None:
+            raise serializers.ValidationError(
+                "Teléfono no válido: usa solo números y la cantidad de "
+                "dígitos del país."
+            )
+        return normalized
 
 
 class OptionalSlugRelatedField(serializers.SlugRelatedField):
@@ -135,21 +162,14 @@ class PatientSerializer(serializers.ModelSerializer):
         required=False,
         allow_blank=True,
     )
-    whatsapp_number = StrippedCharField(
-        max_length=20,
-        required=False,
-        allow_blank=True,
-    )
+    phone_number = PhoneField()
+    whatsapp_number = PhoneField()
     emergency_contact_name = StrippedCharField(
         max_length=150,
         required=False,
         allow_blank=True,
     )
-    emergency_contact_phone = StrippedCharField(
-        max_length=20,
-        required=False,
-        allow_blank=True,
-    )
+    emergency_contact_phone = PhoneField()
     photo = PatientPhotoField(required=False, allow_null=True)
     has_active_assignment = serializers.SerializerMethodField()
     # Para finalizar el caso desde la ficha (/assignments/{id}/finalize/).
