@@ -26,6 +26,7 @@ import {
   CASE_STATUS_LABELS,
   EMERGENCY_RELATIONSHIP_LABELS,
   getPatient,
+  patientDocumentLabel,
   patientFullName,
   patientInitials,
   type CaseStatus,
@@ -206,7 +207,7 @@ export function PatientDetail() {
               <StatusBadge status={patient.case_status} />
             </div>
             <dl className="mt-5 grid gap-4 sm:grid-cols-2">
-              <Fact label="DUI">{patient.dui}</Fact>
+              <Fact label="Documento">{patientDocumentLabel(patient)}</Fact>
               <Fact label="Nacimiento">
                 {patient.date_of_birth ? (
                   <>
