@@ -90,6 +90,8 @@ export type Patient = {
   assignment_note: string;
   /** El usuario actual puede agregar registros clínicos (caso abierto y, si es estudiante, suyo). */
   can_write_clinical: boolean;
+  /** Puede registrar diagnóstico y odontograma (incluye al estudiante evaluando un disponible). */
+  can_evaluate: boolean;
   /** Quién registró al paciente; null en pacientes anteriores a guardarlo. */
   created_by_name: string | null;
   /** Autor del diagnóstico más antiguo, si hay alguno. */

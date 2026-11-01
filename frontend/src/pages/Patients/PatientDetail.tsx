@@ -12,6 +12,7 @@ import { Link, useParams } from "react-router-dom";
 
 import { can } from "../../acl/can";
 import { FinalizeCaseButton } from "./FinalizeCaseButton";
+import { ReleasePatientButton } from "./ReleasePatientButton";
 import { PatientClinicalTabs, hasClinicalTabs } from "./PatientClinicalTabs";
 import { useAuth } from "../../hooks/useAuth";
 import { useTheme } from "../../hooks/useTheme";
@@ -116,12 +117,14 @@ export function PatientDetail() {
   const { patient, areas } = state;
   const assignedLocked =
     user?.role === "recepcion" && patient.has_active_assignment;
-  const canEdit = can(user, "patients.edit") && !assignedLocked;
+  // El estudiante edita y evalúa (diagnóstico, odontograma) los pacientes
+  // disponibles y sus casos activos: justo cuando can_evaluate es true.
+  const studentLocked = user?.role === "estudiante" && !patient.can_evaluate;
+  const canEdit = can(user, "patients.edit") && !assignedLocked && !studentLocked;
   const canFinalize = can(user, "assignments.change_status");
-  // El backend solo deja al estudiante editar el odontograma de sus casos
-  // activos; docente y admin pueden corregirlo aun con el caso cerrado.
-  const odontogramLocked =
-    user?.role === "estudiante" && !patient.can_write_clinical;
+  const canRelease = can(user, "assignments.release");
+  // Docente y admin pueden corregir el odontograma aun con el caso cerrado.
+  const odontogramLocked = studentLocked;
   const areaName = patient.clinical_area
     ? areaLabel(areas, patient.clinical_area)
     : null;
@@ -157,6 +160,29 @@ export function PatientDetail() {
                     has_active_assignment: false,
                     active_assignment_id: null,
                     can_write_clinical: false,
+                  },
+                })
+              }
+            />
+          ) : null}
+          {canRelease && patient.active_assignment_id !== null ? (
+            <ReleasePatientButton
+              assignmentId={patient.active_assignment_id}
+              patientName={patientFullName(patient)}
+              isOwnCase={user?.role === "estudiante"}
+              onReleased={() =>
+                setState({
+                  status: "ready",
+                  areas,
+                  patient: {
+                    ...patient,
+                    case_status: "pendiente",
+                    has_active_assignment: false,
+                    active_assignment_id: null,
+                    assigned_to: null,
+                    assignment_note: "",
+                    can_write_clinical: false,
+                    can_evaluate: user?.role === "estudiante",
                   },
                 })
               }
@@ -310,6 +336,7 @@ export function PatientDetail() {
           clinicalAreaSlug={patient.clinical_area}
           clinicalTreatmentSlug={patient.clinical_subcategory}
           canWriteClinical={patient.can_write_clinical}
+          canEvaluate={patient.can_evaluate}
         />
       ) : null}
 

@@ -58,6 +58,8 @@ type PatientClinicalTabsProps = {
   clinicalTreatmentSlug: string;
   /** Caso abierto y, si es estudiante, asignado a él; si no, solo lectura. */
   canWriteClinical: boolean;
+  /** Diagnóstico: lo anterior o un paciente disponible que el estudiante evalúa. */
+  canEvaluate: boolean;
 };
 
 export function PatientClinicalTabs({
@@ -66,6 +68,7 @@ export function PatientClinicalTabs({
   clinicalAreaSlug,
   clinicalTreatmentSlug,
   canWriteClinical,
+  canEvaluate,
 }: PatientClinicalTabsProps) {
   const { user } = useAuth();
   const visibleTabs = TABS.filter((tab) => can(user, tab.view));
@@ -106,7 +109,7 @@ export function PatientClinicalTabs({
 
       <div className="mt-5">
         {tab === "diagnostico" ? (
-          <DiagnosisTab patientId={patientId} canWriteClinical={canWriteClinical} />
+          <DiagnosisTab patientId={patientId} canWriteClinical={canEvaluate} />
         ) : null}
         {tab === "tratamientos" ? (
           <TreatmentsTab

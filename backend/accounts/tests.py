@@ -529,7 +529,10 @@ class AclMatrixTests(APITestCase):
         self.assertTrue(self.estudiante.has_acl("patients.view"))
         self.assertTrue(self.estudiante.has_acl("assignments.claim"))
         self.assertTrue(self.estudiante.has_acl("clinical_records.create"))
-        self.assertFalse(self.estudiante.has_acl("patients.create"))
+        # Banco de pacientes: registra pacientes y libera los suyos.
+        self.assertTrue(self.estudiante.has_acl("patients.create"))
+        self.assertTrue(self.estudiante.has_acl("assignments.release"))
+        self.assertFalse(self.estudiante.has_acl("patients.delete"))
         self.assertFalse(self.estudiante.has_acl("assignments.create"))
         self.assertFalse(self.estudiante.has_acl("roles.edit"))
 

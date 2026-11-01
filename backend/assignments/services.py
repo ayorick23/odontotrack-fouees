@@ -19,7 +19,11 @@ from .models import Appointment, Assignment
 # decide nada por su cuenta.
 CASE_TRANSITIONS = {
     Patient.CaseStatus.PENDIENTE: {Patient.CaseStatus.EN_PROCESO},
-    Patient.CaseStatus.EN_PROCESO: {Patient.CaseStatus.FINALIZADO},
+    # Volver a pendiente = liberar al paciente al banco (release_assignment).
+    Patient.CaseStatus.EN_PROCESO: {
+        Patient.CaseStatus.FINALIZADO,
+        Patient.CaseStatus.PENDIENTE,
+    },
     Patient.CaseStatus.FINALIZADO: set(),
 }
 
@@ -71,6 +75,40 @@ def finalize_assignment(assignment: Assignment) -> Assignment:
         f"El caso de {_patient_name(patient)} quedó finalizado.",
         link=f"/patients/{patient.pk}",
     )
+    return assignment
+
+
+@transaction.atomic
+def release_assignment(
+    assignment: Assignment, *, user: User, reason: str = ""
+) -> Assignment:
+    """Devuelve el paciente al banco de pacientes.
+
+    La asignación queda cancelada (el estudiante dejó el caso), el caso
+    vuelve a pendiente y se cancelan sus citas programadas. El expediente
+    se queda con el paciente para quien lo tome después. Quién puede
+    liberar lo deciden el permiso assignments.release y el queryset de la
+    vista (el estudiante solo ve sus asignaciones).
+    """
+    assignment = Assignment.objects.select_for_update().get(pk=assignment.pk)
+    if assignment.status != Assignment.AssignmentStatus.ACTIVA:
+        raise ValidationError(
+            {"status": "Solo se puede liberar una asignación activa."}
+        )
+    who = user.get_full_name() or user.username
+    note = f"Liberado por {who} el {timezone.localdate():%d/%m/%Y}."
+    if reason.strip():
+        note = f"{note} Motivo: {reason.strip()}"
+    assignment.notes = "\n".join(filter(None, [assignment.notes.strip(), note]))
+    assignment.status = Assignment.AssignmentStatus.CANCELADA
+    assignment.save(update_fields=["status", "notes", "updated_at"])
+    assignment.appointments.filter(status=Appointment.Status.PROGRAMADA).update(
+        status=Appointment.Status.CANCELADA,
+        updated_at=timezone.now(),
+    )
+    patient = assignment.patient
+    if patient.case_status == Patient.CaseStatus.EN_PROCESO:
+        transition_case_status(patient, Patient.CaseStatus.PENDIENTE)
     return assignment
 
 

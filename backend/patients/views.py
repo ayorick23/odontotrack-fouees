@@ -9,6 +9,7 @@ from assignments.models import Assignment
 
 from .exports import patients_csv_response
 from .models import Patient
+from .permissions import EstudianteEditsOwnOrAvailablePatient
 from .serializers import PatientListSerializer, PatientSerializer
 
 User = get_user_model()
@@ -16,7 +17,12 @@ User = get_user_model()
 
 class PatientViewSet(viewsets.ModelViewSet):
     queryset = Patient.objects.all()
-    permission_classes = [IsAuthenticated, HasRequiredAcl, RecepcionCannotEditAssignedPatient]
+    permission_classes = [
+        IsAuthenticated,
+        HasRequiredAcl,
+        RecepcionCannotEditAssignedPatient,
+        EstudianteEditsOwnOrAvailablePatient,
+    ]
     acl_permissions = {
         "list": "patients.view",
         "retrieve": "patients.view",

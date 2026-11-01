@@ -36,18 +36,46 @@ def scope_clinical_queryset(queryset, user: User):
     return queryset.filter(patient__in=Patient.objects.visible_to(user))
 
 
-def assert_can_write_clinical(user: User, patient: Patient) -> None:
-    """El estudiante solo escribe expediente de sus asignaciones activas."""
-    if user.role != User.Role.ESTUDIANTE:
-        return
-    has_active = patient.assignments.filter(
+def is_assigned_to(user: User, patient: Patient) -> bool:
+    return patient.assignments.filter(
         student=user,
         status=Assignment.AssignmentStatus.ACTIVA,
     ).exists()
-    if not has_active:
-        raise PermissionDenied(
-            "Solo puedes registrar información clínica de pacientes asignados a ti."
-        )
+
+
+def is_available(patient: Patient) -> bool:
+    """Pendiente y sin asignación activa: está en el banco para elegir."""
+    return Patient.objects.available().filter(pk=patient.pk).exists()
+
+
+def assert_can_write_clinical(
+    user: User, patient: Patient, *, allow_available: bool = False
+) -> None:
+    """El estudiante escribe expediente de sus asignaciones activas.
+
+    Con `allow_available`, también de pacientes disponibles: puede
+    evaluarlos (diagnóstico y odontograma) antes de decidir si los toma.
+    """
+    if user.role != User.Role.ESTUDIANTE:
+        return
+    if is_assigned_to(user, patient):
+        return
+    if allow_available and is_available(patient):
+        return
+    raise PermissionDenied(
+        "Solo puedes registrar información clínica de pacientes asignados a ti."
+    )
+
+
+def assert_can_edit_diagnosis(user: User, diagnosis: Diagnostico) -> None:
+    """Sobre un paciente disponible, cada estudiante edita solo lo suyo."""
+    assert_can_write_clinical(user, diagnosis.patient, allow_available=True)
+    if (
+        user.role == User.Role.ESTUDIANTE
+        and diagnosis.student_id != user.id
+        and not is_assigned_to(user, diagnosis.patient)
+    ):
+        raise PermissionDenied("Solo puedes editar los diagnósticos que registraste.")
 
 
 def assert_case_open(patient: Patient) -> None:
@@ -194,7 +222,7 @@ class OdontogramService:
     def assert_can_update(user: User, patient: Patient) -> None:
         if not user.has_acl("odontogram.update"):
             raise PermissionDenied("No puedes actualizar este odontograma.")
-        assert_can_write_clinical(user, patient)
+        assert_can_write_clinical(user, patient, allow_available=True)
 
     @staticmethod
     def record_revision(odontogram: Odontogram, user: User) -> OdontogramRevision | None:

@@ -185,6 +185,9 @@ class PatientSerializer(serializers.ModelSerializer):
     # Si la ficha muestra los formularios clínicos; misma regla que
     # assert_can_write_clinical + assert_case_open en clinical_records.
     can_write_clinical = serializers.SerializerMethodField()
+    # Puede registrar diagnóstico y odontograma: lo anterior o, para el
+    # estudiante, un paciente disponible que está evaluando antes de tomarlo.
+    can_evaluate = serializers.SerializerMethodField()
     # Responsabilidad (observación de la demo): quién registró al paciente
     # y quién hizo el primer diagnóstico.
     created_by_name = serializers.SerializerMethodField()
@@ -229,6 +232,7 @@ class PatientSerializer(serializers.ModelSerializer):
             "assigned_to",
             "assignment_note",
             "can_write_clinical",
+            "can_evaluate",
             "created_by_name",
             "first_diagnosis_by",
             "created_at",
@@ -242,6 +246,7 @@ class PatientSerializer(serializers.ModelSerializer):
             "assigned_to",
             "assignment_note",
             "can_write_clinical",
+            "can_evaluate",
             "created_at",
             "updated_at",
         )
@@ -274,6 +279,18 @@ class PatientSerializer(serializers.ModelSerializer):
             default=None,
         )
         return user_name(first.student) if first else None
+
+    def get_can_evaluate(self, patient: Patient) -> bool:
+        if self.get_can_write_clinical(patient):
+            return True
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        return (
+            user is not None
+            and user.role == User.Role.ESTUDIANTE
+            and patient.case_status == Patient.CaseStatus.PENDIENTE
+            and active_assignment(patient) is None
+        )
 
     def get_can_write_clinical(self, patient: Patient) -> bool:
         assignment = active_assignment(patient)

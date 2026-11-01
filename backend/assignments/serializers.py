@@ -25,6 +25,12 @@ class ClaimAssignmentSerializer(serializers.Serializer):
     reason = serializers.CharField(required=False, allow_blank=True, default="")
 
 
+class ReleaseAssignmentSerializer(serializers.Serializer):
+    reason = serializers.CharField(
+        required=False, allow_blank=True, default="", max_length=500
+    )
+
+
 class BulkAssignmentSerializer(ClaimAssignmentSerializer):
     student = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
 

@@ -214,12 +214,13 @@ class OdontogramApiTests(APITestCase):
         self.assertEqual(saved.status_code, status.HTTP_200_OK)
         self.assertTrue(saved.json()["placa"])
 
-    def test_student_can_view_but_not_update_available_patient(self):
+    def test_student_can_update_odontogram_of_available_patient(self):
+        # Evalúa al paciente disponible (pieza + tratamiento) antes de tomarlo.
         self.client.force_authenticate(user=self.student)
         loaded = self.client.get(self.url)
         self.assertEqual(loaded.status_code, status.HTTP_200_OK)
         saved = self.client.put(self.url, self._payload(placa=True), format="json")
-        self.assertEqual(saved.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(saved.status_code, status.HTTP_200_OK)
 
     def test_student_cannot_view_patient_of_another_student(self):
         other = User.objects.create_user(
@@ -554,7 +555,7 @@ class DiagnosisApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(response.json()["is_validated"])
 
-    def test_student_cannot_create_diagnosis_for_unassigned_patient(self):
+    def test_student_can_evaluate_available_patient_without_taking_it(self):
         available = Patient.objects.create(
             first_name="Libre",
             last_name="Disponible",
@@ -563,9 +564,53 @@ class DiagnosisApiTests(APITestCase):
         self.client.force_authenticate(user=self.student)
         response = self.client.post(
             self.url,
-            {"patient": available.id, "content": "Intento sin asignación."},
+            {"patient": available.id, "content": "Evaluación inicial."},
         )
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertFalse(available.has_active_assignment())
+
+    def test_student_cannot_diagnose_patient_of_another_student(self):
+        other_student = User.objects.create_user(
+            username="estudiante-dx-ajeno",
+            password="pass12345",
+            role=User.Role.ESTUDIANTE,
+        )
+        taken = Patient.objects.create(first_name="Ya", last_name="Tomado", dui="DX-004")
+        Assignment.objects.create(patient=taken, student=other_student)
+        finished = Patient.objects.create(
+            first_name="Ya",
+            last_name="Cerrado",
+            dui="DX-005",
+            case_status=Patient.CaseStatus.FINALIZADO,
+        )
+        self.client.force_authenticate(user=self.student)
+        for patient in (taken, finished):
+            response = self.client.post(
+                self.url, {"patient": patient.id, "content": "Intento."}
+            )
+            self.assertIn(
+                response.status_code,
+                (status.HTTP_400_BAD_REQUEST, status.HTTP_403_FORBIDDEN),
+                patient.last_name,
+            )
+        self.assertFalse(Diagnostico.objects.filter(patient__in=[taken, finished]).exists())
+
+    def test_on_available_patient_student_edits_only_own_diagnosis(self):
+        other_student = User.objects.create_user(
+            username="estudiante-dx-par",
+            password="pass12345",
+            role=User.Role.ESTUDIANTE,
+        )
+        available = Patient.objects.create(first_name="Libre", last_name="Dos", dui="DX-006")
+        mine = Diagnostico.objects.create(patient=available, student=self.student, content="Mío")
+        theirs = Diagnostico.objects.create(
+            patient=available, student=other_student, content="Suyo"
+        )
+        self.client.force_authenticate(user=self.student)
+        ok = self.client.patch(f"{self.url}{mine.id}/", {"content": "Mío, corregido"})
+        self.assertEqual(ok.status_code, status.HTTP_200_OK)
+        denied = self.client.patch(f"{self.url}{theirs.id}/", {"content": "Cambiado"})
+        self.assertEqual(denied.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_student_does_not_see_diagnoses_of_another_student(self):
         other_student = User.objects.create_user(

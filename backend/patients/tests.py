@@ -1334,3 +1334,74 @@ class PatientExportTests(APITestCase):
         _header, row = self._rows(self.client.get(self.url))
         self.assertEqual(row[0], "'=HYPERLINK(\"http://x\")")
         self.assertEqual(row[1], "'-1+1")
+
+
+class StudentPatientBankTests(APITestCase):
+    """El estudiante registra pacientes y edita los disponibles y los suyos."""
+
+    def setUp(self):
+        sync_acl()
+        self.student = User.objects.create_user(
+            username="estudiante-banco",
+            password="pass12345",
+            role=User.Role.ESTUDIANTE,
+        )
+        self.other = User.objects.create_user(
+            username="estudiante-otro-banco",
+            password="pass12345",
+            role=User.Role.ESTUDIANTE,
+        )
+        self.client.force_authenticate(user=self.student)
+
+    def patient(self, dui, **fields):
+        return Patient.objects.create(
+            first_name="Ana", last_name="Banco", dui=dui, **CONTACT, **fields
+        )
+
+    def edit(self, patient):
+        return self.client.patch(
+            f"/api/patients/{patient.id}/", {"address": "Santa Ana"}, format="json"
+        )
+
+    def test_student_registers_patient_without_taking_it(self):
+        response = self.client.post(
+            "/api/patients/",
+            {"first_name": "Nuevo", "last_name": "Paciente", "dui": "04000001-1", **CONTACT},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        patient = Patient.objects.get(dui="04000001-1")
+        self.assertEqual(patient.created_by, self.student)
+        self.assertEqual(patient.case_status, Patient.CaseStatus.PENDIENTE)
+        self.assertFalse(patient.has_active_assignment())
+        self.assertTrue(response.json()["can_evaluate"])
+        self.assertFalse(response.json()["can_write_clinical"])
+
+    def test_student_edits_available_and_own_patients(self):
+        available = self.patient("04000002-2")
+        own = self.patient("04000003-3")
+        Assignment.objects.create(patient=own, student=self.student)
+        self.assertEqual(self.edit(available).status_code, status.HTTP_200_OK)
+        self.assertEqual(self.edit(own).status_code, status.HTTP_200_OK)
+
+    def test_student_cannot_edit_patient_of_another_student(self):
+        taken = self.patient("04000004-4")
+        Assignment.objects.create(patient=taken, student=self.other)
+        # No lo ve (scoping), así que ni siquiera sabe que existe.
+        self.assertEqual(self.edit(taken).status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_student_cannot_edit_own_finished_patient(self):
+        finished = self.patient("04000005-5")
+        Assignment.objects.create(
+            patient=finished,
+            student=self.student,
+            status=Assignment.AssignmentStatus.FINALIZADA,
+        )
+        finished.case_status = Patient.CaseStatus.FINALIZADO
+        finished.save()
+        self.assertEqual(self.edit(finished).status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_student_cannot_delete_patients(self):
+        available = self.patient("04000006-6")
+        response = self.client.delete(f"/api/patients/{available.id}/")
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)

@@ -455,15 +455,17 @@ class CaseTransitionTests(APITestCase):
             validated_by=self.docente,
         )
 
-    def test_only_forward_transitions_are_allowed(self):
+    def test_allowed_transitions(self):
         pendiente = Patient.CaseStatus.PENDIENTE
         en_proceso = Patient.CaseStatus.EN_PROCESO
         finalizado = Patient.CaseStatus.FINALIZADO
         self.assertTrue(can_transition(pendiente, en_proceso))
         self.assertTrue(can_transition(en_proceso, finalizado))
+        # Liberar devuelve el caso al banco.
+        self.assertTrue(can_transition(en_proceso, pendiente))
         self.assertFalse(can_transition(pendiente, finalizado))
-        self.assertFalse(can_transition(en_proceso, pendiente))
         self.assertFalse(can_transition(finalizado, en_proceso))
+        self.assertFalse(can_transition(finalizado, pendiente))
 
     def test_transition_case_status_rejects_invalid_jump(self):
         other = Patient.objects.create(
@@ -906,3 +908,98 @@ class AppointmentReminderTests(APITestCase):
         self.assertEqual(self._reminders().count(), 1)
         with self.assertRaises(CommandError):
             call_command("send_appointment_reminders", "--date", "15/10/2026")
+
+
+class ReleaseAssignmentTests(APITestCase):
+    """Liberar devuelve el paciente al banco de pacientes."""
+
+    def setUp(self):
+        sync_acl()
+        self.student = User.objects.create_user(
+            username="estudiante-libera",
+            password="pass12345",
+            role=User.Role.ESTUDIANTE,
+            first_name="Lucía",
+            last_name="Zelaya",
+        )
+        self.other = User.objects.create_user(
+            username="estudiante-ajeno",
+            password="pass12345",
+            role=User.Role.ESTUDIANTE,
+        )
+        self.patient = Patient.objects.create(
+            first_name="Ana", last_name="Banco", dui="REL-001"
+        )
+        self.assignment = Assignment.objects.create(
+            patient=self.patient, student=self.student
+        )
+        self.appointment = Appointment.objects.create(
+            assignment=self.assignment,
+            starts_at=timezone.now() + timedelta(days=2),
+        )
+        Diagnostico.objects.create(
+            patient=self.patient, student=self.student, content="Caries 16"
+        )
+
+    def release(self, user, assignment=None, **data):
+        self.client.force_authenticate(user=user)
+        assignment = assignment or self.assignment
+        return self.client.post(
+            f"/api/assignments/{assignment.id}/release/", data, format="json"
+        )
+
+    def test_student_releases_own_patient_back_to_the_bank(self):
+        response = self.release(self.student, reason="No me sirve para la práctica")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.assignment.refresh_from_db()
+        self.patient.refresh_from_db()
+        self.appointment.refresh_from_db()
+        self.assertEqual(self.assignment.status, Assignment.AssignmentStatus.CANCELADA)
+        self.assertIn("Liberado por Lucía Zelaya", self.assignment.notes)
+        self.assertIn("No me sirve para la práctica", self.assignment.notes)
+        self.assertEqual(self.patient.case_status, Patient.CaseStatus.PENDIENTE)
+        self.assertEqual(self.appointment.status, Appointment.Status.CANCELADA)
+        # El expediente se queda con el paciente.
+        self.assertTrue(self.patient.diagnoses.exists())
+        self.assertIn(self.patient, Patient.objects.available())
+
+    def test_released_patient_can_be_taken_again(self):
+        self.release(self.student)
+        self.client.force_authenticate(user=self.other)
+        response = self.client.post(
+            "/api/assignments/claim/", {"patients": [self.patient.id]}, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.patient.refresh_from_db()
+        self.assertEqual(self.patient.case_status, Patient.CaseStatus.EN_PROCESO)
+
+    def test_student_cannot_release_another_students_patient(self):
+        response = self.release(self.other)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assignment.refresh_from_db()
+        self.assertEqual(self.assignment.status, Assignment.AssignmentStatus.ACTIVA)
+
+    def test_staff_roles_can_release(self):
+        for role in (User.Role.ADMIN, User.Role.DOCENTE, User.Role.RECEPCION):
+            patient = Patient.objects.create(
+                first_name="Ana", last_name=role, dui=f"REL-{role}"
+            )
+            assignment = Assignment.objects.create(patient=patient, student=self.student)
+            user = User.objects.create_user(
+                username=f"libera-{role}", password="pass12345", role=role
+            )
+            response = self.release(user, assignment)
+            self.assertEqual(response.status_code, status.HTTP_200_OK, role)
+
+    def test_soporte_cannot_release(self):
+        soporte = User.objects.create_user(
+            username="soporte-libera", password="pass12345", role=User.Role.SOPORTE
+        )
+        response = self.release(soporte)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_only_active_assignments_can_be_released(self):
+        self.release(self.student)
+        response = self.release(self.student)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
