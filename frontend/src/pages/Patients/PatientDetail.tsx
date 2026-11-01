@@ -16,6 +16,7 @@ import { PatientClinicalTabs, hasClinicalTabs } from "./PatientClinicalTabs";
 import { useAuth } from "../../hooks/useAuth";
 import { useTheme } from "../../hooks/useTheme";
 import { primaryActionClass } from "../../lib/actions";
+import { phoneHref } from "../../lib/phones";
 import {
   areaLabel,
   listClinicalAreas,
@@ -360,7 +361,7 @@ function PhoneLink({ value }: { value: string }) {
   }
   return (
     <a
-      href={`tel:${trimmed}`}
+      href={phoneHref(trimmed)}
       className="text-teal-700 hover:underline dark:text-teal-400"
     >
       {trimmed}

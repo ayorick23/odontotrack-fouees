@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 
 import { can } from "../../acl/can";
+import { PhoneInput } from "../../components/PhoneInput";
 import {
   Select,
   SelectContent,
@@ -23,6 +24,7 @@ import {
 } from "../../components/ui/select";
 import { useAuth } from "../../hooks/useAuth";
 import { primaryActionClass, secondaryActionClass } from "../../lib/actions";
+import { isValidPhone } from "../../lib/phones";
 import {
   CASE_STATUS_LABELS,
   DOCUMENT_TYPE_LABELS,
@@ -51,6 +53,7 @@ const SUBCATEGORY_NONE = "sin-tratamiento";
 const DUI_PATTERN = /^\d{8}-\d$/;
 const PASSPORT_PATTERN = /^[A-Z0-9]{5,20}$/;
 const DUI_FORMAT_ERROR = "Usa el formato 00000000-0";
+const PHONE_ERROR = "Completa el número con los dígitos del país";
 const MAX_PHOTO_BYTES = 2 * 1024 * 1024;
 const ALLOWED_PHOTO_TYPES = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
 const cardClass =
@@ -93,11 +96,11 @@ const patientFormSchema = z.object({
     .string()
     .trim()
     .min(1, "El teléfono es obligatorio")
-    .max(20, "El teléfono no puede superar 20 caracteres"),
+    .refine(isValidPhone, PHONE_ERROR),
   whatsapp_number: z
     .string()
     .trim()
-    .max(20, "El WhatsApp no puede superar 20 caracteres"),
+    .refine((value) => value === "" || isValidPhone(value), PHONE_ERROR),
   email: z
     .string()
     .trim()
@@ -119,7 +122,7 @@ const patientFormSchema = z.object({
     .string()
     .trim()
     .min(1, "El teléfono de emergencia es obligatorio")
-    .max(20, "El teléfono de emergencia no puede superar 20 caracteres"),
+    .refine(isValidPhone, PHONE_ERROR),
   emergency_contact_relationship: z.union([
     z.literal(""),
     z.enum(["madre", "padre", "hermano_a", "conyuge", "hijo_a", "otro"]),
@@ -684,23 +687,45 @@ export function PatientForm() {
           />
           <div className="grid gap-4 md:grid-cols-2">
             <Field label="Teléfono" error={errors.phone_number?.message} required>
-              <input
-                type="tel"
-                autoComplete="tel"
-                disabled={!canWrite}
-                placeholder="7777-7777"
-                className={inputClass}
-                {...register("phone_number")}
+<Controller
+                name="phone_number"
+                control={control}
+                render={({ field }) => (
+                  <PhoneInput
+                    label="Teléfono"
+                    autoComplete="tel"
+                    disabled={!canWrite}
+                    inputClassName={inputClass}
+                    selectClassName={selectClass}
+                    menuClassName={selectMenuClass}
+                    name={field.name}
+                    inputRef={field.ref}
+                    value={field.value}
+                    onBlur={field.onBlur}
+                    onChange={field.onChange}
+                  />
+                )}
               />
             </Field>
             <Field label="WhatsApp" error={errors.whatsapp_number?.message}>
-              <input
-                type="tel"
-                autoComplete="off"
-                disabled={!canWrite}
-                placeholder="7777-7777"
-                className={inputClass}
-                {...register("whatsapp_number")}
+<Controller
+                name="whatsapp_number"
+                control={control}
+                render={({ field }) => (
+                  <PhoneInput
+                    label="WhatsApp"
+                    autoComplete="off"
+                    disabled={!canWrite}
+                    inputClassName={inputClass}
+                    selectClassName={selectClass}
+                    menuClassName={selectMenuClass}
+                    name={field.name}
+                    inputRef={field.ref}
+                    value={field.value}
+                    onBlur={field.onBlur}
+                    onChange={field.onChange}
+                  />
+                )}
               />
             </Field>
             <Field label="Correo" error={errors.email?.message}>
@@ -748,13 +773,24 @@ export function PatientForm() {
               error={errors.emergency_contact_phone?.message}
               required
             >
-              <input
-                type="tel"
-                autoComplete="tel"
-                disabled={!canWrite}
-                placeholder="7777-7777"
-                className={inputClass}
-                {...register("emergency_contact_phone")}
+<Controller
+                name="emergency_contact_phone"
+                control={control}
+                render={({ field }) => (
+                  <PhoneInput
+                    label="Teléfono de emergencia"
+                    autoComplete="off"
+                    disabled={!canWrite}
+                    inputClassName={inputClass}
+                    selectClassName={selectClass}
+                    menuClassName={selectMenuClass}
+                    name={field.name}
+                    inputRef={field.ref}
+                    value={field.value}
+                    onBlur={field.onBlur}
+                    onChange={field.onChange}
+                  />
+                )}
               />
             </Field>
             <Field
