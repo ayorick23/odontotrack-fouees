@@ -17,6 +17,7 @@ import {
   withoutPrimaryTeeth,
   type FdiToothNumber,
   type OdontogramValue,
+  type OdontogramView,
   type PracticeArea,
   type ToothLayer,
 } from "../../types";
@@ -64,6 +65,11 @@ export type OdontogramProps = {
   patientName?: string;
 };
 
+/** El motor solo distingue carta de estado y carta del plan. */
+function engineLayer(view: OdontogramView): ToothLayer {
+  return view === "plan" ? "plan" : "hallazgo";
+}
+
 function selectTile(fdi: number): void {
   const tile = document.querySelector(
     `.odontogram-fouees .tooth-tile[data-tooth="${fdi}"]`,
@@ -85,8 +91,8 @@ export function Odontogram({
   const drawnRef = useRef<OdontogramValue | undefined>(undefined);
   const drawnKeyRef = useRef("");
   const importingRef = useRef(false);
-  const [layer, setLayer] = useState<ToothLayer>("hallazgo");
-  const layerRef = useRef<ToothLayer>("hallazgo");
+  const [view, setView] = useState<OdontogramView>("diagnostico");
+  const viewRef = useRef<OdontogramView>("diagnostico");
   const [perioOpen, setPerioOpen] = useState(false);
   const [focusedFdi, setFocusedFdi] = useState<FdiToothNumber | null>(null);
   const focusedRef = useRef<FdiToothNumber | null>(null);
@@ -152,7 +158,7 @@ export function Odontogram({
   const draw = useCallback((next: OdontogramValue) => {
     importingRef.current = true;
     try {
-      writeEngineChart(domainToChart(next), layerRef.current);
+      writeEngineChart(domainToChart(next), engineLayer(viewRef.current));
     } finally {
       importingRef.current = false;
     }
@@ -202,17 +208,23 @@ export function Odontogram({
     draw(value);
   }, [value, draw]);
 
-  const changeLayer = (next: ToothLayer) => {
-    layerRef.current = next;
-    setLayer(next);
-    applyToothLayer(next);
+  const changeView = (next: OdontogramView) => {
+    viewRef.current = next;
+    setView(next);
+    applyToothLayer(engineLayer(next));
   };
 
   const current = value ?? emptyOdontogram();
-  const planCount = current.teeth.reduce(
-    (total, tooth) => total + tooth.marks.filter((mark) => mark.layer === "plan").length,
-    0,
-  );
+  const planCounts = { pending: 0, done: 0 };
+  for (const tooth of current.teeth) {
+    for (const mark of tooth.marks) {
+      if (mark.layer === "plan") {
+        planCounts.pending += 1;
+      } else if (mark.layer === "hecho") {
+        planCounts.done += 1;
+      }
+    }
+  }
 
   return (
     <div className="odontogram-fouees" aria-label="Odontograma FDI" translate="no">
@@ -238,27 +250,28 @@ export function Odontogram({
         >
           <div className="min-w-0 space-y-3">
             <OdontogramChartMode
-              layer={layer}
-              onLayerChange={changeLayer}
-              planCount={planCount}
+              view={view}
+              onViewChange={changeView}
+              planCounts={planCounts}
               readOnly={readOnly}
-            />
-            {readOnly || !value ? null : (
-              <label className="inline-flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
-                <input
-                  type="checkbox"
-                  checked={hasPrimaryTeeth(value)}
-                  onChange={(event) =>
-                    onChange?.(
-                      event.target.checked
-                        ? withPrimaryTeeth(value)
-                        : withoutPrimaryTeeth(value),
-                    )
-                  }
-                />
-                Dentición temporal / mixta
-              </label>
-            )}
+            >
+              {readOnly || !value ? null : (
+                <label className="inline-flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                  <input
+                    type="checkbox"
+                    checked={hasPrimaryTeeth(value)}
+                    onChange={(event) =>
+                      onChange?.(
+                        event.target.checked
+                          ? withPrimaryTeeth(value)
+                          : withoutPrimaryTeeth(value),
+                      )
+                    }
+                  />
+                  Dentición temporal / mixta
+                </label>
+              )}
+            </OdontogramChartMode>
             <div
               className="odontogram-chart-wrap overflow-x-auto"
               onClick={(event) => {
@@ -304,6 +317,7 @@ export function Odontogram({
               focusedFdi={focusedFdi}
               onFocusTooth={setFocusedFdi}
               onChange={readOnly ? undefined : onChange}
+              onViewChange={changeView}
             />
           </div>
           {readOnly ? null : (
@@ -311,7 +325,7 @@ export function Odontogram({
               value={current}
               onChange={(next) => onChange?.(next)}
               readOnly={readOnly}
-              layer={layer}
+              view={view}
               onOpenPerio={() => setPerioOpen(true)}
               focusedFdi={focusedFdi}
               clinicalAreas={clinicalAreas}

@@ -92,21 +92,6 @@ WHOLE_TOOTH_STATUSES = frozenset(
     }
 )
 
-HECHO_STATUSES = frozenset(
-    {
-        ToothStatus.OBTURADO,
-        ToothStatus.SELLANTE,
-        ToothStatus.RESTAURACION_TEMPORAL,
-        ToothStatus.ENDODONCIA,
-        ToothStatus.PULPOTOMIA,
-        ToothStatus.CORONA,
-        ToothStatus.PUENTE,
-        ToothStatus.IMPLANTE,
-        ToothStatus.EXTRAIDO,
-    }
-)
-
-
 def is_fdi_permanent_tooth(number: int) -> bool:
     return number in FDI_TOOTH_NUMBER_SET
 
@@ -149,12 +134,6 @@ def has_clinical_content(teeth: list[dict] | None) -> bool:
         if any(oral.get(key) for key in ("placa", "sangrado", "sarro")):
             return True
     return False
-
-
-def default_layer_for_status(status: str) -> str:
-    if status in HECHO_STATUSES:
-        return ToothLayer.HECHO
-    return ToothLayer.HALLAZGO
 
 
 def combine_tooth_statuses(status: str, statuses: list[str] | None) -> list[str]:
@@ -218,8 +197,13 @@ def normalize_tooth_mark(raw: dict) -> dict | None:
         status = None
     layer = raw.get("layer")
     if layer not in ToothLayer.values:
-        layer = default_layer_for_status(status) if status else ToothLayer.PLAN
+        layer = ToothLayer.HALLAZGO if status else ToothLayer.PLAN
     treatment = _treatment_slug(raw) if layer in TREATMENT_LAYERS else None
+    if layer == ToothLayer.HECHO and treatment is None:
+        # "Hecho" es un tratamiento del plan ya realizado. Lo que el
+        # paciente trae de antes (una corona de otra clínica) es parte del
+        # diagnóstico: así no hay dos lugares para marcar lo mismo.
+        layer = ToothLayer.HALLAZGO
     if status is None and treatment is None:
         return None
     surfaces = (
@@ -283,7 +267,7 @@ def migrate_legacy_tooth(raw: dict) -> list[dict]:
     return normalize_tooth_marks(
         [
             {
-                "layer": default_layer_for_status(status),
+                "layer": ToothLayer.HALLAZGO,
                 "status": status,
                 "surfaces": [] if status in WHOLE_TOOTH_STATUSES else surfaces,
             }

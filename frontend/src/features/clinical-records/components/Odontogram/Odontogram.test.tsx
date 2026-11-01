@@ -195,8 +195,14 @@ import { emptyOdontogram, type OdontogramValue } from "../../types";
 import { Odontogram } from "./Odontogram";
 
 /** Odontograma controlado, como en el expediente. */
-function Harness({ onChange }: { onChange?: (value: OdontogramValue) => void }) {
-  const [value, setValue] = useState(emptyOdontogram());
+function Harness({
+  onChange,
+  initial,
+}: {
+  onChange?: (value: OdontogramValue) => void;
+  initial?: OdontogramValue;
+}) {
+  const [value, setValue] = useState(() => initial ?? emptyOdontogram());
   return (
     <Odontogram
       value={value}
@@ -239,9 +245,13 @@ describe("Odontogram wrapper", () => {
     expect(screen.getByRole("button", { name: "Oclusal" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Hueso" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Pulpa" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Hallazgo" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Plan" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Hecho" })).toBeInTheDocument();
+    // Dos vistas; "Hecho" ya no es una pestaña aparte.
+    expect(screen.getByRole("button", { name: "Diagnóstico" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: "Plan de tratamiento" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Hecho" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Exportar PNG" })).not.toBeInTheDocument();
   });
 
@@ -249,17 +259,29 @@ describe("Odontogram wrapper", () => {
     const value = emptyOdontogram();
     const tooth = tooth16(value);
     if (tooth) {
-      tooth.marks = [{ layer: "hecho", status: "implante", surfaces: [] }];
+      tooth.marks = [
+        { layer: "hallazgo", status: "caries", surfaces: ["oclusal"] },
+        {
+          layer: "hecho",
+          status: "endodoncia",
+          surfaces: [],
+          treatment: "endodoncia_monorradicular",
+        },
+      ];
     }
 
     render(<Odontogram value={value} readOnly />);
 
-    expect(screen.getByLabelText("Hallazgos del odontograma")).toHaveTextContent(
-      "16 Implante",
+    expect(screen.getByLabelText("Diagnóstico")).toHaveTextContent("16 Caries O");
+    // Lo realizado se lista dentro del plan.
+    expect(screen.getByLabelText("Plan de tratamiento")).toHaveTextContent(
+      /16 endodoncia/i,
     );
-    expect(screen.getByLabelText("Hecho")).toBeInTheDocument();
-    expect(screen.queryByRole("tab", { name: "Tratamiento" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Registros especializados")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Quitar/ })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Volver a pendiente/ }),
+    ).not.toBeInTheDocument();
   });
 
   it("abre el panel de tratamiento al seleccionar un diente", async () => {
@@ -311,12 +333,12 @@ describe("Odontogram wrapper", () => {
     ]);
   });
 
-  it("en Plan agrega un tratamiento del tarifario y se puede pasar a hecho", async () => {
+  it("en el plan agrega un tratamiento del tarifario y se marca como realizado", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     render(<Harness onChange={onChange} />);
     await user.click(screen.getByRole("button", { name: "Marcar diente 16" }));
-    await user.click(screen.getByRole("button", { name: "Plan" }));
+    await user.click(screen.getByRole("button", { name: "Plan de tratamiento" }));
     expect(engine.setChartMode).toHaveBeenCalledWith("plan");
     expect(
       screen.queryByRole("button", { name: "Indicado para práctica" }),
@@ -334,12 +356,36 @@ describe("Odontogram wrapper", () => {
         treatment: "endodoncia_monorradicular",
       },
     ]);
-    expect(screen.getByLabelText("Plan")).toHaveTextContent(
+    expect(screen.getByLabelText("Plan de tratamiento")).toHaveTextContent(
       "16 Endodoncia monorradicular",
     );
 
-    await user.click(screen.getByRole("button", { name: "Marcar como hecho" }));
+    const realizado = screen.getByRole("checkbox", { name: "Realizado" });
+    await user.click(realizado);
     expect(tooth16(lastValue(onChange))?.marks[0].layer).toBe("hecho");
+    expect(screen.getByRole("checkbox", { name: "Realizado" })).toBeChecked();
+
+    // Desmarcar lo devuelve a pendiente (vuelve al banco).
+    await user.click(screen.getByRole("checkbox", { name: "Realizado" }));
+    expect(tooth16(lastValue(onChange))?.marks[0].layer).toBe("plan");
+  });
+
+  it("tocar una marca del plan abre la vista del plan", async () => {
+    const user = userEvent.setup();
+    const value = emptyOdontogram();
+    const tooth = tooth16(value);
+    if (tooth) {
+      tooth.marks = [
+        { layer: "plan", status: "endodoncia", surfaces: [], treatment: "endodoncia_monorradicular" },
+      ];
+    }
+    render(<Harness initial={value} onChange={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: /^16 endodoncia/i }));
+    expect(screen.getByRole("button", { name: "Plan de tratamiento" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(engine.setChartMode).toHaveBeenLastCalledWith("plan");
   });
 
   it("la × de un hallazgo quita solo esa marca", async () => {
@@ -360,6 +406,9 @@ describe("Odontogram wrapper", () => {
     const user = userEvent.setup();
     render(<Odontogram />);
 
+    // Plegados por defecto: no se usan en cada consulta.
+    expect(screen.queryByRole("tab", { name: "Endodoncia" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Registros especializados" }));
     await user.click(screen.getByRole("tab", { name: "Endodoncia" }));
     expect(screen.getByText("Estado pulpar / endodoncia")).toBeInTheDocument();
 
@@ -381,7 +430,7 @@ describe("Odontogram wrapper", () => {
     const onChange = vi.fn();
     render(<Harness onChange={onChange} />);
     await user.click(screen.getByRole("button", { name: "Marcar diente 16" }));
-    await user.click(screen.getByRole("button", { name: "Más opciones" }));
+    await user.click(screen.getByRole("button", { name: "Higiene: placa, sangrado, sarro" }));
     await user.click(screen.getByRole("button", { name: "Placa" }));
 
     const next = lastValue(onChange);

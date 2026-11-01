@@ -187,17 +187,28 @@ export function removeMark(
   );
 }
 
-/** Plan → Hecho: conserva tratamiento y superficies y sale del banco. */
-export function markDone(
+/**
+ * Casilla "Realizado" de un tratamiento del plan: plan → hecho (sale del
+ * banco) o, al desmarcarla, hecho → plan. Conserva tratamiento y
+ * superficies. Solo aplica a marcas con tratamiento: "hecho" sin
+ * tratamiento no existe (lo previo del paciente es diagnóstico).
+ */
+export function setDone(
   value: OdontogramValue,
   fdi: FdiToothNumber,
   index: number,
+  done: boolean,
 ): OdontogramValue {
   const marks = marksOf(value, fdi);
   const mark = marks[index];
-  if (!mark || mark.layer !== "plan") {
+  const from = done ? "plan" : "hecho";
+  if (!mark || mark.layer !== from || !mark.treatment) {
     return value;
   }
   const rest = marks.filter((_, position) => position !== index);
-  return withMarks(value, fdi, addToLayer(rest, { ...mark, layer: "hecho" }));
+  return withMarks(
+    value,
+    fdi,
+    addToLayer(rest, { ...mark, layer: done ? "hecho" : "plan" }),
+  );
 }

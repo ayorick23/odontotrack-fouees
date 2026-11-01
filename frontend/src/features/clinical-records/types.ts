@@ -23,6 +23,25 @@ export const TOOTH_LAYER_LABELS: Record<ToothLayer, string> = {
   hecho: "Hecho",
 };
 
+/**
+ * Lo que ve el estudiante: dos vistas en el orden en que trabaja.
+ * - Diagnóstico: lo que el paciente trae (capa `hallazgo`), incluidas
+ *   restauraciones previas.
+ * - Plan de tratamiento: lo que se le va a hacer (capa `plan`) y lo ya
+ *   realizado (capa `hecho`, siempre con tratamiento).
+ * Las tres capas siguen en los datos; "Realizado" mueve plan ↔ hecho.
+ */
+export type OdontogramView = "diagnostico" | "plan";
+
+export const ODONTOGRAM_VIEW_LABELS: Record<OdontogramView, string> = {
+  diagnostico: "Diagnóstico",
+  plan: "Plan de tratamiento",
+};
+
+export function viewOfMark(mark: Pick<ToothMark, "layer">): OdontogramView {
+  return mark.layer === "hallazgo" ? "diagnostico" : "plan";
+}
+
 export type ToothStatus =
   | "sano"
   | "caries"
@@ -124,18 +143,6 @@ export const WHOLE_TOOTH_STATUSES: readonly ToothStatus[] = [
   "raiz_retenida",
   "no_erupcionado",
   "ausente_congenito",
-];
-
-export const HECHO_STATUSES: readonly ToothStatus[] = [
-  "obturado",
-  "sellante",
-  "restauracion_temporal",
-  "endodoncia",
-  "pulpotomia",
-  "corona",
-  "puente",
-  "implante",
-  "extraido",
 ];
 
 /** Agrupación solo de UI. El dominio sigue siendo ToothStatus plano. */
@@ -309,10 +316,6 @@ export function updateTooth(
     tooth.fdi === fdi ? { ...tooth, ...patch } : tooth,
   );
   return { ...value, teeth, oralMarks: deriveOralMarks(teeth) };
-}
-
-export function defaultLayerForStatus(status: ToothStatus): ToothLayer {
-  return HECHO_STATUSES.includes(status) ? "hecho" : "hallazgo";
 }
 
 export function findingStatuses(finding: ToothFinding): ToothStatus[] {

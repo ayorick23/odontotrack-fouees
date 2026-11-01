@@ -12,16 +12,16 @@ import {
   type FdiToothNumber,
   type OralGeneralMark,
   type OdontogramValue,
+  type OdontogramView,
   type PracticeArea,
-  type ToothLayer,
   type ToothStatus,
 } from "../../types";
 import { clearChartSelection } from "./engine";
 import {
   addPlannedTreatment,
   layerStatuses,
-  markDone,
   removeMark,
+  setDone,
   setMarkSurface,
   toggleStatus,
   toggleSurface,
@@ -64,14 +64,15 @@ const STATUS_BUTTON: Record<ToothStatus, string> = {
 
 const PRESSED = "ring-2 ring-teal-500 ring-offset-1 dark:ring-offset-slate-900";
 
-const LAYER_HELP: Record<ToothLayer, string> = {
-  hallazgo:
-    "Lo que hay ahora en la pieza. Cada botón marca o desmarca; Sano limpia la capa.",
+const VIEW_HELP: Record<OdontogramView, string> = {
+  diagnostico:
+    "Lo que trae la pieza, incluidas restauraciones de antes. Cada botón marca o desmarca; Sano limpia el diagnóstico.",
   plan:
-    "Elige el tratamiento del tarifario: se dibuja solo y la pieza queda disponible en el banco de pacientes hasta marcarla como hecha.",
-  hecho:
-    "Trabajo ya realizado (antecedentes). Lo planificado pasa aquí con el botón Hecho.",
+    "Elige el tratamiento del tarifario: se dibuja solo y la pieza queda en el banco de pacientes hasta marcarlo como realizado.",
 };
+
+/** El diagnóstico se guarda en la capa hallazgo. */
+const DIAGNOSIS_LAYER = "hallazgo";
 
 const MARKS = Object.keys(ORAL_GENERAL_MARK_LABELS) as OralGeneralMark[];
 
@@ -79,7 +80,7 @@ type OdontogramToolbarProps = {
   value: OdontogramValue;
   onChange: (value: OdontogramValue) => void;
   readOnly: boolean;
-  layer: ToothLayer;
+  view: OdontogramView;
   focusedFdi?: number | null;
   clinicalAreas?: PracticeArea[];
   treatmentNames?: Record<string, string>;
@@ -90,7 +91,7 @@ export function OdontogramToolbar({
   value,
   onChange,
   readOnly,
-  layer,
+  view,
   focusedFdi,
   clinicalAreas = [],
   treatmentNames = {},
@@ -120,7 +121,7 @@ export function OdontogramToolbar({
           Diente {fdi}
         </p>
         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-          {LAYER_HELP[layer]}
+          {VIEW_HELP[view]}
         </p>
         {readOnly ? null : (
           <button
@@ -136,7 +137,7 @@ export function OdontogramToolbar({
         )}
       </div>
 
-      {layer === "plan" ? (
+      {view === "plan" ? (
         <PlanSection
           value={value}
           fdi={fdi}
@@ -149,56 +150,21 @@ export function OdontogramToolbar({
         <StatusSection
           value={value}
           fdi={fdi}
-          layer={layer}
           onChange={onChange}
           readOnly={readOnly}
         />
       )}
 
-      <div>
-        <button
-          type="button"
-          aria-expanded={moreOpen}
-          onClick={() => setMoreOpen((open) => !open)}
-          className="text-xs font-semibold text-teal-700 hover:underline dark:text-teal-300"
-        >
-          {moreOpen ? "Ocultar opciones" : "Más opciones"}
-        </button>
-        {moreOpen ? (
-          <div className="mt-3">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
-              Marcas del diente {fdi}
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {MARKS.map((mark) => {
-                const active = focusedOral[mark];
-                return (
-                  <button
-                    key={mark}
-                    type="button"
-                    disabled={readOnly}
-                    aria-pressed={active}
-                    onClick={() =>
-                      onChange(
-                        updateTooth(value, fdi, {
-                          oralMarks: { ...focusedOral, [mark]: !active },
-                        }),
-                      )
-                    }
-                    className={`rounded-full border px-3 py-1.5 text-sm font-semibold transition disabled:opacity-50 ${
-                      active
-                        ? "border-teal-500 bg-teal-600 text-white"
-                        : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
-                    }`}
-                  >
-                    {ORAL_GENERAL_MARK_LABELS[mark]}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        ) : null}
-      </div>
+      {view === "plan" ? null : (
+        <HygieneSection
+          value={value}
+          fdi={fdi}
+          onChange={onChange}
+          readOnly={readOnly}
+          open={moreOpen}
+          onToggle={() => setMoreOpen((open) => !open)}
+        />
+      )}
     </div>
   );
 }
@@ -210,13 +176,67 @@ type SectionProps = {
   readOnly: boolean;
 };
 
-function StatusSection({
+/** Placa, sangrado y sarro de la pieza: son parte del diagnóstico. */
+function HygieneSection({
   value,
   fdi,
-  layer,
   onChange,
   readOnly,
-}: SectionProps & { layer: ToothLayer }) {
+  open,
+  onToggle,
+}: SectionProps & { open: boolean; onToggle: () => void }) {
+  const focusedOral =
+    value.teeth.find((tooth) => tooth.fdi === fdi)?.oralMarks ?? emptyOralMarks();
+  return (
+    <div>
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={onToggle}
+        className="text-xs font-semibold text-teal-700 hover:underline dark:text-teal-300"
+      >
+        {open ? "Ocultar higiene" : "Higiene: placa, sangrado, sarro"}
+      </button>
+      {open ? (
+        <div className="mt-3">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+            Marcas del diente {fdi}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {MARKS.map((mark) => {
+              const active = focusedOral[mark];
+              return (
+                <button
+                  key={mark}
+                  type="button"
+                  disabled={readOnly}
+                  aria-pressed={active}
+                  onClick={() =>
+                    onChange(
+                      updateTooth(value, fdi, {
+                        oralMarks: { ...focusedOral, [mark]: !active },
+                      }),
+                    )
+                  }
+                  className={`rounded-full border px-3 py-1.5 text-sm font-semibold transition disabled:opacity-50 ${
+                    active
+                      ? "border-teal-500 bg-teal-600 text-white"
+                      : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                  }`}
+                >
+                  {ORAL_GENERAL_MARK_LABELS[mark]}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function StatusSection({ value, fdi, onChange, readOnly }: SectionProps) {
+  const layer = DIAGNOSIS_LAYER;
   const [surfaceMode, setSurfaceMode] = useState<"caries" | "obturado">("caries");
   const active = layerStatuses(value, fdi, layer);
   const tooth = value.teeth.find((item) => item.fdi === fdi);
@@ -310,9 +330,11 @@ function PlanSection({
   const area = clinicalAreas.find((item) => item.slug === areaSlug);
   const treatment = area?.treatments.find((item) => item.slug === treatmentSlug);
   const marks = value.teeth.find((item) => item.fdi === fdi)?.marks ?? [];
+  // Pendientes primero; los realizados quedan abajo, tachados.
   const planned = marks
     .map((mark, index) => ({ mark, index }))
-    .filter(({ mark }) => mark.layer === "plan");
+    .filter(({ mark }) => mark.layer !== "hallazgo")
+    .sort((a, b) => Number(a.mark.layer === "hecho") - Number(b.mark.layer === "hecho"));
 
   return (
     <>
@@ -358,7 +380,7 @@ function PlanSection({
 
       <div>
         <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
-          Planificado en el diente {fdi}
+          Plan del diente {fdi}
         </p>
         {planned.length === 0 ? (
           <p className="text-sm text-slate-500 dark:text-slate-400">
@@ -366,52 +388,70 @@ function PlanSection({
           </p>
         ) : (
           <ul className="flex flex-col gap-3">
-            {planned.map(({ mark, index }) => (
-              <li
-                key={`${index}-${mark.treatment ?? mark.status}`}
-                className="rounded-xl bg-white p-3 ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700"
-              >
-                <p className="text-sm font-semibold text-slate-700 dark:text-slate-100">
-                  {formatToothMark(mark, treatmentNames) || "Sin tratamiento"}
-                </p>
-                {mark.treatment ? null : (
-                  <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
-                    Sin tratamiento del tarifario: no aparece en el banco. Quítalo y
-                    agrega el tratamiento.
+            {planned.map(({ mark, index }) => {
+              const done = mark.layer === "hecho";
+              return (
+                <li
+                  key={`${index}-${mark.treatment ?? mark.status}`}
+                  className={`rounded-xl p-3 ring-1 ${
+                    done
+                      ? "bg-emerald-50/60 ring-emerald-200 dark:bg-emerald-950/30 dark:ring-emerald-900"
+                      : "bg-white ring-slate-200 dark:bg-slate-900 dark:ring-slate-700"
+                  }`}
+                >
+                  <p
+                    className={`text-sm font-semibold ${
+                      done
+                        ? "text-emerald-800 line-through decoration-1 dark:text-emerald-200"
+                        : "text-slate-700 dark:text-slate-100"
+                    }`}
+                  >
+                    {formatToothMark(mark, treatmentNames) || "Sin tratamiento"}
                   </p>
-                )}
-                {mark.status && SURFACE_STATUSES.includes(mark.status) ? (
-                  <div className="mt-2">
-                    <OdontogramSurfaceDiagram
-                      activeSurfaces={mark.surfaces}
-                      disabled={readOnly}
-                      mode="obturado"
-                      onToggle={(surface, on) =>
-                        onChange(setMarkSurface(value, fdi, index, surface, on))
-                      }
-                    />
-                  </div>
-                ) : null}
-                {readOnly ? null : (
-                  <div className="mt-2 flex gap-3">
-                    <button
-                      type="button"
-                      onClick={() => onChange(markDone(value, fdi, index))}
-                      className="text-xs font-semibold text-teal-700 hover:underline dark:text-teal-300"
-                    >
-                      Marcar como hecho
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onChange(removeMark(value, fdi, index))}
-                      className="text-xs font-semibold text-red-700 hover:underline dark:text-red-300"
-                    >
-                      Quitar
-                    </button>
-                  </div>
-                )}
-              </li>
-            ))}
+                  {mark.treatment ? null : (
+                    <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
+                      Sin tratamiento del tarifario: no aparece en el banco. Quítalo y
+                      agrega el tratamiento.
+                    </p>
+                  )}
+                  {!done && mark.status && SURFACE_STATUSES.includes(mark.status) ? (
+                    <div className="mt-2">
+                      <OdontogramSurfaceDiagram
+                        activeSurfaces={mark.surfaces}
+                        disabled={readOnly}
+                        mode="obturado"
+                        onToggle={(surface, on) =>
+                          onChange(setMarkSurface(value, fdi, index, surface, on))
+                        }
+                      />
+                    </div>
+                  ) : null}
+                  {readOnly ? null : (
+                    <div className="mt-2 flex items-center gap-4">
+                      {mark.treatment ? (
+                        <label className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200">
+                          <input
+                            type="checkbox"
+                            checked={done}
+                            onChange={(event) =>
+                              onChange(setDone(value, fdi, index, event.target.checked))
+                            }
+                          />
+                          Realizado
+                        </label>
+                      ) : null}
+                      <button
+                        type="button"
+                        onClick={() => onChange(removeMark(value, fdi, index))}
+                        className="text-xs font-semibold text-red-700 hover:underline dark:text-red-300"
+                      >
+                        Quitar
+                      </button>
+                    </div>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>

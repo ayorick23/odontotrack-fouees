@@ -17,6 +17,7 @@ from clinical_records.catalog import (
     is_fdi_permanent_tooth,
     is_fdi_tooth,
     normalize_tooth,
+    normalize_tooth_marks,
     primary_tooth_status,
 )
 from clinical_records.models import OdontogramRevision
@@ -108,12 +109,35 @@ class OdontogramCatalogTests(SimpleTestCase):
                     "surfaces": ["mesial", "oclusal"],
                 },
                 {
-                    "layer": ToothLayer.HECHO,
+                    # Lo que el paciente trae es diagnóstico, no "hecho".
+                    "layer": ToothLayer.HALLAZGO,
                     "status": ToothStatus.OBTURADO,
                     "surfaces": ["mesial", "oclusal"],
                 },
             ],
         )
+
+
+class DoneLayerTests(SimpleTestCase):
+    """Hecho = tratamiento del plan ya realizado; sin tratamiento es
+    diagnóstico (lo que el paciente trae)."""
+
+    def test_done_without_treatment_becomes_finding(self):
+        self.assertEqual(
+            normalize_tooth_marks(
+                [{"layer": "hecho", "status": "corona", "surfaces": []}]
+            ),
+            [{"layer": "hallazgo", "status": "corona", "surfaces": []}],
+        )
+
+    def test_done_with_treatment_stays_done(self):
+        mark = {
+            "layer": "hecho",
+            "status": "endodoncia",
+            "surfaces": [],
+            "treatment": "endodoncia_monorradicular",
+        }
+        self.assertEqual(normalize_tooth_marks([mark]), [mark])
 
 
 class OdontogramApiTests(APITestCase):
@@ -362,7 +386,8 @@ class OdontogramApiTests(APITestCase):
                     "surfaces": ["mesial", "oclusal"],
                 },
                 {
-                    "layer": ToothLayer.HECHO,
+                    # Lo que el paciente trae es diagnóstico, no "hecho".
+                    "layer": ToothLayer.HALLAZGO,
                     "status": ToothStatus.OBTURADO,
                     "surfaces": ["mesial", "oclusal"],
                 },
@@ -1057,3 +1082,46 @@ class PracticeToPlanMigrationTests(SimpleTestCase):
         )
         self.assertEqual(dropped, 1)
         self.assertEqual(teeth, [{"fdi": 18, "marks": []}, {"fdi": 17, "marks": []}])
+
+
+class DoneToFindingMigrationTests(SimpleTestCase):
+    """Migración 0007: Hecho sin tratamiento pasa a diagnóstico."""
+
+    def _convert(self, marks):
+        from importlib import import_module
+
+        module = import_module(
+            "clinical_records.migrations.0007_done_without_treatment_to_finding"
+        )
+        teeth = [{"fdi": 16, "marks": marks}]
+        converted = module._convert(teeth)
+        return teeth[0]["marks"], converted
+
+    def test_moves_only_marks_without_treatment(self):
+        done = {
+            "layer": "hecho",
+            "status": "endodoncia",
+            "surfaces": [],
+            "treatment": "endodoncia_monorradicular",
+        }
+        marks, converted = self._convert(
+            [{"layer": "hecho", "status": "corona", "surfaces": []}, done]
+        )
+        self.assertEqual(converted, 1)
+        self.assertEqual(
+            marks, [{"layer": "hallazgo", "status": "corona", "surfaces": []}, done]
+        )
+
+    def test_duplicates_merge_and_existing_finding_wins(self):
+        marks, _ = self._convert(
+            [
+                {"layer": "hallazgo", "status": "obturado", "surfaces": ["oclusal"]},
+                {"layer": "hecho", "status": "obturado", "surfaces": ["oclusal"]},
+                {"layer": "hecho", "status": "implante", "surfaces": []},
+                {"layer": "hallazgo", "status": "raiz_retenida", "surfaces": []},
+            ]
+        )
+        self.assertEqual(
+            marks, [{"layer": "hallazgo", "status": "raiz_retenida", "surfaces": []}]
+        )
+

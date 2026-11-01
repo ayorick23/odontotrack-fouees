@@ -10,8 +10,8 @@ import {
 import {
   addPlannedTreatment,
   layerStatuses,
-  markDone,
   removeMark,
+  setDone,
   setMarkSurface,
   toggleStatus,
   toggleSurface,
@@ -61,8 +61,8 @@ describe("toggleStatus", () => {
       ]);
     }
     for (const status of ["sellante", "restauracion_temporal"] as const) {
-      expect(marks(toggleStatus(start(), 18, "hecho", status))).toEqual([
-        { layer: "hecho", status, surfaces: ["oclusal"] },
+      expect(marks(toggleStatus(start(), 18, "hallazgo", status))).toEqual([
+        { layer: "hallazgo", status, surfaces: ["oclusal"] },
       ]);
     }
   });
@@ -75,10 +75,10 @@ describe("toggleStatus", () => {
   it("sano limpia solo esa capa", () => {
     const value = start(
       { layer: "hallazgo", status: "caries", surfaces: ["oclusal"] },
-      { layer: "hecho", status: "corona", surfaces: [] },
+      { layer: "plan", status: "corona", surfaces: [], treatment: "corona_metal_porcelana" },
     );
     expect(marks(toggleStatus(value, 18, "hallazgo", "sano"))).toEqual([
-      { layer: "hecho", status: "corona", surfaces: [] },
+      { layer: "plan", status: "corona", surfaces: [], treatment: "corona_metal_porcelana" },
     ]);
   });
 
@@ -135,16 +135,20 @@ describe("plan", () => {
     ]);
   });
 
-  it("marcar como hecho conserva tratamiento y superficies", () => {
+  it("Realizado conserva tratamiento y superficies, y se puede desmarcar", () => {
     const planned = addPlannedTreatment(start(), 18, RESINA);
-    expect(marks(markDone(planned, 18, 0))).toEqual([
+    const done = setDone(planned, 18, 0, true);
+    expect(marks(done)).toEqual([
       { layer: "hecho", status: "obturado", surfaces: ["oclusal"], treatment: RESINA.slug },
     ]);
+    expect(marks(setDone(done, 18, 0, false))).toEqual(marks(planned));
   });
 
-  it("solo una marca de plan pasa a hecho", () => {
-    const value = start({ layer: "hallazgo", status: "caries", surfaces: ["oclusal"] });
-    expect(markDone(value, 18, 0)).toBe(value);
+  it("Realizado solo aplica a tratamientos del plan", () => {
+    const finding = start({ layer: "hallazgo", status: "caries", surfaces: ["oclusal"] });
+    expect(setDone(finding, 18, 0, true)).toBe(finding);
+    const untreated = start({ layer: "plan", status: "obturado", surfaces: ["oclusal"] });
+    expect(setDone(untreated, 18, 0, true)).toBe(untreated);
   });
 });
 
