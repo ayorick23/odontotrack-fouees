@@ -13,6 +13,9 @@ sistema: un rol nuevo ve lo que sus permisos le permiten.
 - faculty (dashboard.faculty): estadísticas de toda la facultad; admin.
 - accounts (users.view): soporte y admin. Soporte no ve pacientes (no
   tiene patients.view), así que su dashboard son las cuentas.
+
+Cada bloque trae `kpis` ({value, trend, trend_label, spark}, ver
+metrics.py) para las tarjetas de arriba y los datos de sus gráficas.
 """
 
 from collections import Counter
@@ -30,12 +33,14 @@ from django.db.models import (
 )
 from django.utils import timezone
 
+from accounts.models import Role
 from assignments.models import Appointment, Assignment
 from catalogs.models import ClinicalArea, ClinicalTreatment
 from clinical_records.catalog import ToothLayer
 from clinical_records.models import Diagnostico, Odontogram
 from patients.models import Patient
 
+from . import metrics
 from .indicators import build_indicators
 from .scoping import dashboard_scope_for
 
@@ -46,6 +51,11 @@ UPCOMING_DAYS = 7
 # que refleja cómo funciona hoy el banco).
 WAIT_WINDOW_DAYS = 182
 BANK_DEMAND_LIMIT = 10
+TASKS_LIMIT = 5
+QUEUE_LIMIT = 4
+TOP_LIMIT = 4
+OCCUPANCY_DAYS = ("Lun", "Mar", "Mié", "Jue", "Vie")
+OCCUPANCY_SLOTS = ((7, 9), (9, 11), (11, 13), (13, 15), (15, 17))
 
 
 def _patient_name(patient: Patient) -> str:
@@ -61,17 +71,11 @@ def _local_day_bounds(day) -> tuple[datetime, datetime]:
     return start, start + timedelta(days=1)
 
 
-def _appointment_row(appointment: Appointment, *, with_student: bool) -> dict:
-    patient = appointment.assignment.patient
-    row = {
-        "id": appointment.id,
-        "starts_at": appointment.starts_at,
-        "patient_id": patient.id,
-        "patient_name": _patient_name(patient),
-    }
-    if with_student:
-        row["student_name"] = _user_name(appointment.assignment.student)
-    return row
+def _labelled(metric: dict, label: str) -> dict:
+    return {**metric, "trend_label": label}
+
+
+MONTH = "vs mes anterior"
 
 
 def takes_cases(user) -> bool:
@@ -80,26 +84,84 @@ def takes_cases(user) -> bool:
     )
 
 
-def _done_by(odontograms, user) -> int:
-    """Tratamientos del plan que `user` marcó como realizados (doneBy)."""
-    total = 0
+def _case_status_counts(patients) -> dict:
+    rows = dict(patients.values_list("case_status").annotate(total=Count("id")))
+    return {status: rows.get(status, 0) for status in Patient.CaseStatus.values}
+
+
+def _treatment_marks(teeth):
+    for tooth in teeth or []:
+        for mark in tooth.get("marks") or []:
+            if mark.get("treatment"):
+                yield mark
+
+
+def _appointments_per_week(appointments, weeks: int = metrics.SPARK_MONTHS) -> list[int]:
+    """Citas de cada una de las últimas semanas (la actual al final)."""
+    today = timezone.localdate()
+    monday = today - timedelta(days=today.weekday())
+    values = []
+    for back in range(weeks - 1, -1, -1):
+        start, _ = _local_day_bounds(monday - timedelta(weeks=back))
+        values.append(appointments.filter(starts_at__gte=start, starts_at__lt=start + timedelta(days=7)).count())
+    return values
+
+
+def _appointments_same_weekday(appointments, weeks: int = metrics.SPARK_MONTHS) -> list[int]:
+    """Citas de hoy y del mismo día de las semanas anteriores."""
+    today = timezone.localdate()
+    values = []
+    for back in range(weeks - 1, -1, -1):
+        start, end = _local_day_bounds(today - timedelta(weeks=back))
+        values.append(appointments.filter(starts_at__gte=start, starts_at__lt=end).count())
+    return values
+
+
+def occupancy(appointments) -> dict:
+    """Citas de la semana por día (lun-vie) y franja de 2 horas. En fin de
+    semana ya pasó la semana hábil: se muestra la que empieza."""
+    today = timezone.localdate()
+    monday = today - timedelta(days=today.weekday())
+    if today.weekday() >= 5:
+        monday += timedelta(weeks=1)
+    start, _ = _local_day_bounds(monday)
+    cells = [[0] * len(OCCUPANCY_SLOTS) for _ in OCCUPANCY_DAYS]
+    week = appointments.filter(
+        starts_at__gte=start,
+        starts_at__lt=start + timedelta(days=5),
+    ).exclude(status=Appointment.Status.CANCELADA)
+    for starts_at in week.values_list("starts_at", flat=True):
+        local = timezone.localtime(starts_at)
+        for index, (begin, end) in enumerate(OCCUPANCY_SLOTS):
+            if begin <= local.hour < end:
+                cells[local.weekday()][index] += 1
+    return {
+        "label": "Próxima semana" if today.weekday() >= 5 else "Esta semana",
+        "days": list(OCCUPANCY_DAYS),
+        "slots": [f"{begin}–{end}" for begin, end in OCCUPANCY_SLOTS],
+        "cells": cells,
+    }
+
+
+# --- Mis casos (estudiante) ------------------------------------------------
+
+
+def _done_by_dates(odontograms, user) -> list[str]:
+    """Fechas en que `user` marcó tratamientos como realizados (doneAt)."""
+    dates = []
     for teeth in odontograms.values_list("teeth", flat=True):
-        for tooth in teeth or []:
-            total += sum(
-                1
-                for mark in tooth.get("marks") or []
-                if mark.get("layer") == ToothLayer.HECHO
-                and mark.get("doneBy") == user.pk
-            )
-    return total
+        for mark in _treatment_marks(teeth):
+            if mark.get("layer") == ToothLayer.HECHO and mark.get("doneBy") == user.pk:
+                dates.append(mark.get("doneAt"))
+    return [value for value in dates if value]
 
 
 def my_cases(user) -> dict:
     now = timezone.now()
+    today = timezone.localdate()
+    mine = Assignment.objects.filter(student=user)
     active = list(
-        Assignment.objects.filter(
-            student=user, status=Assignment.AssignmentStatus.ACTIVA
-        ).select_related("patient", "student")
+        mine.filter(status=Assignment.AssignmentStatus.ACTIVA).select_related("patient")
     )
     upcoming = list(
         Appointment.objects.filter(
@@ -107,21 +169,34 @@ def my_cases(user) -> dict:
             status=Appointment.Status.PROGRAMADA,
             starts_at__gte=now,
         )
-        .select_related("assignment__patient", "assignment__student")
+        .select_related("assignment__patient")
         .order_by("starts_at")
     )
     next_by_assignment: dict[int, datetime] = {}
     for appointment in upcoming:
         next_by_assignment.setdefault(appointment.assignment_id, appointment.starts_at)
 
-    cases = [
-        {
-            "patient_id": assignment.patient_id,
-            "patient_name": _patient_name(assignment.patient),
-            "next_appointment": next_by_assignment.get(assignment.id),
-        }
-        for assignment in active
-    ]
+    teeth_by_patient = dict(
+        Odontogram.objects.filter(patient__in=[a.patient_id for a in active]).values_list(
+            "patient_id", "teeth"
+        )
+    )
+    cases = []
+    for assignment in active:
+        marks = [
+            mark
+            for mark in _treatment_marks(teeth_by_patient.get(assignment.patient_id))
+            if mark.get("layer") in (ToothLayer.PLAN, ToothLayer.HECHO)
+        ]
+        cases.append(
+            {
+                "patient_id": assignment.patient_id,
+                "patient_name": _patient_name(assignment.patient),
+                "next_appointment": next_by_assignment.get(assignment.id),
+                "plan_done": sum(1 for mark in marks if mark["layer"] == ToothLayer.HECHO),
+                "plan_total": len(marks),
+            }
+        )
     # Primero los que tienen cita más pronto; sin cita, al final.
     cases.sort(
         key=lambda case: (
@@ -130,42 +205,171 @@ def my_cases(user) -> dict:
             case["patient_name"],
         )
     )
+
+    pending = Diagnostico.objects.filter(student=user, is_validated=False).select_related("patient")
+    tasks = []
+    for case in cases:
+        if case["next_appointment"] is None:
+            tasks.append(
+                {
+                    "kind": "schedule",
+                    "title": f"Agendar cita para {case['patient_name']}",
+                    "detail": "Caso sin cita",
+                    "patient_id": case["patient_id"],
+                }
+            )
+    for diagnosis in pending.order_by("created_at"):
+        tasks.append(
+            {
+                "kind": "diagnosis",
+                "title": f"Diagnóstico de {_patient_name(diagnosis.patient)}",
+                "detail": "Esperando validación del docente",
+                "patient_id": diagnosis.patient_id,
+            }
+        )
+    for appointment in upcoming:
+        day = timezone.localtime(appointment.starts_at).date()
+        if day > today + timedelta(days=1):
+            break
+        tasks.append(
+            {
+                "kind": "appointment",
+                "title": f"Cita con {_patient_name(appointment.assignment.patient)}",
+                "detail": "Hoy" if day == today else "Mañana",
+                "starts_at": appointment.starts_at,
+                "patient_id": appointment.assignment.patient_id,
+            }
+        )
+
     week_end = now + timedelta(days=UPCOMING_DAYS)
     # Cualquier paciente que tuvo: lo realizado cuenta aunque lo liberara.
-    own_patients = Assignment.objects.filter(student=user).values("patient_id")
+    own_odontograms = Odontogram.objects.filter(patient_id__in=mine.values("patient_id"))
+    done_dates = _done_by_dates(own_odontograms, user)
+    mine_appointments = Appointment.objects.filter(assignment__student=user).exclude(
+        status=Appointment.Status.CANCELADA
+    )
+    done_ends = metrics.month_ends()
     return {
+        "kpis": {
+            "active_cases": _labelled(
+                metrics.stock(lambda moment: metrics.active_assignments_at(mine, moment).count()),
+                MONTH,
+            ),
+            "week_appointments": _labelled(
+                metrics.metric(_appointments_per_week(mine_appointments)), "vs semana anterior"
+            ),
+            "pending_diagnoses": _labelled(
+                metrics.stock(
+                    lambda moment: metrics.pending_diagnoses_at(
+                        Diagnostico.objects.filter(student=user), moment
+                    ).count()
+                ),
+                MONTH,
+            ),
+            "done_treatments": _labelled(
+                metrics.metric(
+                    [
+                        sum(1 for value in done_dates if value <= timezone.localtime(end).date().isoformat())
+                        for end in done_ends
+                    ]
+                ),
+                MONTH,
+            ),
+        },
         "cases": cases,
+        "tasks": tasks[:TASKS_LIMIT],
         "upcoming_appointments": [
-            _appointment_row(appointment, with_student=False)
+            {
+                "id": appointment.id,
+                "starts_at": appointment.starts_at,
+                "patient_id": appointment.assignment.patient_id,
+                "patient_name": _patient_name(appointment.assignment.patient),
+            }
             for appointment in upcoming
             if appointment.starts_at < week_end
         ],
-        "diagnoses_awaiting_validation": Diagnostico.objects.filter(
-            student=user, is_validated=False
-        ).count(),
-        "bank_available": Patient.objects.available().count(),
-        "my_done_treatments": _done_by(
-            Odontogram.objects.filter(patient_id__in=own_patients), user
+        "done_by_month": metrics.per_month(
+            datetime.fromisoformat(value).date() for value in done_dates
         ),
+        "bank_available": Patient.objects.available().count(),
+        "bank_top": bank_demand()[:3],
     }
+
+
+# --- Supervisión (docente) -------------------------------------------------
 
 
 def supervision(user) -> dict:
     scope = dashboard_scope_for(user)
-    return {
-        # Misma cola que la pantalla de Supervisión (?is_validated=false).
-        "diagnoses_to_validate": scope.diagnoses.filter(is_validated=False).count(),
-        "cases_in_progress": scope.patients.filter(
-            case_status=Patient.CaseStatus.EN_PROCESO
-        ).count(),
-        "students_with_active_cases": scope.assignments.filter(
-            status=Assignment.AssignmentStatus.ACTIVA
+    pending = scope.diagnoses.filter(is_validated=False)
+
+    def validated_ratio_at(moment):
+        total = scope.diagnoses.filter(created_at__lte=moment).count()
+        validated = scope.diagnoses.filter(validated_at__lte=moment, is_validated=True).count()
+        return round(validated * 100 / total) if total else 0
+
+    def in_process(moment):
+        return (
+            metrics.active_assignments_at(scope.assignments, moment)
+            .values("patient")
+            .distinct()
+            .count()
         )
+
+    top = (
+        scope.assignments.filter(status=Assignment.AssignmentStatus.ACTIVA)
         .values("student")
-        .distinct()
-        .count(),
+        .annotate(total=Count("id"))
+        .order_by("-total")[:TOP_LIMIT]
+    )
+    students = User.objects.in_bulk([row["student"] for row in top])
+    return {
+        "kpis": {
+            "pending_diagnoses": _labelled(
+                metrics.stock(lambda moment: metrics.pending_diagnoses_at(scope.diagnoses, moment).count()),
+                MONTH,
+            ),
+            "cases_in_progress": _labelled(metrics.stock(in_process), MONTH),
+            "students_active": _labelled(
+                metrics.stock(
+                    lambda moment: metrics.active_assignments_at(scope.assignments, moment)
+                    .values("student")
+                    .distinct()
+                    .count()
+                ),
+                MONTH,
+            ),
+            "validated_ratio": _labelled(
+                {**metrics.stock(validated_ratio_at), "unit": "%"}, MONTH
+            ),
+        },
+        # Los que más esperan primero.
+        "queue": [
+            {
+                "id": diagnosis.id,
+                "content": diagnosis.content,
+                "patient_id": diagnosis.patient_id,
+                "patient_name": _patient_name(diagnosis.patient),
+                "student_name": _user_name(diagnosis.student),
+                "created_at": diagnosis.created_at,
+            }
+            for diagnosis in pending.select_related("patient", "student").order_by("created_at")[:QUEUE_LIMIT]
+        ],
+        "diagnoses_to_validate": pending.count(),
         "indicators": build_indicators(scope),
+        "validated_by_month": metrics.per_month(
+            scope.diagnoses.filter(is_validated=True).values_list("validated_at", flat=True)
+        ),
+        "top_students": [
+            {"name": _user_name(students[row["student"]]), "count": row["total"]}
+            for row in top
+            if row["student"] in students
+        ],
+        "status": _case_status_counts(scope.patients),
     }
+
+
+# --- Banco y agenda (recepción) -------------------------------------------
 
 
 def average_wait_days(patients) -> float | None:
@@ -196,34 +400,70 @@ def average_wait_days(patients) -> float | None:
     return round(average.total_seconds() / 86400, 1)
 
 
+def _wait_metric() -> dict:
+    """Valor: espera de los últimos 6 meses. Curva: espera de los pacientes
+    registrados en cada mes (los meses sin asignaciones repiten el valor
+    anterior para no dibujar caídas a cero)."""
+    values = []
+    for start in metrics.recent_months(metrics.SPARK_MONTHS):
+        begin, _ = _local_day_bounds(start)
+        end_month = metrics.month_start(start + timedelta(days=32))
+        end, _ = _local_day_bounds(end_month)
+        month_value = average_wait_days(Patient.objects.filter(created_at__gte=begin, created_at__lt=end))
+        values.append(month_value if month_value is not None else (values[-1] if values else 0))
+    window = average_wait_days(
+        Patient.objects.filter(created_at__gte=timezone.now() - timedelta(days=WAIT_WINDOW_DAYS))
+    )
+    return {
+        **metrics.metric(values),
+        "value": window,
+        "unit": "días",
+        "trend_label": MONTH,
+    }
+
+
 def bank(user) -> dict:
     today = timezone.localdate()
     day_start, day_end = _local_day_bounds(today)
-    month_start, _ = _local_day_bounds(today.replace(day=1))
-    appointments = (
-        Appointment.objects.filter(
-            status=Appointment.Status.PROGRAMADA,
-            starts_at__gte=day_start,
-            starts_at__lt=day_end,
-        )
+    appointments = Appointment.objects.exclude(status=Appointment.Status.CANCELADA)
+    today_rows = (
+        appointments.filter(starts_at__gte=day_start, starts_at__lt=day_end)
         .select_related("assignment__patient", "assignment__student")
         .order_by("starts_at")
     )
+    registered = metrics.per_month(Patient.objects.values_list("created_at", flat=True))
     return {
-        "unassigned": Patient.objects.available().count(),
-        "registered_this_month": Patient.objects.filter(
-            created_at__gte=month_start
-        ).count(),
-        "today_appointments": [
-            _appointment_row(appointment, with_student=True)
-            for appointment in appointments
+        "kpis": {
+            "unassigned": _labelled(
+                metrics.stock(lambda moment: metrics.bank_at(Patient.objects.all(), moment).count()),
+                MONTH,
+            ),
+            "today_appointments": _labelled(
+                metrics.metric(_appointments_same_weekday(appointments)), "vs mismo día semana pasada"
+            ),
+            "registered_month": _labelled(
+                metrics.metric(metrics.counts(registered)[-metrics.SPARK_MONTHS :]), MONTH
+            ),
+            "wait_days": _wait_metric(),
+        },
+        "today": [
+            {
+                "id": appointment.id,
+                "starts_at": appointment.starts_at,
+                "duration_minutes": appointment.duration_minutes,
+                "status": appointment.status,
+                "patient_id": appointment.assignment.patient_id,
+                "patient_name": _patient_name(appointment.assignment.patient),
+                "student_name": _user_name(appointment.assignment.student),
+            }
+            for appointment in today_rows
         ],
-        "average_wait_days": average_wait_days(
-            Patient.objects.filter(
-                created_at__gte=timezone.now() - timedelta(days=WAIT_WINDOW_DAYS)
-            )
-        ),
+        "occupancy": occupancy(appointments),
+        "registered_by_month": registered,
     }
+
+
+# --- Facultad (admin) -------------------------------------------------------
 
 
 def patients_by_area() -> list[dict]:
@@ -237,10 +477,10 @@ def patients_by_area() -> list[dict]:
         area.name: dict(empty)
         for area in ClinicalArea.objects.filter(is_active=True).order_by("sort_order")
     }
-    counts = Patient.objects.values("clinical_area__name", "case_status").annotate(
+    totals = Patient.objects.values("clinical_area__name", "case_status").annotate(
         total=Count("id")
     )
-    for row in counts:
+    for row in totals:
         area = row["clinical_area__name"] or "Sin área"
         rows.setdefault(area, dict(empty))[row["case_status"]] = row["total"]
     return sorted(
@@ -252,16 +492,15 @@ def patients_by_area() -> list[dict]:
 def bank_demand() -> list[dict]:
     """Tratamientos planificados en los pacientes del banco (disponibles):
     qué prácticas tiene la facultad para ofrecer, de más a menos."""
-    counts: Counter[str] = Counter()
+    tally: Counter[str] = Counter()
     teeth_lists = Odontogram.objects.filter(
         patient__in=Patient.objects.available()
     ).values_list("teeth", flat=True)
     for teeth in teeth_lists:
-        for tooth in teeth or []:
-            for mark in tooth.get("marks") or []:
-                if mark.get("layer") == ToothLayer.PLAN and mark.get("treatment"):
-                    counts[mark["treatment"]] += 1
-    top = counts.most_common(BANK_DEMAND_LIMIT)
+        for mark in _treatment_marks(teeth):
+            if mark.get("layer") == ToothLayer.PLAN:
+                tally[mark["treatment"]] += 1
+    top = tally.most_common(BANK_DEMAND_LIMIT)
     names = {
         row["slug"]: row
         for row in ClinicalTreatment.objects.filter(
@@ -280,7 +519,15 @@ def bank_demand() -> list[dict]:
 
 
 def faculty(user) -> dict:
-    return {"by_area": patients_by_area(), "bank_demand": bank_demand()}
+    return {
+        "by_area": patients_by_area(),
+        "bank_demand": bank_demand(),
+        "status": _case_status_counts(Patient.objects.all()),
+        "occupancy": occupancy(Appointment.objects.all()),
+    }
+
+
+# --- Cuentas (soporte) ------------------------------------------------------
 
 
 def accounts(user) -> dict:
@@ -291,11 +538,32 @@ def accounts(user) -> dict:
         .annotate(total=Count("id"))
     )
     return {
+        "kpis": {
+            # Aproximación: no se guarda cuándo se desactivó una cuenta.
+            "active": _labelled(
+                metrics.stock(
+                    lambda moment: User.objects.filter(is_active=True, date_joined__lte=moment).count()
+                ),
+                MONTH,
+            ),
+            "inactive": {"value": User.objects.filter(is_active=False).count(), "trend": None, "spark": []},
+            "roles": {"value": Role.objects.count(), "trend": None, "spark": []},
+        },
         "active_by_role": [
             {"role": role, "label": label, "count": active.get(role, 0)}
             for role, label in labels.items()
         ],
         "inactive": User.objects.filter(is_active=False).count(),
+        "new_by_month": metrics.per_month(User.objects.values_list("date_joined", flat=True)),
+        "recent": [
+            {
+                "id": account.id,
+                "name": _user_name(account),
+                "role_label": labels.get(account.role, account.role),
+                "date_joined": account.date_joined,
+            }
+            for account in User.objects.order_by("-date_joined")[:QUEUE_LIMIT]
+        ],
     }
 
 

@@ -1,4 +1,5 @@
 from django.db.models import Count
+from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework.permissions import IsAuthenticated
 
@@ -11,7 +12,6 @@ from .overview import build_overview, menu_counters
 from .scoping import dashboard_scope_for
 from .serializers import (
     DashboardIndicatorsSerializer,
-    DashboardOverviewSerializer,
     MenuCountersSerializer,
     DashboardSeriesSerializer,
     DashboardSummarySerializer,
@@ -108,7 +108,9 @@ class DashboardOverviewView(APIView):
     permission_classes = [IsAuthenticated, HasRequiredAcl]
     acl_permission = "dashboard.view"
 
-    @extend_schema(tags=["dashboard"], responses=DashboardOverviewSerializer)
+    # La forma de cada bloque está documentada en dashboard/overview.py; un
+    # serializer anidado solo la duplicaría (y quedaría desactualizado).
+    @extend_schema(tags=["dashboard"], responses=OpenApiTypes.OBJECT)
     def get(self, request):
         return Response(build_overview(request.user))
 
