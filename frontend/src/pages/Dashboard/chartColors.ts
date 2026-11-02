@@ -30,6 +30,7 @@ export function useChartTheme() {
   const { theme } = useTheme();
   const dark = theme === "dark";
   return {
+    dark,
     axis: "#94a3b8",
     grid: dark ? "#1e293b" : "#eef2f7",
     /** Fondo de la tarjeta: separa segmentos apilados. */

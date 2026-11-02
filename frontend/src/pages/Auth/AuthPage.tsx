@@ -33,7 +33,8 @@ export function AuthPage() {
   const { isAuthenticated, isReady } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const mode: AuthMode = location.pathname === "/registro" ? "registro" : "login";
+  const mode: AuthMode =
+    location.pathname === "/registro" ? "registro" : "login";
   const isLogin = mode === "login";
 
   useEffect(() => {
@@ -42,12 +43,15 @@ export function AuthPage() {
     }
   }, [isReady, isAuthenticated, navigate]);
 
-  const switchTo = (next: AuthMode) => navigate(next === "login" ? "/login" : "/registro");
+  const switchTo = (next: AuthMode) =>
+    navigate(next === "login" ? "/login" : "/registro");
 
   if (!isReady) {
     return (
       <div className="flex min-h-svh items-center justify-center bg-slate-100 dark:bg-slate-950">
-        <p className="text-sm text-slate-500 dark:text-slate-400">Cargando sesión...</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400">
+          Cargando sesión...
+        </p>
       </div>
     );
   }
@@ -105,7 +109,9 @@ function FormSlot({
       className={`${active ? "flex" : "hidden md:flex"} items-center justify-center px-6 py-10 sm:px-12 md:absolute md:inset-y-0 md:w-1/2 md:overflow-y-auto ${
         side === "left" ? "md:left-0" : "md:right-0"
       } transition-[opacity,transform] duration-500 motion-reduce:transition-none ${EASE} ${
-        active ? "translate-x-0 opacity-100 delay-200" : `pointer-events-none opacity-0 ${offset}`
+        active
+          ? "translate-x-0 opacity-100 delay-200"
+          : `pointer-events-none opacity-0 ${offset}`
       }`}
     >
       {children}
@@ -113,7 +119,13 @@ function FormSlot({
   );
 }
 
-function BrandPanel({ mode, compact = false }: { mode: AuthMode; compact?: boolean }) {
+function BrandPanel({
+  mode,
+  compact = false,
+}: {
+  mode: AuthMode;
+  compact?: boolean;
+}) {
   return (
     <div
       className={`relative isolate h-full overflow-hidden rounded-[28px] bg-teal-950 text-white ${
@@ -126,10 +138,16 @@ function BrandPanel({ mode, compact = false }: { mode: AuthMode; compact?: boole
       <div className="absolute -bottom-[25%] left-[15%] -z-10 aspect-square w-[75%] rounded-full bg-sky-600/70 blur-[100px]" />
       <div className="absolute inset-0 -z-10 bg-gradient-to-t from-teal-950/70 via-transparent to-transparent" />
 
-      <div className={`flex h-full ${compact ? "items-center gap-4" : "flex-col justify-between"}`}>
+      <div
+        className={`flex h-full ${compact ? "items-center gap-4" : "flex-col justify-between"}`}
+      >
         <div className="flex items-center gap-3">
           <span className="grid size-14 place-items-center rounded-full bg-white/95 p-2 shadow-lg shadow-teal-950/30">
-            <img src={logoSello} alt="Universidad Evangélica de El Salvador" className="size-full object-contain" />
+            <img
+              src={logoSello}
+              alt="Universidad Evangélica de El Salvador"
+              className="size-full object-contain"
+            />
           </span>
           <div>
             <p className="text-lg font-semibold tracking-tight">OdontoTrack</p>
@@ -139,12 +157,19 @@ function BrandPanel({ mode, compact = false }: { mode: AuthMode; compact?: boole
 
         {compact ? null : (
           // Se vuelve a montar al cambiar de modo para que el texto entre con fundido.
-          <div key={mode} className="animate-in fade-in slide-in-from-bottom-2 duration-700 motion-reduce:animate-none">
-            <p className="text-sm font-medium text-white/80">{PANEL_TEXT[mode].kicker}</p>
+          <div
+            key={mode}
+            className="animate-in fade-in slide-in-from-bottom-2 duration-700 motion-reduce:animate-none"
+          >
+            <p className="text-sm font-medium text-white/80">
+              {PANEL_TEXT[mode].kicker}
+            </p>
             <p className="mt-3 max-w-md text-4xl font-semibold leading-tight tracking-tight">
               {PANEL_TEXT[mode].title}
             </p>
-            <p className="mt-6 text-xs text-white/60">2026 © Sistema FOUEES — Facultad de Odontología UEES</p>
+            <p className="mt-6 text-xs text-white/60">
+              2026 © Sistema FOUEES - Facultad de Odontología UEES
+            </p>
           </div>
         )}
       </div>

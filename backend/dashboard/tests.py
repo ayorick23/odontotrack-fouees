@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime, time, timedelta
 
 from django.utils import timezone
 from rest_framework import status
@@ -361,7 +361,8 @@ class DashboardOverviewTests(APITestCase):
             teeth=[
                 {"fdi": 16, "marks": [
                     {"layer": "hecho", "status": "obturado", "surfaces": ["oclusal"],
-                     "treatment": "resina", "doneBy": self.student.pk},
+                     "treatment": "resina", "doneBy": self.student.pk,
+                     "doneAt": timezone.localdate().isoformat()},
                     # Lo hizo otro: no cuenta para ella.
                     {"layer": "hecho", "status": "sellante", "surfaces": ["oclusal"],
                      "treatment": "sellante", "doneBy": self.other.pk},
@@ -419,36 +420,77 @@ class DashboardOverviewTests(APITestCase):
         self.assertEqual(
             [case["patient_name"] for case in block["cases"]], ["Ana Pronto", "Beto Sincita"]
         )
-        self.assertIsNotNone(block["cases"][0]["next_appointment"])
-        self.assertIsNone(block["cases"][1]["next_appointment"])
+        ana, beto = block["cases"]
+        self.assertIsNotNone(ana["next_appointment"])
+        self.assertIsNone(beto["next_appointment"])
+        # Avance del plan: 2 realizados (hecho) de 3 tratamientos (plan + hecho).
+        self.assertEqual((ana["plan_done"], ana["plan_total"]), (2, 3))
         self.assertEqual(len(block["upcoming_appointments"]), 1)
-        self.assertEqual(block["upcoming_appointments"][0]["patient_id"], self.soon.id)
-        self.assertEqual(block["diagnoses_awaiting_validation"], 1)
         self.assertEqual(block["bank_available"], 2)
-        self.assertEqual(block["my_done_treatments"], 1)
+        self.assertEqual(block["bank_top"][0]["count"], 2)
 
-    def test_supervision_counts_the_validation_queue(self):
+        kpis = block["kpis"]
+        self.assertEqual(kpis["active_cases"]["value"], 2)
+        self.assertEqual(len(kpis["active_cases"]["spark"]), 6)
+        self.assertEqual(kpis["pending_diagnoses"]["value"], 1)
+        self.assertEqual(kpis["done_treatments"]["value"], 1)
+        self.assertEqual(kpis["week_appointments"]["trend_label"], "vs semana anterior")
+        self.assertEqual(block["done_by_month"][-1]["count"], 1)
+
+        # Pendientes: el caso sin cita y el diagnóstico sin validar.
+        kinds = [task["kind"] for task in block["tasks"]]
+        self.assertIn("schedule", kinds)
+        self.assertIn("diagnosis", kinds)
+
+    def test_supervision(self):
         block = self.get(self._user("doc-ov", User.Role.DOCENTE))["supervision"]
         self.assertEqual(block["diagnoses_to_validate"], 2)
-        self.assertEqual(block["cases_in_progress"], 3)
-        self.assertEqual(block["students_with_active_cases"], 2)
+        self.assertEqual(block["kpis"]["pending_diagnoses"]["value"], 2)
+        self.assertEqual(block["kpis"]["cases_in_progress"]["value"], 3)
+        self.assertEqual(block["kpis"]["students_active"]["value"], 2)
+        self.assertEqual(block["kpis"]["validated_ratio"]["unit"], "%")
         self.assertEqual(block["indicators"]["validated_diagnoses"]["count"], 1)
+        # Cola: el que más espera primero.
+        self.assertEqual(len(block["queue"]), 2)
+        self.assertEqual(block["top_students"][0], {"name": "Lucía Zepeda", "count": 2})
+        self.assertEqual(sum(block["status"].values()), Patient.objects.count())
 
     def test_bank(self):
         from assignments.models import Appointment
 
-        today = timezone.localtime().replace(hour=23, minute=0)
+        today = timezone.localtime().replace(hour=10, minute=0)
         Appointment.objects.create(
             assignment=Assignment.objects.get(patient=self.later), starts_at=today
         )
         block = self.get(self._user("rec-ov", User.Role.RECEPCION))["bank"]
-        self.assertEqual(block["unassigned"], 2)
-        self.assertEqual(block["registered_this_month"], Patient.objects.count())
-        self.assertEqual(
-            [row["student_name"] for row in block["today_appointments"]], ["Lucía Zepeda"]
-        )
+        self.assertEqual(block["kpis"]["unassigned"]["value"], 2)
+        self.assertEqual(block["kpis"]["registered_month"]["value"], Patient.objects.count())
+        self.assertEqual([row["student_name"] for row in block["today"]], ["Lucía Zepeda"])
         # Asignados al momento de registrarse: espera ~0 días.
-        self.assertEqual(block["average_wait_days"], 0.0)
+        self.assertEqual(block["kpis"]["wait_days"]["value"], 0.0)
+        self.assertEqual(block["kpis"]["wait_days"]["unit"], "días")
+        # La cita de hoy a las 10 cae en la franja 9–11 de hoy (si es día hábil;
+        # en fin de semana el mapa muestra la semana que empieza).
+        weekday = timezone.localdate().weekday()
+        if weekday < 5:
+            self.assertEqual(block["occupancy"]["cells"][weekday][1], 1)
+
+    def test_occupancy_on_weekend_shows_next_week(self):
+        from unittest import mock
+
+        from assignments.models import Appointment
+        from dashboard.overview import occupancy
+
+        saturday = timezone.localdate() + timedelta(days=(5 - timezone.localdate().weekday()) % 7)
+        monday_10 = timezone.make_aware(
+            datetime.combine(saturday + timedelta(days=2), time(10, 0))
+        )
+        Appointment.objects.create(
+            assignment=Assignment.objects.get(patient=self.later), starts_at=monday_10
+        )
+        with mock.patch("django.utils.timezone.localdate", return_value=saturday):
+            cells = occupancy(Appointment.objects.all())["cells"]
+        self.assertEqual(cells[0][1], 1)
 
     def test_faculty_bank_demand_counts_only_available_patients(self):
         block = self.get(self._user("adm-ov", User.Role.ADMIN))["faculty"]
@@ -460,8 +502,9 @@ class DashboardOverviewTests(APITestCase):
         )
         sin_area = next(row for row in block["by_area"] if row["area"] == "Sin área")
         self.assertEqual(sin_area["pendiente"] + sin_area["en_proceso"], Patient.objects.count())
+        self.assertEqual(len(block["occupancy"]["cells"]), 5)
 
-    def test_accounts_by_role(self):
+    def test_accounts(self):
         inactive = self._user("inactivo", User.Role.RECEPCION)
         inactive.is_active = False
         inactive.save(update_fields=["is_active"])
@@ -469,6 +512,9 @@ class DashboardOverviewTests(APITestCase):
         by_role = {row["role"]: row["count"] for row in block["active_by_role"]}
         self.assertEqual(by_role[User.Role.ESTUDIANTE], 2)
         self.assertEqual(block["inactive"], 1)
+        self.assertEqual(block["kpis"]["inactive"]["value"], 1)
+        self.assertEqual(block["recent"][0]["name"], "sop-ov")
+        self.assertEqual(len(block["new_by_month"]), 12)
 
     def test_menu_counters_follow_permissions(self):
         def counters(user):
@@ -496,3 +542,72 @@ class DashboardOverviewTests(APITestCase):
         months = self.client.get("/api/dashboard/series/", {"period": "todos"}).json()["months"]
         self.assertGreater(len(months), 24)
         self.assertEqual(sum(month["patients"] for month in months), Patient.objects.count())
+
+
+class DashboardMetricsTests(APITestCase):
+    """Existencias reconstruidas al cierre de cada mes (metrics.py)."""
+
+    def test_assignment_counts_while_it_was_active(self):
+        from dashboard import metrics
+
+        student = User.objects.create_user(username="m-est", password="x", role=User.Role.ESTUDIANTE)
+        patient = Patient.objects.create(first_name="A", last_name="B", dui="MT-1")
+        assignment = Assignment.objects.create(patient=patient, student=student)
+        now = timezone.now()
+        Assignment.objects.filter(pk=assignment.pk).update(
+            created_at=now - timedelta(days=60),
+            status=Assignment.AssignmentStatus.FINALIZADA,
+            updated_at=now - timedelta(days=10),
+        )
+        qs = Assignment.objects.all()
+        self.assertEqual(metrics.active_assignments_at(qs, now - timedelta(days=30)).count(), 1)
+        self.assertEqual(metrics.active_assignments_at(qs, now).count(), 0)
+        self.assertEqual(metrics.active_assignments_at(qs, now - timedelta(days=90)).count(), 0)
+
+    def test_bank_excludes_taken_but_not_released(self):
+        from dashboard import metrics
+
+        student = User.objects.create_user(username="m-est2", password="x", role=User.Role.ESTUDIANTE)
+        released = Patient.objects.create(first_name="L", last_name="Liberado", dui="MT-2")
+        taken = Patient.objects.create(first_name="T", last_name="Tomado", dui="MT-3")
+        Assignment.objects.create(
+            patient=released, student=student, status=Assignment.AssignmentStatus.CANCELADA
+        )
+        Assignment.objects.create(patient=taken, student=student)
+        ids = set(metrics.bank_at(Patient.objects.all(), timezone.now() + timedelta(seconds=1)).values_list("id", flat=True))
+        self.assertIn(released.id, ids)
+        self.assertNotIn(taken.id, ids)
+
+    def test_month_to_date_compares_the_same_span(self):
+        from unittest import mock
+
+        from dashboard import metrics
+
+        now = timezone.now()
+        day_3 = timezone.localdate().replace(day=3)
+        prev_2 = metrics.month_start(day_3.replace(day=1) - timedelta(days=1)).replace(day=2)
+        prev_20 = prev_2.replace(day=20)
+        for index, day in enumerate([day_3, prev_2, prev_20]):
+            patient = Patient.objects.create(first_name="M", last_name=str(index), dui=f"MTD-{index}")
+            Patient.objects.filter(pk=patient.pk).update(
+                created_at=timezone.make_aware(datetime.combine(day, time(12, 0)))
+            )
+        # Día 3: este mes 1 (el día 3) contra 1 en el mismo tramo del mes
+        # anterior (el día 2; el 20 queda fuera del tramo).
+        with mock.patch("django.utils.timezone.localdate", return_value=day_3), mock.patch(
+            "django.utils.timezone.now", return_value=max(now, timezone.make_aware(datetime.combine(day_3, time(23, 0))))
+        ):
+            result = metrics.month_to_date(Patient.objects.filter(dui__startswith="MTD-"), "created_at")
+        self.assertEqual(result["value"], 1)
+        self.assertEqual(result["trend"], 0)
+        self.assertEqual(result["trend_label"], "vs mismo tramo del mes anterior")
+
+    def test_trend_and_per_month(self):
+        from dashboard import metrics
+
+        self.assertEqual(metrics.trend([2, 3]), 50)
+        self.assertIsNone(metrics.trend([0, 3]))
+        rows = metrics.per_month([timezone.now(), timezone.now() - timedelta(days=400)])
+        self.assertEqual(len(rows), 12)
+        self.assertEqual(rows[-1]["count"], 1)
+
