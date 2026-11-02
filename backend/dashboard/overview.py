@@ -441,9 +441,7 @@ def bank(user) -> dict:
             "today_appointments": _labelled(
                 metrics.metric(_appointments_same_weekday(appointments)), "vs mismo día semana pasada"
             ),
-            "registered_month": _labelled(
-                metrics.metric(metrics.counts(registered)[-metrics.SPARK_MONTHS :]), MONTH
-            ),
+            "registered_month": metrics.month_to_date(Patient.objects.all(), "created_at"),
             "wait_days": _wait_metric(),
         },
         "today": [
@@ -546,6 +544,7 @@ def accounts(user) -> dict:
                 ),
                 MONTH,
             ),
+            "new_month": metrics.month_to_date(User.objects.all(), "date_joined"),
             "inactive": {"value": User.objects.filter(is_active=False).count(), "trend": None, "spark": []},
             "roles": {"value": Role.objects.count(), "trend": None, "spark": []},
         },

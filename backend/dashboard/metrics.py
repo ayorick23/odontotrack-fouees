@@ -128,3 +128,25 @@ def per_month(dates, count: int = CHART_MONTHS) -> list[dict]:
 
 def counts(rows: list[dict]) -> list[int]:
     return [row["count"] for row in rows]
+
+
+def month_to_date(queryset: QuerySet, field: str) -> dict:
+    """"Este mes": del día 1 a hoy, comparado con el mismo tramo del mes
+    anterior (no con el mes anterior completo, que a inicio de mes daría
+    siempre una caída). La curva muestra los totales de cada mes."""
+    today = timezone.localdate()
+    start = month_start(today)
+    previous_start = month_start(start - timedelta(days=1))
+    # Mismo día del mes anterior; si no existe (31 → 30), su último día.
+    previous_end = min(previous_start.replace(day=1) + timedelta(days=today.day), start)
+    now_count = queryset.filter(**{f"{field}__gte": _aware(start)}).count()
+    before = queryset.filter(
+        **{f"{field}__gte": _aware(previous_start), f"{field}__lt": _aware(previous_end)}
+    ).count()
+    spark = counts(per_month(queryset.values_list(field, flat=True), SPARK_MONTHS))
+    return {
+        "value": now_count,
+        "trend": round((now_count - before) * 100 / before) if before else None,
+        "trend_label": "vs mismo tramo del mes anterior",
+        "spark": spark,
+    }

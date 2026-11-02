@@ -216,6 +216,7 @@ describe("Dashboard por rol", () => {
         accounts: {
           kpis: {
             active: metric(64),
+            new_month: metric(2),
             inactive: { value: 3, trend: null, spark: [] },
             roles: { value: 5, trend: null, spark: [] },
           },

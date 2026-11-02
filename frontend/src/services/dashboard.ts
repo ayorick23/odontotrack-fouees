@@ -170,7 +170,7 @@ export type DashboardOverview = {
     occupancy: Occupancy;
   } | null;
   accounts: {
-    kpis: Record<"active" | "inactive" | "roles", DashboardMetric>;
+    kpis: Record<"active" | "new_month" | "inactive" | "roles", DashboardMetric>;
     active_by_role: Array<{ role: string; label: string; count: number }>;
     inactive: number;
     new_by_month: MonthCount[];

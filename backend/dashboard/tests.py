@@ -578,6 +578,30 @@ class DashboardMetricsTests(APITestCase):
         self.assertIn(released.id, ids)
         self.assertNotIn(taken.id, ids)
 
+    def test_month_to_date_compares_the_same_span(self):
+        from unittest import mock
+
+        from dashboard import metrics
+
+        now = timezone.now()
+        day_3 = timezone.localdate().replace(day=3)
+        prev_2 = metrics.month_start(day_3.replace(day=1) - timedelta(days=1)).replace(day=2)
+        prev_20 = prev_2.replace(day=20)
+        for index, day in enumerate([day_3, prev_2, prev_20]):
+            patient = Patient.objects.create(first_name="M", last_name=str(index), dui=f"MTD-{index}")
+            Patient.objects.filter(pk=patient.pk).update(
+                created_at=timezone.make_aware(datetime.combine(day, time(12, 0)))
+            )
+        # Día 3: este mes 1 (el día 3) contra 1 en el mismo tramo del mes
+        # anterior (el día 2; el 20 queda fuera del tramo).
+        with mock.patch("django.utils.timezone.localdate", return_value=day_3), mock.patch(
+            "django.utils.timezone.now", return_value=max(now, timezone.make_aware(datetime.combine(day_3, time(23, 0))))
+        ):
+            result = metrics.month_to_date(Patient.objects.filter(dui__startswith="MTD-"), "created_at")
+        self.assertEqual(result["value"], 1)
+        self.assertEqual(result["trend"], 0)
+        self.assertEqual(result["trend_label"], "vs mismo tramo del mes anterior")
+
     def test_trend_and_per_month(self):
         from dashboard import metrics
 

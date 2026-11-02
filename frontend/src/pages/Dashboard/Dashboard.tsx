@@ -28,7 +28,6 @@ import { useAuth } from "../../hooks/useAuth";
 import {
   getDashboardOverview,
   getDashboardSeries,
-  type DashboardMetric,
   type DashboardOverview,
   type DashboardSeries,
   type SeriesPeriod,
@@ -596,14 +595,6 @@ function AdminLayout({
 // --- Soporte ----------------------------------------------------------------
 
 function SupportLayout({ data, user }: { data: NonNullable<DashboardOverview["accounts"]>; user: Perms }) {
-  const monthly = data.new_by_month.map((row) => row.count);
-  const last = monthly.at(-1) ?? 0;
-  const previous = monthly.at(-2) ?? 0;
-  const newThisMonth: DashboardMetric = {
-    value: last,
-    trend: previous ? Math.round(((last - previous) * 100) / previous) : null,
-    spark: monthly.slice(-6),
-  };
   const actions = allowed(user, [
     ["users.view", { to: "/users", label: "Usuarios", icon: <UserCog className={ACTION_ICON} /> }],
     ["roles.view", { to: "/roles", label: "Roles y permisos", icon: <Shield className={ACTION_ICON} /> }],
@@ -615,7 +606,7 @@ function SupportLayout({ data, user }: { data: NonNullable<DashboardOverview["ac
       <Kpis
         items={[
           { label: "Cuentas activas", metric: data.kpis.active, icon: <Users className={ICON} />, featured: true },
-          { label: "Cuentas nuevas este mes", metric: newThisMonth, icon: <UserPlus className={ICON} /> },
+          { label: "Cuentas nuevas este mes", metric: data.kpis.new_month, icon: <UserPlus className={ICON} /> },
           { label: "Cuentas desactivadas", metric: data.kpis.inactive, icon: <UserX className={ICON} /> },
           { label: "Roles configurados", metric: data.kpis.roles, icon: <Shield className={ICON} /> },
         ]}
