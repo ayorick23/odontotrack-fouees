@@ -71,7 +71,7 @@ export function Students() {
 
 
   return (
-    <section className="rounded-2xl bg-white p-4 shadow-[0_10px_30px_rgba(15,40,80,0.06)] dark:bg-slate-900 dark:shadow-none dark:ring-1 dark:ring-white/10 sm:p-5">
+    <section className="rounded-2xl bg-white p-4 dark:bg-slate-900 sm:p-5">
       {state.status === "loading" ? (
         <p className="px-2 py-10 text-center text-sm text-slate-500 dark:text-slate-400">
           Cargando estudiantes...

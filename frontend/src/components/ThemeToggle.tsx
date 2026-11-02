@@ -13,7 +13,7 @@ export function ThemeToggle() {
       title={isDark ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
       aria-label={isDark ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
       aria-pressed={isDark}
-      className="rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+      className="grid size-10 place-items-center rounded-full bg-white text-slate-500 transition-colors hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 dark:bg-slate-900 dark:text-slate-300 dark:hover:text-white"
     >
       {isDark ? <Sun className="size-4" /> : <Moon className="size-4" />}
     </button>

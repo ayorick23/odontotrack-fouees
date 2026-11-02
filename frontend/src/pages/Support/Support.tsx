@@ -7,7 +7,7 @@ import { checkApiHealth, getApiBaseUrl } from "../../services/health";
 type LoadState = { status: "loading" } | { status: "error" } | { status: "ready" };
 
 const cardClass =
-  "rounded-2xl bg-white p-4 shadow-[0_10px_30px_rgba(15,40,80,0.06)] dark:bg-slate-900 dark:shadow-none dark:ring-1 dark:ring-white/10 sm:p-5";
+  "rounded-2xl bg-white p-4 dark:bg-slate-900 sm:p-5";
 const rowClass = "flex flex-col gap-0.5 sm:flex-row sm:gap-4";
 const labelClass =
   "w-48 shrink-0 text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400";

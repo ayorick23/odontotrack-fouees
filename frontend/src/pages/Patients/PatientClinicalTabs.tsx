@@ -29,7 +29,7 @@ import {
 } from "../../services/clinicalRecords";
 
 const cardClass =
-  "rounded-2xl bg-white p-5 shadow-[0_10px_30px_rgba(15,40,80,0.06)] dark:bg-slate-900 dark:shadow-none dark:ring-1 dark:ring-white/10 sm:p-6";
+  "rounded-2xl bg-white p-5 dark:bg-slate-900 sm:p-6";
 const inputClass =
   "mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100";
 const selectClass =

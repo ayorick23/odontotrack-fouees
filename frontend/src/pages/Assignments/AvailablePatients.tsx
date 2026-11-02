@@ -206,7 +206,7 @@ export function AvailablePatients() {
         </p>
       </div>
 
-      <section className="rounded-2xl bg-white p-4 shadow-[0_10px_30px_rgba(15,40,80,0.06)] dark:bg-slate-900 dark:shadow-none dark:ring-1 dark:ring-white/10 sm:p-5">
+      <section className="rounded-2xl bg-white p-4 dark:bg-slate-900 sm:p-5">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <form
             className="flex w-full max-w-md items-center gap-2 rounded-full bg-slate-50 px-3 py-2 dark:bg-slate-800"

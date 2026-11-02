@@ -189,3 +189,17 @@ html.dark body {
   border-radius: 6px;
   cursor: pointer;
 }
+
+/* Tailwind 4 dejó los botones con cursor por defecto (en v3 era la mano).
+   Se restaura para todo lo clicable; lo deshabilitado no muestra la mano. */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  summary,
+  label[for],
+  select:not(:disabled),
+  input[type="checkbox"]:not(:disabled),
+  input[type="radio"]:not(:disabled) {
+    cursor: pointer;
+  }
+}

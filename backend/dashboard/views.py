@@ -7,11 +7,12 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .indicators import build_indicators
-from .overview import build_overview
+from .overview import build_overview, menu_counters
 from .scoping import dashboard_scope_for
 from .serializers import (
     DashboardIndicatorsSerializer,
     DashboardOverviewSerializer,
+    MenuCountersSerializer,
     DashboardSeriesSerializer,
     DashboardSummarySerializer,
 )
@@ -110,3 +111,13 @@ class DashboardOverviewView(APIView):
     @extend_schema(tags=["dashboard"], responses=DashboardOverviewSerializer)
     def get(self, request):
         return Response(build_overview(request.user))
+
+
+class MenuCountersView(APIView):
+    """Contadores del menú lateral (Supervisión, Asignaciones)."""
+
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(tags=["dashboard"], responses=MenuCountersSerializer)
+    def get(self, request):
+        return Response(menu_counters(request.user))

@@ -12,8 +12,8 @@ import { Toaster } from "./components/ui/sonner";
 import { AuthProvider } from "./context/AuthContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import { AvailablePatients } from "./pages/Assignments/AvailablePatients";
+import { AuthPage } from "./pages/Auth/AuthPage";
 import { Dashboard } from "./pages/Dashboard/Dashboard";
-import { Login } from "./pages/Login/Login";
 import { PatientDetail } from "./pages/Patients/PatientDetail";
 import { PatientForm } from "./pages/Patients/PatientForm";
 import { PatientList } from "./pages/Patients/PatientList";
@@ -36,7 +36,11 @@ const router = createBrowserRouter(
   createRoutesFromElements(
     <>
       <Route path="/" element={<Navigate to="/login" replace />} />
-      <Route path="/login" element={<Login />} />
+      {/* Una sola página para ambas: el panel se desliza entre /login y /registro. */}
+      <Route element={<AuthPage />}>
+        <Route path="/login" />
+        <Route path="/registro" />
+      </Route>
       <Route element={<AppLayout />}>
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/patients" element={<PatientList />} />

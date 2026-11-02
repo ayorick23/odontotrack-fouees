@@ -26,7 +26,7 @@ type PendingDelete =
   | { kind: "treatment"; id: number; name: string };
 
 const panelClass =
-  "flex min-h-[28rem] flex-col overflow-hidden rounded-2xl bg-white shadow-[0_10px_30px_rgba(15,40,80,0.06)] dark:bg-slate-900 dark:shadow-none dark:ring-1 dark:ring-white/10";
+  "flex min-h-[28rem] flex-col overflow-hidden rounded-2xl bg-white dark:bg-slate-900";
 
 const deleteButtonClass =
   "inline-flex size-8 items-center justify-center rounded-lg text-red-500 transition hover:bg-red-50 hover:text-red-600 dark:text-red-400 dark:hover:bg-red-950/40 dark:hover:text-red-300";
