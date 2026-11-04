@@ -203,7 +203,7 @@ describe("Dashboard por rol", () => {
     expect(
       await screen.findByRole("region", { name: "Tratamientos más demandados en el banco" }),
     ).toHaveTextContent("Endodoncia monorradicular");
-    expect(screen.getByRole("article", { name: "En el banco" })).toBeInTheDocument();
+    expect(screen.getByRole("article", { name: "Pendientes" })).toBeInTheDocument();
     await waitFor(() => expect(mocks.getDashboardSeries).toHaveBeenLastCalledWith({ period: "1a" }));
     await user.click(screen.getByRole("button", { name: "Todos" }));
     await waitFor(() => expect(mocks.getDashboardSeries).toHaveBeenLastCalledWith({ period: "todos" }));

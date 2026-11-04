@@ -201,8 +201,8 @@ export function AvailablePatients() {
         </h2>
         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
           {assignsOthers
-            ? "Pendientes de asignación. Al asignar uno a un estudiante se abre la cita y el caso pasa a en proceso."
-            : "Pendientes de asignación. Al elegir uno se abre la cita y el caso pasa a en proceso."}
+            ? "Pendientes de asignación. Al asignar uno a un estudiante se abre la cita y el caso pasa a asignado."
+            : "Pendientes de asignación. Al elegir uno se abre la cita y el caso pasa a asignado."}
         </p>
       </div>
 
