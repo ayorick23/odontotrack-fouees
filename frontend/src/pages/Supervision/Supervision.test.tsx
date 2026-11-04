@@ -95,7 +95,7 @@ describe("Supervision", () => {
     api.listInProgressAssignments.mockResolvedValue([]);
   });
 
-  it("muestra los casos en proceso con el estado de su diagnóstico", async ()=>{
+  it("muestra los casos asignados con el estado de su diagnóstico", async ()=>{
     api.listInProgressAssignments.mockResolvedValue([
       { ...finalizableCase, patient_name: "Luis Mejía", diagnosis_state: "pending" },
     ]);

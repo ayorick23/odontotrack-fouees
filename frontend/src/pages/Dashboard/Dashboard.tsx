@@ -341,7 +341,7 @@ type SupervisionData = NonNullable<DashboardOverview["supervision"]>;
 function teacherKpis(data: SupervisionData): KpiSpec[] {
   return [
     { label: "Diagnósticos por validar", metric: data.kpis.pending_diagnoses, icon: <ClipboardCheck className={ICON} />, lowerIsBetter: true, featured: true },
-    { label: "Casos en proceso", metric: data.kpis.cases_in_progress, icon: <Stethoscope className={ICON} /> },
+    { label: "Casos asignados", metric: data.kpis.cases_in_progress, icon: <Stethoscope className={ICON} /> },
     { label: "Estudiantes con casos", metric: data.kpis.students_active, icon: <GraduationCap className={ICON} /> },
     { label: "Diagnósticos validados", metric: data.kpis.validated_ratio, icon: <BadgeCheck className={ICON} /> },
   ];
@@ -413,7 +413,7 @@ function Indicators({ data }: { data: SupervisionData }) {
   const rows = [
     { label: "Digitalización", hint: "Pacientes con expediente digital", indicator: data.indicators.digitalization },
     { label: "Diagnósticos validados", hint: "Del total registrado", indicator: data.indicators.validated_diagnoses },
-    { label: "Casos con diagnóstico validado", hint: "En proceso o finalizados", indicator: data.indicators.cases_with_validated_diagnosis },
+    { label: "Casos con diagnóstico validado", hint: "Asignados o finalizados", indicator: data.indicators.cases_with_validated_diagnosis },
   ];
   return (
     <Card title="Indicadores">
@@ -443,7 +443,7 @@ type BankData = NonNullable<DashboardOverview["bank"]>;
 
 function receptionKpis(data: BankData): KpiSpec[] {
   return [
-    { label: "En el banco sin asignar", metric: data.kpis.unassigned, icon: <Inbox className={ICON} />, lowerIsBetter: true, featured: true },
+    { label: "Pendientes sin asignar", metric: data.kpis.unassigned, icon: <Inbox className={ICON} />, lowerIsBetter: true, featured: true },
     { label: "Citas de hoy", metric: data.kpis.today_appointments, icon: <CalendarClock className={ICON} /> },
     { label: "Registrados este mes", metric: data.kpis.registered_month, icon: <UserPlus className={ICON} /> },
     { label: "Espera hasta asignación", metric: data.kpis.wait_days, icon: <Clock3 className={ICON} />, lowerIsBetter: true },
@@ -518,7 +518,7 @@ function AdminLayout({
   const [unassigned, , , wait] = receptionKpis(bank);
   return (
     <>
-      <Kpis items={[pending, { ...unassigned, label: "En el banco", featured: false }, inProgress, wait]} />
+      <Kpis items={[pending, { ...unassigned, label: "Pendientes", featured: false }, inProgress, wait]} />
       <Row>
         <Card
           title="Registrados y asignaciones por mes"

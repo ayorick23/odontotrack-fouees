@@ -1,12 +1,13 @@
 import { useTheme } from "../../hooks/useTheme";
 import type { CaseStatus } from "../../services/dashboard";
+import { CASE_STATUS_LABELS } from "../../services/patients";
 
 /**
  * Colores de las gráficas del dashboard, validados con el script de la
  * guía de visualización (banda de luminosidad, croma, separación para
  * daltonismo y contraste contra el fondo), en claro y en oscuro.
  *
- * Estados del caso en orden fijo: pendiente → en proceso → finalizado.
+ * Estados del caso en orden fijo: pendiente → asignado → finalizado.
  * La versión oscura tiene su propio violeta (el claro no contrasta sobre
  * slate-900); no es una inversión automática.
  */
@@ -17,11 +18,8 @@ const CASE_STATUS_COLORS: Record<"light" | "dark", Record<CaseStatus, string>> =
 
 export const CASE_STATUS_ORDER: CaseStatus[] = ["pendiente", "en_proceso", "finalizado"];
 
-export const CASE_STATUS_LABELS: Record<CaseStatus, string> = {
-  pendiente: "En el banco",
-  en_proceso: "En proceso",
-  finalizado: "Finalizado",
-};
+// Mismos nombres de estado en toda la app (directorio, ficha y dashboard).
+export { CASE_STATUS_LABELS };
 
 /** Una sola serie (asignaciones, demanda del banco): teal de la marca. */
 export const SINGLE_SERIES_COLOR = "#0d9488";

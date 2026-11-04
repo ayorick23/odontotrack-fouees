@@ -369,7 +369,7 @@ function InProgressCases({ reloadToken }: { reloadToken: number }) {
         if (!cancelled) {
           setState({
             status: "error",
-            message: "No se pudieron cargar los casos en proceso.",
+            message: "No se pudieron cargar los casos asignados.",
           });
         }
       });
@@ -409,7 +409,7 @@ function InProgressCases({ reloadToken }: { reloadToken: number }) {
     <section className={cardClass} aria-labelledby="in-progress-title">
       <SectionHeader
         id="in-progress-title"
-        title="Casos en proceso"
+        title="Casos asignados"
         count={state.status === "ready" ? state.data.length : null}
       />
 
@@ -424,11 +424,11 @@ function InProgressCases({ reloadToken }: { reloadToken: number }) {
 
       {state.status === "ready" ? (
         <Table
-          caption="Casos en proceso"
+          caption="Casos asignados"
           columns={columns}
           rows={state.data}
           getRowKey={(row) => row.id}
-          emptyMessage="No hay casos en proceso."
+          emptyMessage="No hay casos asignados."
         />
       ) : null}
     </section>
