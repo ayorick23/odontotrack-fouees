@@ -1,7 +1,12 @@
 import { useState, type ReactNode } from "react";
 import { ChevronDown, MousePointerClick } from "lucide-react";
 
-import type { OdontogramValue, OdontogramView, PracticeArea } from "../../types";
+import type {
+  FdiToothNumber,
+  OdontogramValue,
+  OdontogramView,
+  PracticeArea,
+} from "../../types";
 import { OdontogramClinicalFields } from "./OdontogramClinicalFields";
 import { OdontogramToolbar } from "./OdontogramToolbar";
 
@@ -25,6 +30,7 @@ type OdontogramClinicalPanelProps = {
   clinicalAreas?: PracticeArea[];
   treatmentNames?: Record<string, string>;
   onClearFocus?: () => void;
+  onFocusTooth?: (fdi: FdiToothNumber) => void;
 };
 
 /**
@@ -41,13 +47,14 @@ export function OdontogramClinicalPanel({
   clinicalAreas = [],
   treatmentNames = {},
   onClearFocus,
+  onFocusTooth,
 }: OdontogramClinicalPanelProps) {
   const [specialtyOpen, setSpecialtyOpen] = useState(false);
   const [tab, setTab] = useState<SpecialtyTab>("endodoncia");
   const hasTooth = focusedFdi != null;
 
   return (
-    <aside className="flex min-w-0 flex-col gap-4 overflow-visible rounded-2xl border border-slate-100 bg-slate-50/80 p-4 dark:border-white/10 dark:bg-slate-950/40">
+    <aside className="flex min-w-0 flex-col gap-4 self-start overflow-visible rounded-2xl bg-white p-4 ring-1 ring-slate-100 dark:bg-slate-900 dark:ring-slate-800">
       <div className="min-w-0 overflow-visible">
         {hasTooth ? (
           <OdontogramToolbar
@@ -59,18 +66,19 @@ export function OdontogramClinicalPanel({
             clinicalAreas={clinicalAreas}
             treatmentNames={treatmentNames}
             onClearFocus={onClearFocus}
+            onFocusTooth={onFocusTooth}
           />
         ) : (
           <EmptyToothState />
         )}
       </div>
 
-      <div className="border-t border-slate-200 pt-3 dark:border-slate-800">
+      <div className="border-t border-slate-100 pt-3 dark:border-slate-800">
         <button
           type="button"
           aria-expanded={specialtyOpen}
           onClick={() => setSpecialtyOpen((open) => !open)}
-          className="flex w-full items-center justify-between text-xs font-semibold uppercase tracking-wide text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+          className="flex w-full items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-slate-400 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-200"
         >
           Registros especializados
           <ChevronDown
@@ -94,7 +102,7 @@ export function OdontogramClinicalPanel({
                   onClick={() => setTab(item.id)}
                   className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold transition ${
                     tab === item.id
-                      ? "bg-teal-600 text-white"
+                      ? "bg-teal-700 text-white"
                       : "text-slate-500 hover:bg-slate-50 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
                   }`}
                 >
@@ -120,7 +128,7 @@ export function OdontogramClinicalPanel({
                 <button
                   type="button"
                   onClick={onOpenPerio}
-                  className="inline-flex items-center justify-center rounded-full bg-teal-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-teal-700"
+                  className="inline-flex items-center justify-center rounded-full bg-teal-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-teal-800"
                 >
                   Abrir carta periodontal
                 </button>

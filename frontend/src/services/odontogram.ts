@@ -28,6 +28,8 @@ export type OdontogramRevisionRecord = {
   visual_snapshot: OdontogramSnapshot | null;
   created_at: string;
   created_by: number | null;
+  /** Quién guardó esta versión (para el selector "Versión"). */
+  created_by_name: string | null;
 };
 
 export async function getOdontogram(patientId: number): Promise<OdontogramValue> {

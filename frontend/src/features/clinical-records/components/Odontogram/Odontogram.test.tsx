@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { useState, type ReactNode } from "react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -92,10 +92,14 @@ vi.mock("react-advanced-odontogram", () => ({
   ),
   // Como la librería real: el clic en un diente solo lo selecciona.
   OdontogramChartSurface: () => (
-    <div className="tooth-tile" data-tooth="16">
-      <button type="button" onClick={() => engine.notify()}>
-        Marcar diente 16
-      </button>
+    <div>
+      {/* Número de pieza como lo dibuja la librería (sin data-tooth). */}
+      <div className="tooth-label-cell">16</div>
+      <div className="tooth-tile" data-tooth="16">
+        <button type="button" onClick={() => engine.notify()}>
+          Marcar diente 16
+        </button>
+      </div>
     </div>
   ),
   PerioChart: ({ open }: { open?: boolean }) =>
@@ -272,11 +276,15 @@ describe("Odontogram wrapper", () => {
 
     render(<Odontogram value={value} readOnly />);
 
-    expect(screen.getByLabelText("Diagnóstico")).toHaveTextContent("16 Caries O");
-    // Lo realizado se lista dentro del plan.
-    expect(screen.getByLabelText("Plan de tratamiento")).toHaveTextContent(
-      /16 endodoncia/i,
-    );
+    const record = screen.getByRole("table", { name: "Registro de la carta" });
+    expect(
+      within(record).getByRole("button", { name: "Ubicar 16 Caries O en la carta" }),
+    ).toBeInTheDocument();
+    // Lo realizado se lista como plan, con su estado.
+    expect(
+      within(record).getByRole("button", { name: /^Ubicar 16 endodoncia/i }),
+    ).toBeInTheDocument();
+    expect(within(record).getByText("Se registra al guardar")).toBeInTheDocument();
     expect(screen.queryByText("Registros especializados")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Quitar/ })).not.toBeInTheDocument();
     expect(
@@ -288,9 +296,33 @@ describe("Odontogram wrapper", () => {
     const user = userEvent.setup();
     render(<Odontogram />);
     await user.click(screen.getByRole("button", { name: "Marcar diente 16" }));
-    expect(screen.getByText("Diente 16")).toBeInTheDocument();
+    expect(screen.getByText("Pieza 16")).toBeInTheDocument();
+    expect(screen.getByText("Primer molar superior derecho")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Caries" })).toBeInTheDocument();
     expect(screen.getByLabelText("Superficies del diente")).toBeInTheDocument();
+  });
+
+  it("las flechas pasan a la pieza vecina", async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+    await user.click(screen.getByRole("button", { name: "Marcar diente 16" }));
+    await user.click(screen.getByRole("button", { name: "Pieza siguiente" }));
+    expect(screen.getByText("Pieza 15")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Pieza anterior" }));
+    expect(screen.getByText("Pieza 16")).toBeInTheDocument();
+  });
+
+  it("colorea el número de la pieza según lo que tiene", async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+    const label = screen.getByText("16", { selector: ".tooth-label-cell" });
+    expect(label.dataset.state).toBeUndefined();
+    await user.click(screen.getByRole("button", { name: "Marcar diente 16" }));
+    await user.click(screen.getByRole("button", { name: "Caries" }));
+    expect(label.dataset.state).toBe("finding");
+    // En el plan la caries no cuenta: no hay nada planificado.
+    await user.click(screen.getByRole("button", { name: "Plan de tratamiento" }));
+    expect(label.dataset.state).toBeUndefined();
   });
 
   it("seleccionar un diente no cuenta como cambio", async () => {
@@ -344,9 +376,14 @@ describe("Odontogram wrapper", () => {
       screen.queryByRole("button", { name: "Indicado para práctica" }),
     ).not.toBeInTheDocument();
 
-    await user.selectOptions(await screen.findByLabelText("Área clínica"), "endodoncia");
-    await user.selectOptions(screen.getByLabelText("Tratamiento"), "endodoncia_monorradicular");
-    await user.click(screen.getByRole("button", { name: "Agregar al plan" }));
+    // Un solo buscador del tarifario, sin acentos ni palabra completa.
+    await user.type(
+      screen.getByRole("searchbox", { name: "Buscar tratamiento en el tarifario" }),
+      "monorra",
+    );
+    await user.click(
+      await screen.findByRole("button", { name: "Agregar Endodoncia monorradicular al plan" }),
+    );
 
     expect(tooth16(lastValue(onChange))?.marks).toEqual([
       {
@@ -356,9 +393,9 @@ describe("Odontogram wrapper", () => {
         treatment: "endodoncia_monorradicular",
       },
     ]);
-    expect(screen.getByLabelText("Plan de tratamiento")).toHaveTextContent(
-      "16 Endodoncia monorradicular",
-    );
+    expect(
+      screen.getByRole("button", { name: "Ubicar 16 Endodoncia monorradicular en la carta" }),
+    ).toBeInTheDocument();
 
     const realizado = screen.getByRole("checkbox", { name: "Realizado" });
     await user.click(realizado);
@@ -380,7 +417,7 @@ describe("Odontogram wrapper", () => {
       ];
     }
     render(<Harness initial={value} onChange={vi.fn()} />);
-    await user.click(screen.getByRole("button", { name: /^16 endodoncia/i }));
+    await user.click(screen.getByRole("button", { name: /^Ubicar 16 endodoncia/i }));
     expect(screen.getByRole("button", { name: "Plan de tratamiento" })).toHaveAttribute(
       "aria-pressed",
       "true",

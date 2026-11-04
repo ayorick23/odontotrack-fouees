@@ -9,46 +9,47 @@ const VIEWS: Array<{ id: OdontogramView; hint: string }> = [
   },
   {
     id: "plan",
-    hint: "Tratamientos a realizar. Los pendientes quedan disponibles en el banco de pacientes.",
+    hint: "Lo que se le va a hacer al paciente. Lo pendiente queda visible en el banco de pacientes hasta marcarlo como realizado.",
   },
 ];
 
 type OdontogramChartModeProps = {
   view: OdontogramView;
   onViewChange: (view: OdontogramView) => void;
-  /** Tratamientos del plan pendientes y realizados, para el resumen. */
+  /** Registros del diagnóstico (hallazgos y marcas de higiene). */
+  findingCount: number;
+  /** Tratamientos del plan pendientes y realizados. */
   planCounts: { pending: number; done: number };
   readOnly: boolean;
   /** Controles de la carta (dentición temporal), a la derecha. */
   children?: ReactNode;
 };
 
-function planSummary({ pending, done }: { pending: number; done: number }): string {
-  if (pending + done === 0) {
-    return "";
-  }
+function planBadge({ pending, done }: { pending: number; done: number }): string {
   const parts = [`${pending} ${pending === 1 ? "pendiente" : "pendientes"}`];
   if (done > 0) {
     parts.push(`${done} ${done === 1 ? "realizado" : "realizados"}`);
   }
-  return ` ${parts.join(" · ")}.`;
+  return parts.join(" · ");
 }
 
 export function OdontogramChartMode({
   view,
   onViewChange,
+  findingCount,
   planCounts,
   readOnly,
   children,
 }: OdontogramChartModeProps) {
+  const badges: Record<OdontogramView, string> = {
+    diagnostico: String(findingCount),
+    plan: planBadge(planCounts),
+  };
+
   return (
-    <div className="space-y-1.5">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div
-          className="flex gap-1 rounded-full bg-slate-100 p-1 dark:bg-slate-800"
-          role="group"
-          aria-label="Vista del odontograma"
-        >
+    <div>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800">
+        <div className="-mb-px flex gap-1" role="group" aria-label="Vista del odontograma">
           {VIEWS.map((button, index) => {
             const active = view === button.id;
             return (
@@ -58,27 +59,49 @@ export function OdontogramChartMode({
                 title={button.hint}
                 aria-pressed={active}
                 onClick={() => onViewChange(button.id)}
-                className={`rounded-full px-3.5 py-1.5 text-sm font-semibold transition ${
+                className={`group relative flex items-center gap-2 px-3 pt-1.5 pb-3 text-sm font-medium transition ${
                   active
-                    ? "bg-white text-teal-800 shadow-sm dark:bg-slate-900 dark:text-teal-200"
-                    : "text-slate-500 hover:text-slate-700 dark:text-slate-400"
+                    ? "text-slate-900 dark:text-white"
+                    : "text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
                 }`}
               >
-                <span className="mr-1.5 text-xs opacity-60" aria-hidden="true">
+                <span
+                  className={`flex size-5 items-center justify-center rounded-full text-[11px] font-semibold ${
+                    active
+                      ? "bg-teal-700 text-white"
+                      : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+                  }`}
+                  aria-hidden="true"
+                >
                   {index + 1}
                 </span>
                 {ODONTOGRAM_VIEW_LABELS[button.id]}
+                <span
+                  className={`rounded-full px-1.5 py-px text-[11px] font-semibold tabular-nums ${
+                    active
+                      ? "bg-teal-50 text-teal-800 dark:bg-teal-950/60 dark:text-teal-200"
+                      : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+                  }`}
+                  aria-hidden="true"
+                >
+                  {badges[button.id]}
+                </span>
+                <span
+                  className={`absolute inset-x-2 bottom-0 h-0.5 rounded-full ${
+                    active ? "bg-teal-700 dark:bg-teal-400" : "bg-transparent"
+                  }`}
+                  aria-hidden="true"
+                />
               </button>
             );
           })}
         </div>
-        {children}
+        <div className="pb-2.5">{children}</div>
       </div>
-      <p className="text-xs text-slate-500 dark:text-slate-400">
+      <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
         {readOnly
-          ? `${ODONTOGRAM_VIEW_LABELS[view]}.`
+          ? `${ODONTOGRAM_VIEW_LABELS[view]}: ${badges[view]}.`
           : VIEWS.find((item) => item.id === view)?.hint}
-        {view === "plan" ? planSummary(planCounts) : ""}
       </p>
     </div>
   );

@@ -283,6 +283,9 @@ class OdontogramSerializer(serializers.ModelSerializer):
 
 
 class OdontogramRevisionSerializer(serializers.ModelSerializer):
+    # Para el selector "Versión" del odontograma: fecha · quién guardó.
+    created_by_name = serializers.SerializerMethodField()
+
     class Meta:
         model = OdontogramRevision
         fields = (
@@ -294,8 +297,14 @@ class OdontogramRevisionSerializer(serializers.ModelSerializer):
             "visual_snapshot",
             "created_at",
             "created_by",
+            "created_by_name",
         )
         read_only_fields = fields
+
+    def get_created_by_name(self, instance: OdontogramRevision) -> str | None:
+        if instance.created_by is None:
+            return None
+        return user_display_name(instance.created_by)
 
     def to_representation(self, instance: OdontogramRevision) -> dict:
         data = super().to_representation(instance)

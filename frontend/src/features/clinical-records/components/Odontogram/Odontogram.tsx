@@ -33,8 +33,9 @@ import { domainKey, domainToChart, withEngineSnapshot } from "./mapEngineState";
 import { OdontogramChartMode } from "./OdontogramChartMode";
 import { OdontogramChartViews } from "./OdontogramChartViews";
 import { OdontogramClinicalPanel } from "./OdontogramClinicalPanel";
-import { OdontogramFindings } from "./OdontogramFindings";
+import { OdontogramChartRecord } from "./OdontogramChartRecord";
 import "./odontogram.css";
+import { applyToothLabelStates, toothLabelStates } from "./toothLabels";
 import {
   FOUEES_ODONTOGRAM_THEME,
   FOUEES_ODONTOGRAM_THEME_DARK,
@@ -97,6 +98,7 @@ export function Odontogram({
   const [focusedFdi, setFocusedFdi] = useState<FdiToothNumber | null>(null);
   const focusedRef = useRef<FdiToothNumber | null>(null);
   const [clinicalAreas, setClinicalAreas] = useState<PracticeArea[]>([]);
+  const chartRef = useRef<HTMLDivElement>(null);
   const treatmentNames = useMemo(
     () =>
       Object.fromEntries(
@@ -208,21 +210,59 @@ export function Odontogram({
     draw(value);
   }, [value, draw]);
 
+  const current = value ?? emptyOdontogram();
+
+  // Números de pieza coloreados según lo que tiene cada una (toothLabels.ts).
+  // La librería crea los números de forma asíncrona: se vuelve a aplicar
+  // cuando agrega elementos, además de cada vez que cambian los datos.
+  const labelStates = useMemo(() => toothLabelStates(current, view), [current, view]);
+  const labelStatesRef = useRef(labelStates);
+  useEffect(() => {
+    labelStatesRef.current = labelStates;
+    if (chartRef.current) {
+      applyToothLabelStates(chartRef.current, labelStates);
+    }
+  }, [labelStates]);
+  useEffect(() => {
+    const root = chartRef.current;
+    if (!root) {
+      return;
+    }
+    const observer = new MutationObserver(() =>
+      applyToothLabelStates(root, labelStatesRef.current),
+    );
+    observer.observe(root, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, []);
+
+  /** Enfoca la pieza en el panel y la selecciona en la librería (las
+   * cartas de endodoncia u ortodoncia trabajan sobre esa selección). */
+  const focusTooth = useCallback((fdi: FdiToothNumber) => {
+    setFocusedFdi(fdi);
+    selectTile(fdi);
+  }, []);
+
   const changeView = (next: OdontogramView) => {
     viewRef.current = next;
     setView(next);
     applyToothLayer(engineLayer(next));
   };
 
-  const current = value ?? emptyOdontogram();
   const planCounts = { pending: 0, done: 0 };
+  let findingCount = 0;
   for (const tooth of current.teeth) {
     for (const mark of tooth.marks) {
-      if (mark.layer === "plan") {
+      if (mark.layer === "hallazgo") {
+        findingCount += 1;
+      } else if (mark.layer === "plan") {
         planCounts.pending += 1;
       } else if (mark.layer === "hecho") {
         planCounts.done += 1;
       }
+    }
+    const { placa, sangrado, sarro } = tooth.oralMarks;
+    if (placa || sangrado || sarro) {
+      findingCount += 1;
     }
   }
 
@@ -252,13 +292,16 @@ export function Odontogram({
             <OdontogramChartMode
               view={view}
               onViewChange={changeView}
+              findingCount={findingCount}
               planCounts={planCounts}
               readOnly={readOnly}
             >
               {readOnly || !value ? null : (
-                <label className="inline-flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-300">
                   <input
                     type="checkbox"
+                    role="switch"
+                    className="peer sr-only"
                     checked={hasPrimaryTeeth(value)}
                     onChange={(event) =>
                       onChange?.(
@@ -268,11 +311,16 @@ export function Odontogram({
                       )
                     }
                   />
+                  <span
+                    className="relative h-5 w-9 rounded-full bg-slate-200 transition peer-checked:bg-teal-700 peer-focus-visible:ring-2 peer-focus-visible:ring-teal-600/40 after:absolute after:top-0.5 after:left-0.5 after:size-4 after:rounded-full after:bg-white after:shadow after:transition peer-checked:after:translate-x-4 dark:bg-slate-700"
+                    aria-hidden="true"
+                  />
                   Dentición temporal / mixta
                 </label>
               )}
             </OdontogramChartMode>
             <div
+              ref={chartRef}
               className="odontogram-chart-wrap overflow-x-auto"
               onClick={(event) => {
                 const tile = (event.target as Element).closest(".tooth-tile");
@@ -298,7 +346,7 @@ export function Odontogram({
                     <button
                       key={fdi}
                       type="button"
-                      onClick={() => setFocusedFdi(fdi)}
+                      onClick={() => focusTooth(fdi)}
                       className={`rounded-md px-2 py-1 text-xs font-semibold ring-1 ${
                         focusedFdi === fdi
                           ? "bg-teal-600 text-white ring-teal-600"
@@ -311,11 +359,11 @@ export function Odontogram({
                 </div>
               </div>
             ) : null}
-            <OdontogramFindings
+            <OdontogramChartRecord
               value={current}
               treatmentNames={treatmentNames}
               focusedFdi={focusedFdi}
-              onFocusTooth={setFocusedFdi}
+              onFocusTooth={focusTooth}
               onChange={readOnly ? undefined : onChange}
               onViewChange={changeView}
             />
@@ -331,6 +379,7 @@ export function Odontogram({
               clinicalAreas={clinicalAreas}
               treatmentNames={treatmentNames}
               onClearFocus={() => setFocusedFdi(null)}
+              onFocusTooth={focusTooth}
             />
           )}
         </div>

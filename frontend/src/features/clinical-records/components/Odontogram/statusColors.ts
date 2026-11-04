@@ -21,3 +21,22 @@ export const STATUS_SWATCH: Record<ToothStatus, string> = {
 
 /** Tratamiento planificado sin dibujo (diagnóstico, profilaxis...). */
 export const NO_SYMBOL_SWATCH = "bg-sky-300";
+
+/** Borde izquierdo de cada botón de la paleta del diagnóstico. */
+export const STATUS_BORDER: Record<ToothStatus, string> = {
+  sano: "border-l-slate-300 dark:border-l-slate-500",
+  caries: "border-l-amber-400",
+  fractura: "border-l-red-400",
+  obturado: "border-l-violet-500",
+  sellante: "border-l-sky-400",
+  restauracion_temporal: "border-l-orange-400",
+  endodoncia: "border-l-rose-500",
+  pulpotomia: "border-l-rose-300",
+  corona: "border-l-teal-500",
+  puente: "border-l-cyan-600",
+  implante: "border-l-emerald-400",
+  extraido: "border-l-slate-500",
+  raiz_retenida: "border-l-stone-500",
+  no_erupcionado: "border-l-slate-400",
+  ausente_congenito: "border-l-slate-300 dark:border-l-slate-500",
+};

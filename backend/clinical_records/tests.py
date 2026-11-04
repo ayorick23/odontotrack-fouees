@@ -498,6 +498,13 @@ class OdontogramApiTests(APITestCase):
             item for item in history.json()[0]["teeth"] if item["fdi"] == 16
         )
         self.assertEqual(revision_16["marks"][0]["status"], ToothStatus.CARIES)
+        # El selector "Versión" muestra quién guardó cada versión.
+        from accounts.models import User
+        from clinical_records.services import user_display_name
+
+        revision = history.json()[0]
+        author = User.objects.get(pk=revision["created_by"])
+        self.assertEqual(revision["created_by_name"], user_display_name(author))
         self.assertEqual(OdontogramRevision.objects.count(), 1)
 
 

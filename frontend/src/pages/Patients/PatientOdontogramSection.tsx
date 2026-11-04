@@ -1,18 +1,18 @@
-import { RotateCcw, Save, Undo2 } from "lucide-react";
+import { ChevronDown, History, Save, Undo2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { UnsavedChangesGuard } from "../../components/UnsavedChangesGuard";
 import { Odontogram } from "../../features/clinical-records/components/Odontogram";
+import { changedTeethCount } from "../../features/clinical-records/components/Odontogram/changes";
 import { OdontogramExportButtons } from "../../features/clinical-records/components/Odontogram/OdontogramExportButtons";
 import { useOdontogramData } from "../../features/clinical-records/hooks/useOdontogramData";
 import {
   ORAL_GENERAL_MARK_LABELS,
-  markedTeeth,
   type OdontogramValue,
   type OralGeneralMark,
 } from "../../features/clinical-records/types";
-import { primaryActionClass, secondaryActionClass } from "../../lib/actions";
+import { secondaryActionClass } from "../../lib/actions";
 import {
   listOdontogramHistory,
   revisionToDomain,
@@ -21,6 +21,20 @@ import {
 
 const cardClass =
   "rounded-2xl bg-white p-5 dark:bg-slate-900 sm:p-6";
+
+const REVISION_DATE = new Intl.DateTimeFormat("es-SV", {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+});
+
+/** "31 oct 2026, 2:05 p. m. · Lucía Zepeda" */
+function revisionLabel(revision: OdontogramRevisionRecord): string {
+  const date = REVISION_DATE.format(new Date(revision.created_at));
+  return revision.created_by_name ? `${date} · ${revision.created_by_name}` : date;
+}
 
 type PatientOdontogramSectionProps = {
   patientId: number;
@@ -37,6 +51,7 @@ export function PatientOdontogramSection({
 }: PatientOdontogramSectionProps) {
   const {
     value,
+    savedValue,
     onChange,
     save,
     undo,
@@ -73,7 +88,8 @@ export function PatientOdontogramSection({
   const displayedValue: OdontogramValue = viewingRevision
     ? revisionToDomain(viewingRevision)
     : value;
-  const findingCount = markedTeeth(displayedValue).length;
+  const changedTeeth = isDirty ? changedTeethCount(savedValue, value) : 0;
+  const editing = !readOnly && viewingRevisionId == null;
   const activeMarks = (
     Object.entries(displayedValue.oralMarks) as Array<[OralGeneralMark, boolean]>
   )
@@ -136,97 +152,124 @@ export function PatientOdontogramSection({
       />
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-base font-semibold text-slate-800 dark:text-slate-100">
+          <h2 className="text-lg font-semibold tracking-tight text-slate-900 dark:text-white">
             Odontograma
           </h2>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Numeración FDI. Estado, plan, periodoncia y diagnósticos se
-            guardan en el expediente.
+          <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+            Numeración FDI · se guarda en el expediente con cada versión
           </p>
+          {activeMarks.length > 0 ? (
+            <div className="mt-2 flex flex-wrap gap-1">
+              {activeMarks.map((label) => (
+                <span
+                  key={label}
+                  className="rounded-full bg-teal-50 px-2.5 py-0.5 text-xs font-semibold text-teal-700 dark:bg-teal-950/60 dark:text-teal-300"
+                >
+                  {label}
+                </span>
+              ))}
+            </div>
+          ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {revisions.length > 0 ? (
-            <select
-              aria-label="Historial del odontograma"
-              className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
-              value={viewingRevisionId ?? ""}
-              onChange={(event) => {
-                const next = event.target.value;
-                setViewingRevisionId(next ? Number(next) : null);
-              }}
+            <label
+              className="flex h-9 items-center gap-2 rounded-full bg-slate-100 pr-1 pl-3 text-xs dark:bg-slate-800"
+              title="Historial: ver cómo estaba la carta en una versión guardada antes"
             >
-              <option value="">Estado actual</option>
-              {revisions.map((revision) => (
-                <option key={revision.id} value={revision.id}>
-                  {new Date(revision.created_at).toLocaleString("es-SV")}
-                </option>
-              ))}
-            </select>
+              <History className="size-3.5 text-slate-400" aria-hidden="true" />
+              <span className="text-slate-500 dark:text-slate-400">Versión</span>
+              <span className="relative flex items-center">
+                <select
+                  aria-label="Historial del odontograma"
+                  className="max-w-60 appearance-none truncate rounded-full bg-white py-1 pr-7 pl-2.5 font-semibold text-slate-700 outline-none focus-visible:ring-2 focus-visible:ring-teal-600/40 dark:bg-slate-900 dark:text-slate-100"
+                  value={viewingRevisionId ?? ""}
+                  onChange={(event) => {
+                    const next = event.target.value;
+                    setViewingRevisionId(next ? Number(next) : null);
+                  }}
+                >
+                  <option value="">Actual</option>
+                  {revisions.map((revision) => (
+                    <option key={revision.id} value={revision.id}>
+                      {revisionLabel(revision)}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown
+                  className="pointer-events-none absolute right-2 size-3.5 text-slate-400"
+                  aria-hidden="true"
+                />
+              </span>
+            </label>
           ) : null}
-          {findingCount > 0 ? (
-            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-              {findingCount}{" "}
-              {findingCount === 1 ? "hallazgo" : "hallazgos"}
-            </span>
-          ) : loadStatus === "ready" ? (
-            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-              Sin hallazgos
-            </span>
-          ) : null}
-          {activeMarks.map((label) => (
+          {isDirty && editing ? (
             <span
-              key={label}
-              className="rounded-full bg-teal-50 px-2.5 py-1 text-xs font-semibold text-teal-700 dark:bg-teal-950/60 dark:text-teal-300"
+              role="status"
+              className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1.5 text-xs font-semibold text-amber-800 dark:bg-amber-950/50 dark:text-amber-300"
             >
-              {label}
+              <span className="size-1.5 animate-pulse rounded-full bg-amber-500" aria-hidden="true" />
+              {changedTeeth > 0
+                ? `Cambios sin guardar en ${changedTeeth} ${changedTeeth === 1 ? "pieza" : "piezas"}`
+                : "Cambios sin guardar"}
             </span>
-          ))}
-          {isDirty && !readOnly && viewingRevisionId == null ? (
-            <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800 ring-1 ring-amber-300 dark:bg-amber-950 dark:text-amber-200 dark:ring-amber-800">
-              Sin guardar
-            </span>
+          ) : null}
+          {editing ? (
+            <button
+              type="button"
+              aria-label="Deshacer"
+              title="Deshacer el último cambio (Ctrl+Z)"
+              disabled={!canUndo || isSaving || loadStatus !== "ready"}
+              onClick={undo}
+              className="flex size-9 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 disabled:cursor-not-allowed disabled:opacity-30 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+            >
+              <Undo2 className="size-4" aria-hidden="true" />
+            </button>
           ) : null}
           {loadStatus === "ready" ? <OdontogramExportButtons /> : null}
-          {readOnly || viewingRevisionId != null ? null : (
+          {editing ? (
             <>
               <button
                 type="button"
-                className={secondaryActionClass}
-                title="Deshacer el último cambio (Ctrl+Z)"
-                disabled={!canUndo || isSaving || loadStatus !== "ready"}
-                onClick={undo}
-              >
-                <Undo2 className="size-4" />
-                Deshacer
-              </button>
-              <button
-                type="button"
-                className={secondaryActionClass}
                 title="Volver a lo último guardado"
                 disabled={!isDirty || isSaving || loadStatus !== "ready"}
                 onClick={() => {
                   discard();
                   toast.message("Cambios descartados.");
                 }}
+                className="h-9 rounded-full px-3 text-sm font-medium text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 disabled:cursor-not-allowed disabled:opacity-30 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
               >
-                <RotateCcw className="size-4" />
-                Descartar cambios
+                Descartar
               </button>
               <button
                 type="button"
-                className={primaryActionClass}
+                title="Guardar (Ctrl+S)"
                 disabled={!isDirty || isSaving || loadStatus !== "ready"}
                 onClick={() => {
                   void handleSave();
                 }}
+                className="inline-flex h-9 items-center gap-2 rounded-full bg-teal-700 px-4 text-sm font-semibold text-white shadow-sm shadow-teal-900/20 transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none dark:disabled:bg-slate-800 dark:disabled:text-slate-500"
               >
-                <Save className="size-4" />
-                {isSaving ? "Guardando..." : "Guardar"}
+                <Save className="size-4" aria-hidden="true" />
+                {isSaving ? "Guardando…" : "Guardar"}
               </button>
             </>
-          )}
+          ) : null}
         </div>
       </div>
+
+      {viewingRevision ? (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-sky-50 px-4 py-2.5 text-sm text-sky-900 dark:bg-sky-950/40 dark:text-sky-100">
+          <span>Estás viendo la versión del {revisionLabel(viewingRevision)}. Es de solo lectura.</span>
+          <button
+            type="button"
+            onClick={() => setViewingRevisionId(null)}
+            className="font-semibold text-sky-800 hover:underline dark:text-sky-200"
+          >
+            Volver a la actual
+          </button>
+        </div>
+      ) : null}
 
       {loadStatus === "loading" ? (
         <p className="text-sm text-slate-400 dark:text-slate-500">
