@@ -4,7 +4,6 @@ import {
   APPOINTMENT_DURATIONS,
   DURATION_LABELS,
   type AppointmentDuration,
-  type AppointmentStatus,
 } from "../../services/appointments";
 
 /** Valores del formulario de cita, en hora local. */
@@ -27,16 +26,6 @@ export function draftFrom(
 export function draftStartIso(draft: AppointmentDraft): string {
   return new Date(`${draft.date}T${draft.time}`).toISOString();
 }
-
-// Colores de la marca por estado: los mismos en el calendario y el detalle.
-export const STATUS_COLORS: Record<
-  AppointmentStatus,
-  { background: string; text: string }
-> = {
-  programada: { background: "#2ad4c5", text: "#0f172a" },
-  atendida: { background: "#8b5cf6", text: "#ffffff" },
-  cancelada: { background: "#94a3b8", text: "#0f172a" },
-};
 
 const labelClass = "block text-sm text-slate-600 dark:text-slate-300";
 const inputClass =

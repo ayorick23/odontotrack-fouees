@@ -17,9 +17,9 @@ import {
   updateAppointment,
   type Appointment,
 } from "../../services/appointments";
+import { KIND_STYLE } from "./calendarModel";
 import {
   AppointmentFields,
-  STATUS_COLORS,
   draftFrom,
   draftStartIso,
   type AppointmentDraft,
@@ -30,12 +30,15 @@ type Mode = "view" | "reschedule" | "confirm-cancel";
 export function AppointmentDetailModal({
   appointment,
   canEdit,
+  pending = false,
   onClose,
   onChanged,
 }: {
   appointment: Appointment;
   /** Permiso calendar.edit: reprogramar, marcar atendida o cancelar. */
   canEdit: boolean;
+  /** Programada cuya hora ya pasó: falta registrar si el paciente vino. */
+  pending?: boolean;
   onClose: () => void;
   onChanged: () => void;
 }) {
@@ -49,7 +52,7 @@ export function AppointmentDetailModal({
   const [error, setError] = useState<string | null>(null);
   // Solo las citas programadas se pueden cambiar.
   const editable = canEdit && appointment.status === "programada";
-  const colors = STATUS_COLORS[appointment.status];
+  const kindStyle = KIND_STYLE[pending ? "pendiente" : appointment.status];
 
   function close() {
     if (!busy) {
@@ -107,14 +110,17 @@ export function AppointmentDetailModal({
         </form>
       ) : (
         <div className="space-y-4">
+          {pending ? (
+            <p className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+              La hora de esta cita ya pasó. ¿El paciente asistió?
+            </p>
+          ) : null}
           <dl className="grid grid-cols-2 gap-3 text-sm">
             <Detail label="Estudiante">{appointment.student.name}</Detail>
             <Detail label="Estado">
-              <span
-                className="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold"
-                style={{ backgroundColor: colors.background, color: colors.text }}
-              >
-                {APPOINTMENT_STATUS_LABELS[appointment.status]}
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 px-2.5 py-0.5 text-xs font-semibold dark:border-slate-700">
+                <span className="size-2 rounded-full" style={{ background: kindStyle.bar }} aria-hidden="true" />
+                {pending ? kindStyle.label : APPOINTMENT_STATUS_LABELS[appointment.status]}
               </span>
             </Detail>
             <Detail label="Fecha">{capitalize(format(start, "EEEE d 'de' MMMM", { locale: es }))}</Detail>
