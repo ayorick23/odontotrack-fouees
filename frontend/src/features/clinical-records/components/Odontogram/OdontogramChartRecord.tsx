@@ -186,7 +186,7 @@ export function OdontogramChartRecord({
       </div>
 
       {rows.length > 0 ? (
-        <div className="mt-3 overflow-x-auto rounded-xl ring-1 ring-slate-100 dark:ring-slate-800">
+        <div className="relative mt-3 overflow-x-auto rounded-xl ring-1 ring-slate-100 dark:ring-slate-800">
           <table className="w-full min-w-[640px] text-left text-sm">
             <caption className="sr-only">Registro de la carta</caption>
             <thead className="bg-slate-50 text-xs text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">

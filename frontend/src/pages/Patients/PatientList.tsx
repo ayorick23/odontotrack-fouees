@@ -494,7 +494,7 @@ export function PatientList() {
       </div>
 
       {/* Solo la tabla se desplaza; el encabezado queda fijo */}
-      <div className="min-h-0 flex-1 overflow-auto px-2">
+      <div className="relative min-h-0 flex-1 overflow-auto px-2">
         {state.status === "loading" ? <DirectorySkeleton /> : null}
 
         {state.status === "error" ? (

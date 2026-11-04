@@ -53,7 +53,12 @@ export function AppLayout() {
       <Sidebar user={user} onLogout={handleLogout} />
       <div className="flex min-w-0 flex-1 flex-col pb-3 pr-3">
         <Navbar user={user} onLogout={handleLogout} />
-        <main className="min-h-0 min-w-0 flex-1 overflow-auto rounded-3xl bg-slate-50 p-6 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_40px_-12px_rgba(15,23,42,0.10)] dark:bg-[#0b1220] dark:shadow-none">
+        {/* `relative`: lo posicionado en absoluto dentro de las páginas (el
+            <select> oculto de Radix, textos sr-only, subrayados de pestañas)
+            se ubica respecto a este panel y se desplaza con él. Sin esto
+            se ubicaba respecto al documento, lo estiraba por debajo de la
+            ventana y aparecía un segundo scroll en la página. */}
+        <main className="relative min-h-0 min-w-0 flex-1 overflow-auto rounded-3xl bg-slate-50 p-6 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_40px_-12px_rgba(15,23,42,0.10)] dark:bg-[#0b1220] dark:shadow-none">
           <Outlet />
         </main>
       </div>
