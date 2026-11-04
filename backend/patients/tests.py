@@ -1722,3 +1722,90 @@ class DirectoryPracticeSearchTests(APITestCase):
         rows = self.client.get("/api/patients/").json()["results"]
         row = next(r for r in rows if r["id"] == finished.id)
         self.assertEqual(row["assigned_to"], "Lucía Zepeda")
+
+
+class DirectoryStatusCountsAndOrderingTests(APITestCase):
+    """Pestañas de estado del directorio (status_counts) y ?ordering=."""
+
+    def setUp(self):
+        sync_acl()
+        self.admin = User.objects.create_user(
+            username="admin", password="pass12345", role=User.Role.ADMIN
+        )
+        self.client.force_authenticate(user=self.admin)
+        Status = Patient.CaseStatus
+        self.bruno = Patient.objects.create(
+            first_name="Bruno", last_name="Rivas", dui="CNT-001",
+            case_status=Status.PENDIENTE, clinical_area=clinical_area("endodoncia"),
+        )
+        self.ana = Patient.objects.create(
+            first_name="Ana", last_name="Zelaya", dui="CNT-002",
+            case_status=Status.PENDIENTE, clinical_area=clinical_area("operatoria"),
+        )
+        self.carla = Patient.objects.create(
+            first_name="Carla", last_name="Mejía", dui="CNT-003",
+            case_status=Status.FINALIZADO, clinical_area=clinical_area("endodoncia"),
+        )
+        # created_at es auto_now_add: se fija a mano para probar el orden.
+        now = timezone.now()
+        for days, patient in ((10, self.bruno), (5, self.ana), (1, self.carla)):
+            Patient.objects.filter(pk=patient.pk).update(
+                created_at=now - timedelta(days=days)
+            )
+
+    def _names(self, params):
+        response = self.client.get("/api/patients/", params)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        return [row["first_name"] for row in response.json()["results"]]
+
+    def test_counts_ignore_status_filter_but_follow_the_others(self):
+        body = self.client.get(
+            "/api/patients/", {"case_status": "pendiente", "clinical_area": "endodoncia"}
+        ).json()
+        self.assertEqual(body["count"], 1)
+        # La pestaña "Finalizados" dice cuántos habría al elegirla.
+        self.assertEqual(
+            body["status_counts"], {"pendiente": 1, "en_proceso": 0, "finalizado": 1}
+        )
+
+    def test_counts_follow_search(self):
+        body = self.client.get("/api/patients/", {"search": "Mejía"}).json()
+        self.assertEqual(
+            body["status_counts"], {"pendiente": 0, "en_proceso": 0, "finalizado": 1}
+        )
+
+    def test_student_counts_only_visible_patients(self):
+        student = User.objects.create_user(
+            username="est-cuentas", password="pass12345", role=User.Role.ESTUDIANTE
+        )
+        self.client.force_authenticate(user=student)
+        body = self.client.get("/api/patients/").json()
+        # El finalizado nunca fue suyo: no lo ve ni lo cuenta.
+        self.assertEqual(
+            body["status_counts"], {"pendiente": 2, "en_proceso": 0, "finalizado": 0}
+        )
+
+    def test_order_by_name_both_directions(self):
+        self.assertEqual(self._names({"ordering": "name"}), ["Ana", "Bruno", "Carla"])
+        self.assertEqual(self._names({"ordering": "-name"}), ["Carla", "Bruno", "Ana"])
+
+    def test_order_by_created_at_both_directions(self):
+        self.assertEqual(
+            self._names({"ordering": "-created_at"}), ["Carla", "Ana", "Bruno"]
+        )
+        self.assertEqual(
+            self._names({"ordering": "created_at"}), ["Bruno", "Ana", "Carla"]
+        )
+
+    def test_unknown_ordering_falls_back_to_id(self):
+        # Campos fuera de la lista (p. ej. dui) no se aceptan: orden por id.
+        self.assertEqual(self._names({"ordering": "dui"}), ["Bruno", "Ana", "Carla"])
+        self.assertEqual(self._names({}), ["Bruno", "Ana", "Carla"])
+
+    def test_export_uses_the_same_ordering(self):
+        response = self.client.get("/api/patients/export/", {"ordering": "name"})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        content = b"".join(response.streaming_content) if response.streaming else response.content
+        text = content.decode("utf-8-sig")
+        self.assertLess(text.index("Ana"), text.index("Bruno"))
+        self.assertLess(text.index("Bruno"), text.index("Carla"))

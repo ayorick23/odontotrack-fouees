@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.db.models import Count
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
@@ -15,6 +16,25 @@ from .practices import PracticeMatch
 from .serializers import PatientListSerializer, PatientSerializer
 
 User = get_user_model()
+
+# Orden del directorio (?ordering=name, -created_at, ...). Lista cerrada:
+# solo columnas que la tabla muestra, nunca campos arbitrarios. "id" al
+# final desempata para que la paginación no repita ni salte filas.
+DIRECTORY_ORDERINGS = {
+    "name": ("first_name", "last_name"),
+    "created_at": ("created_at",),
+}
+
+
+def directory_ordering(value: str | None) -> tuple[str, ...]:
+    """Campos de `order_by` para `value`; sin valor o desconocido, por id."""
+    value = (value or "").strip()
+    descending = value.startswith("-")
+    fields = DIRECTORY_ORDERINGS.get(value.removeprefix("-"))
+    if fields is None:
+        return ("id",)
+    prefix = "-" if descending else ""
+    return tuple(f"{prefix}{field}" for field in fields) + (f"{prefix}id",)
 
 
 class PatientViewSet(viewsets.ModelViewSet):
@@ -58,16 +78,43 @@ class PatientViewSet(viewsets.ModelViewSet):
                 "diagnoses__student"
             )
         return (
-            queryset
+            self._directory_filters(queryset)
             .select_related("clinical_area", "clinical_treatment", "odontogram")
-            .visible_to(self.request.user)
-            .in_period(params.get("period"))
             .by_case_status(params.get("case_status"))
+            .order_by(*directory_ordering(params.get("ordering")))
+        )
+
+    def _directory_filters(self, queryset):
+        """Filtros del directorio salvo el estado del caso: los conteos de
+        las pestañas de estado salen de aquí."""
+        params = self.request.query_params
+        return (
+            queryset.visible_to(self.request.user)
+            .in_period(params.get("period"))
             .by_clinical_area(params.get("clinical_area"))
             .by_assignee(params.get("assigned_to"))
             .by_indicated_practice(params.get("tooth"), params.get("treatment"))
-            .order_by("id")
         )
+
+    def list(self, request, *args, **kwargs):
+        response = super().list(request, *args, **kwargs)
+        if isinstance(response.data, dict):
+            response.data["status_counts"] = self._status_counts()
+        return response
+
+    def _status_counts(self) -> dict[str, int]:
+        """Cuántos pacientes habría en cada estado con la búsqueda y los
+        demás filtros actuales (pestañas del directorio)."""
+        queryset = self.filter_queryset(self._directory_filters(Patient.objects.all()))
+        rows = (
+            queryset.order_by()
+            .values("case_status")
+            .annotate(total=Count("id", distinct=True))
+        )
+        counts = {status: 0 for status in Patient.CaseStatus.values}
+        for row in rows:
+            counts[row["case_status"]] = row["total"]
+        return counts
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
