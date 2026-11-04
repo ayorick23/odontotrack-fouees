@@ -125,6 +125,8 @@ export function useOdontogramData(patientId: number) {
 
   return {
     value,
+    /** Lo último guardado: para contar las piezas con cambios. */
+    savedValue,
     onChange,
     save,
     undo,

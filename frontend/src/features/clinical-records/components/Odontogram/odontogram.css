@@ -89,8 +89,13 @@ select {
   color: #fff;
 }
 
+/* Margen izquierdo para los rótulos de fila (Vestibular / Oclusal).
+   Arriba y abajo iguales: la línea entre arcadas va al 50 % del alto. */
 .odontogram-fouees .tooth-grid {
-  padding: 0.75rem 0.5rem 1rem;
+  --odon-row-label: 5.75rem;
+  padding: 0.75rem 0.5rem 0.75rem var(--odon-row-label);
+  /* Más aire entre filas: el hueco entre arcadas lleva la línea. */
+  row-gap: 10px;
 }
 
 .odontogram-fouees .tooth-svg,
@@ -151,6 +156,89 @@ select {
 
 :is(.dark) .odontogram-fouees .tooth-label-cell {
   color: rgb(226 232 240);
+}
+
+/* ---------- Rediseño 2026-11 (maqueta aprobada, paso 4) ---------- */
+
+/* Línea media (entre 11|21 y 41|31) y línea entre arcadas. Las 16
+   columnas son iguales y las filas simétricas: el centro del área de
+   dientes cae justo entre ambas. */
+.odontogram-fouees .tooth-grid::before,
+.odontogram-fouees .tooth-grid::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  background: rgb(148 163 184);
+}
+
+.odontogram-fouees .tooth-grid::before {
+  top: 0.75rem;
+  bottom: 0.75rem;
+  width: 2px;
+  left: calc(var(--odon-row-label) + (100% - var(--odon-row-label) - 0.5rem) / 2 - 1px);
+}
+
+.odontogram-fouees .tooth-grid::after {
+  left: var(--odon-row-label);
+  right: 0.5rem;
+  top: calc(50% - 1px);
+  height: 2px;
+}
+
+:is(.dark) .odontogram-fouees .tooth-grid::before,
+:is(.dark) .odontogram-fouees .tooth-grid::after {
+  background: rgb(100 116 139);
+}
+
+/* Rótulo de cada fila, a la izquierda de su primera pieza. */
+.odontogram-fouees .tooth-tile.upper-row[data-tooth="18"]::before,
+.odontogram-fouees .tooth-tile.lower-row[data-tooth="48"]::before {
+  position: absolute;
+  top: 50%;
+  right: calc(100% + 0.5rem);
+  transform: translateY(-50%);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: rgb(148 163 184);
+  pointer-events: none;
+}
+
+.odontogram-fouees .tooth-tile.side-view[data-tooth="18"]::before,
+.odontogram-fouees .tooth-tile.side-view[data-tooth="48"]::before {
+  content: "Vestibular";
+}
+
+.odontogram-fouees .tooth-tile.occl-view[data-tooth="18"]::before,
+.odontogram-fouees .tooth-tile.occl-view[data-tooth="48"]::before {
+  content: "Oclusal";
+}
+
+/* Número de pieza según lo que tiene (toothLabels.ts). */
+.odontogram-fouees .tooth-label-cell[data-state="finding"] {
+  color: #e11d48;
+}
+
+.odontogram-fouees .tooth-label-cell[data-state="plan"] {
+  color: #7c3aed;
+}
+
+.odontogram-fouees .tooth-label-cell[data-state="done"] {
+  color: #0f766e;
+}
+
+:is(.dark) .odontogram-fouees .tooth-label-cell[data-state="finding"] {
+  color: #fb7185;
+}
+
+:is(.dark) .odontogram-fouees .tooth-label-cell[data-state="plan"] {
+  color: #a78bfa;
+}
+
+:is(.dark) .odontogram-fouees .tooth-label-cell[data-state="done"] {
+  color: #5eead4;
 }
 
 /* react-advanced-odontogram/style.css trae una regla `select { … }` global

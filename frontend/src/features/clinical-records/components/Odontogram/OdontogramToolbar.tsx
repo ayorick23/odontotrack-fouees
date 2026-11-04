@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { Check, ChevronLeft, ChevronRight, Plus, Search, X } from "lucide-react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import {
   ORAL_GENERAL_MARK_LABELS,
@@ -14,7 +15,6 @@ import {
   type OdontogramValue,
   type OdontogramView,
   type PracticeArea,
-  type ToothStatus,
 } from "../../types";
 import { clearChartSelection } from "./engine";
 import {
@@ -26,66 +26,22 @@ import {
   toggleStatus,
   toggleSurface,
 } from "./edits";
-import { OdontogramFieldSelect } from "./OdontogramFieldSelect";
+import { formatDoneAt } from "./formatDoneAt";
 import { OdontogramSurfaceDiagram } from "./OdontogramSurfaceDiagram";
-import { STATUS_SWATCH } from "./statusColors";
-
-const STATUS_BUTTON: Record<ToothStatus, string> = {
-  sano: "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300",
-  caries:
-    "border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-200",
-  fractura:
-    "border-red-200 bg-red-50 text-red-800 hover:bg-red-100 dark:border-red-800 dark:bg-red-950/50 dark:text-red-200",
-  obturado:
-    "border-violet-200 bg-violet-50 text-violet-800 hover:bg-violet-100 dark:border-violet-800 dark:bg-violet-950/50 dark:text-violet-200",
-  sellante:
-    "border-sky-200 bg-sky-50 text-sky-800 hover:bg-sky-100 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-200",
-  restauracion_temporal:
-    "border-orange-200 bg-orange-50 text-orange-800 hover:bg-orange-100 dark:border-orange-800 dark:bg-orange-950/50 dark:text-orange-200",
-  endodoncia:
-    "border-rose-200 bg-rose-50 text-rose-800 hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-950/50 dark:text-rose-200",
-  pulpotomia:
-    "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-200",
-  extraido:
-    "border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200",
-  raiz_retenida:
-    "border-stone-300 bg-stone-100 text-stone-700 hover:bg-stone-200 dark:border-stone-600 dark:bg-stone-800 dark:text-stone-200",
-  no_erupcionado:
-    "border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300",
-  ausente_congenito:
-    "border-slate-200 bg-white text-slate-500 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400",
-  corona:
-    "border-teal-200 bg-teal-50 text-teal-800 hover:bg-teal-100 dark:border-teal-800 dark:bg-teal-950/50 dark:text-teal-200",
-  puente:
-    "border-cyan-200 bg-cyan-50 text-cyan-800 hover:bg-cyan-100 dark:border-cyan-800 dark:bg-cyan-950/50 dark:text-cyan-200",
-  implante:
-    "border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200",
-};
-
-const PRESSED = "ring-2 ring-teal-500 ring-offset-1 dark:ring-offset-slate-900";
-
-const VIEW_HELP: Record<OdontogramView, string> = {
-  diagnostico:
-    "Lo que trae la pieza, incluidas restauraciones de antes. Cada botón marca o desmarca; Sano limpia el diagnóstico.",
-  plan:
-    "Elige el tratamiento del tarifario: se dibuja solo y la pieza queda en el banco de pacientes hasta marcarlo como realizado.",
-};
+import { STATUS_BORDER, STATUS_SWATCH } from "./statusColors";
+import { neighborTooth, toothName } from "./toothNames";
 
 /** El diagnóstico se guarda en la capa hallazgo. */
 const DIAGNOSIS_LAYER = "hallazgo";
 
 const MARKS = Object.keys(ORAL_GENERAL_MARK_LABELS) as OralGeneralMark[];
 
-const DONE_DATE = new Intl.DateTimeFormat("es-SV", {
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-});
+const SECTION_TITLE =
+  "mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500";
 
-/** "2026-11-01" → "1 nov 2026" (sin desfase de zona horaria). */
-function formatDoneAt(iso: string): string {
-  const [year, month, day] = iso.split("-").map(Number);
-  return DONE_DATE.format(new Date(year, month - 1, day));
+/** Sin acentos ni mayúsculas: "monorra" encuentra "Monorradicular". */
+function normalize(text: string): string {
+  return text.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
 }
 
 type OdontogramToolbarProps = {
@@ -97,6 +53,8 @@ type OdontogramToolbarProps = {
   clinicalAreas?: PracticeArea[];
   treatmentNames?: Record<string, string>;
   onClearFocus?: () => void;
+  /** Pasar a otra pieza (flechas ‹ ›). */
+  onFocusTooth?: (fdi: FdiToothNumber) => void;
 };
 
 export function OdontogramToolbar({
@@ -108,6 +66,7 @@ export function OdontogramToolbar({
   clinicalAreas = [],
   treatmentNames = {},
   onClearFocus,
+  onFocusTooth,
 }: OdontogramToolbarProps) {
   const focused =
     focusedFdi != null && isFdiToothNumber(focusedFdi)
@@ -127,57 +86,82 @@ export function OdontogramToolbar({
   const fdi = focused.fdi;
 
   return (
-    <div className="flex h-full flex-col gap-5">
-      <div>
-        <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
-          Diente {fdi}
-        </p>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-          {VIEW_HELP[view]}
-        </p>
+    <div className="flex flex-col">
+      <div className="flex items-center gap-1 border-b border-slate-100 pb-3 dark:border-slate-800">
+        {onFocusTooth ? (
+          <NavButton label="Pieza anterior" onClick={() => onFocusTooth(neighborTooth(fdi, -1))}>
+            <ChevronLeft className="size-4" aria-hidden="true" />
+          </NavButton>
+        ) : null}
+        <div className="min-w-0 flex-1 text-center">
+          <p className="text-base font-semibold text-slate-900 dark:text-white">Pieza {fdi}</p>
+          <p className="truncate text-xs text-slate-500 dark:text-slate-400">{toothName(fdi)}</p>
+        </div>
+        {onFocusTooth ? (
+          <NavButton label="Pieza siguiente" onClick={() => onFocusTooth(neighborTooth(fdi, 1))}>
+            <ChevronRight className="size-4" aria-hidden="true" />
+          </NavButton>
+        ) : null}
         {readOnly ? null : (
-          <button
-            type="button"
+          <NavButton
+            label="Quitar selección"
             onClick={() => {
               clearChartSelection();
               onClearFocus?.();
             }}
-            className="mt-2 text-xs font-semibold text-teal-700 hover:underline dark:text-teal-300"
           >
-            Borrar selección
-          </button>
+            <X className="size-4" aria-hidden="true" />
+          </NavButton>
         )}
       </div>
 
-      {view === "plan" ? (
-        <PlanSection
-          value={value}
-          fdi={fdi}
-          onChange={onChange}
-          readOnly={readOnly}
-          clinicalAreas={clinicalAreas}
-          treatmentNames={treatmentNames}
-        />
-      ) : (
-        <StatusSection
-          value={value}
-          fdi={fdi}
-          onChange={onChange}
-          readOnly={readOnly}
-        />
-      )}
-
-      {view === "plan" ? null : (
-        <HygieneSection
-          value={value}
-          fdi={fdi}
-          onChange={onChange}
-          readOnly={readOnly}
-          open={moreOpen}
-          onToggle={() => setMoreOpen((open) => !open)}
-        />
-      )}
+      <div className="flex flex-col gap-4 pt-4">
+        {view === "plan" ? (
+          <PlanSection
+            value={value}
+            fdi={fdi}
+            onChange={onChange}
+            readOnly={readOnly}
+            clinicalAreas={clinicalAreas}
+            treatmentNames={treatmentNames}
+          />
+        ) : (
+          <>
+            <StatusSection value={value} fdi={fdi} onChange={onChange} readOnly={readOnly} />
+            <HygieneSection
+              value={value}
+              fdi={fdi}
+              onChange={onChange}
+              readOnly={readOnly}
+              open={moreOpen}
+              onToggle={() => setMoreOpen((open) => !open)}
+            />
+          </>
+        )}
+      </div>
     </div>
+  );
+}
+
+function NavButton({
+  label,
+  onClick,
+  children,
+}: {
+  label: string;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      onClick={onClick}
+      className="flex size-8 shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+    >
+      {children}
+    </button>
   );
 }
 
@@ -210,37 +194,32 @@ function HygieneSection({
         {open ? "Ocultar higiene" : "Higiene: placa, sangrado, sarro"}
       </button>
       {open ? (
-        <div className="mt-3">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
-            Marcas del diente {fdi}
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {MARKS.map((mark) => {
-              const active = focusedOral[mark];
-              return (
-                <button
-                  key={mark}
-                  type="button"
-                  disabled={readOnly}
-                  aria-pressed={active}
-                  onClick={() =>
-                    onChange(
-                      updateTooth(value, fdi, {
-                        oralMarks: { ...focusedOral, [mark]: !active },
-                      }),
-                    )
-                  }
-                  className={`rounded-full border px-3 py-1.5 text-sm font-semibold transition disabled:opacity-50 ${
-                    active
-                      ? "border-teal-500 bg-teal-600 text-white"
-                      : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
-                  }`}
-                >
-                  {ORAL_GENERAL_MARK_LABELS[mark]}
-                </button>
-              );
-            })}
-          </div>
+        <div className="mt-2 grid grid-cols-3 gap-1.5">
+          {MARKS.map((mark) => {
+            const active = focusedOral[mark];
+            return (
+              <button
+                key={mark}
+                type="button"
+                disabled={readOnly}
+                aria-pressed={active}
+                onClick={() =>
+                  onChange(
+                    updateTooth(value, fdi, {
+                      oralMarks: { ...focusedOral, [mark]: !active },
+                    }),
+                  )
+                }
+                className={`rounded-lg px-2.5 py-2 text-xs font-medium transition disabled:opacity-50 ${
+                  active
+                    ? "bg-teal-700 text-white"
+                    : "bg-slate-50 text-slate-700 hover:bg-slate-100 dark:bg-slate-800/60 dark:text-slate-200 dark:hover:bg-slate-800"
+                }`}
+              >
+                {ORAL_GENERAL_MARK_LABELS[mark]}
+              </button>
+            );
+          })}
         </div>
       ) : null}
     </div>
@@ -261,26 +240,28 @@ function StatusSection({ value, fdi, onChange, readOnly }: SectionProps) {
     <>
       {TOOTH_STATUS_GROUPS.map((group) => (
         <div key={group.id}>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
-            {group.label}
+          <p className={SECTION_TITLE}>
+            {group.id === "tratamiento" ? "Tratamiento previo" : group.label}
           </p>
-          <div className="flex flex-wrap gap-2">
+          <div className="grid grid-cols-2 gap-1.5">
             {group.statuses.map((status) => {
-              const pressed = active.includes(status);
+              const pressed = status !== "sano" && active.includes(status);
               return (
                 <button
                   key={status}
                   type="button"
                   disabled={readOnly}
                   aria-pressed={status === "sano" ? undefined : pressed}
+                  title={status === "sano" ? "Marca la pieza como sana: limpia el diagnóstico" : undefined}
                   onClick={() => onChange(toggleStatus(value, fdi, layer, status))}
-                  className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${STATUS_BUTTON[status]} ${pressed ? PRESSED : ""}`}
+                  className={`flex items-center gap-2 rounded-lg border-l-[3px] px-2.5 py-2 text-left text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${STATUS_BORDER[status]} ${
+                    pressed
+                      ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900"
+                      : "bg-slate-50 text-slate-700 hover:bg-slate-100 dark:bg-slate-800/60 dark:text-slate-200 dark:hover:bg-slate-800"
+                  }`}
                 >
-                  <span
-                    className={`size-2 rounded-full ${STATUS_SWATCH[status]}`}
-                    aria-hidden="true"
-                  />
-                  {TOOTH_STATUS_LABELS[status]}
+                  <span className="min-w-0 flex-1 truncate">{TOOTH_STATUS_LABELS[status]}</span>
+                  {pressed ? <Check className="size-3.5 shrink-0" aria-hidden="true" /> : null}
                 </button>
               );
             })}
@@ -289,38 +270,42 @@ function StatusSection({ value, fdi, onChange, readOnly }: SectionProps) {
       ))}
 
       <div>
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
-          Superficies
-        </p>
-        <div className="mb-3 flex gap-1 rounded-full bg-white p-1 ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700">
-          {(["caries", "obturado"] as const).map((mode) => (
-            <button
-              key={mode}
-              type="button"
-              disabled={readOnly}
-              aria-pressed={surfaceMode === mode}
-              aria-label={`Modo superficie ${mode}`}
-              onClick={() => setSurfaceMode(mode)}
-              className={`flex-1 rounded-full px-2 py-1 text-xs font-semibold transition ${
-                surfaceMode === mode
-                  ? mode === "caries"
-                    ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200"
-                    : "bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-200"
-                  : "text-slate-500 dark:text-slate-400"
-              }`}
-            >
-              {TOOTH_STATUS_LABELS[mode]}
-            </button>
-          ))}
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <p className={SECTION_TITLE.replace("mb-1.5 ", "")}>Superficies</p>
+          <div className="flex gap-0.5 rounded-full bg-slate-100 p-0.5 dark:bg-slate-800">
+            {(["caries", "obturado"] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                disabled={readOnly}
+                aria-pressed={surfaceMode === mode}
+                aria-label={`Modo superficie ${mode}`}
+                onClick={() => setSurfaceMode(mode)}
+                className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold transition ${
+                  surfaceMode === mode
+                    ? "bg-white text-slate-800 shadow-sm dark:bg-slate-700 dark:text-white"
+                    : "text-slate-500 dark:text-slate-400"
+                }`}
+              >
+                <span className={`size-1.5 rounded-full ${STATUS_SWATCH[mode]}`} aria-hidden="true" />
+                {TOOTH_STATUS_LABELS[mode]}
+              </button>
+            ))}
+          </div>
         </div>
-        <OdontogramSurfaceDiagram
-          activeSurfaces={activeSurfaces}
-          disabled={readOnly}
-          mode={surfaceMode}
-          onToggle={(surface, on) =>
-            onChange(toggleSurface(value, fdi, layer, surfaceMode, surface, on))
-          }
-        />
+        <div className="rounded-xl bg-slate-50 py-3 dark:bg-slate-800/40">
+          <OdontogramSurfaceDiagram
+            activeSurfaces={activeSurfaces}
+            disabled={readOnly}
+            mode={surfaceMode}
+            onToggle={(surface, on) =>
+              onChange(toggleSurface(value, fdi, layer, surfaceMode, surface, on))
+            }
+          />
+        </div>
+        <p className="mt-1.5 text-center text-[11px] text-slate-400 dark:text-slate-500">
+          Clic en una superficie para marcar o quitar {TOOTH_STATUS_LABELS[surfaceMode].toLowerCase()}
+        </p>
       </div>
     </>
   );
@@ -337,10 +322,20 @@ function PlanSection({
   clinicalAreas: PracticeArea[];
   treatmentNames: Record<string, string>;
 }) {
-  const [areaSlug, setAreaSlug] = useState("");
-  const [treatmentSlug, setTreatmentSlug] = useState("");
-  const area = clinicalAreas.find((item) => item.slug === areaSlug);
-  const treatment = area?.treatments.find((item) => item.slug === treatmentSlug);
+  const [query, setQuery] = useState("");
+  const results = useMemo(() => {
+    const term = normalize(query.trim());
+    return clinicalAreas.flatMap((area) =>
+      area.treatments
+        .filter(
+          (treatment) =>
+            !term ||
+            normalize(treatment.name).includes(term) ||
+            normalize(area.name).includes(term),
+        )
+        .map((treatment) => ({ area, treatment })),
+    );
+  }, [clinicalAreas, query]);
   const marks = value.teeth.find((item) => item.fdi === fdi)?.marks ?? [];
   // Pendientes primero; los realizados quedan abajo, tachados.
   const planned = marks
@@ -350,93 +345,107 @@ function PlanSection({
 
   return (
     <>
-      <div className="flex flex-col gap-2">
-        <OdontogramFieldSelect
-          label="Área clínica"
-          placeholder="Seleccionar área"
-          disabled={readOnly}
-          value={areaSlug}
-          options={clinicalAreas.map((item) => ({ value: item.slug, label: item.name }))}
-          onChange={(next) => {
-            setAreaSlug(next);
-            setTreatmentSlug("");
-          }}
-        />
-        {area ? (
-          <OdontogramFieldSelect
-            label="Tratamiento"
-            placeholder="Seleccionar tratamiento"
-            disabled={readOnly}
-            value={treatmentSlug}
-            options={area.treatments.map((item) => ({
-              value: item.slug,
-              label: item.odontogramStatus ? item.name : `${item.name} (sin dibujo)`,
-            }))}
-            onChange={setTreatmentSlug}
-          />
-        ) : null}
-        <button
-          type="button"
-          disabled={readOnly || !treatment}
-          onClick={() => {
-            if (treatment) {
-              onChange(addPlannedTreatment(value, fdi, treatment));
-              setTreatmentSlug("");
-            }
-          }}
-          className="w-fit rounded-full bg-sky-600 px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          Agregar al plan
-        </button>
-      </div>
+      {readOnly ? null : (
+        <div>
+          <p className={SECTION_TITLE}>Agregar tratamiento</p>
+          <label className="flex h-10 items-center gap-2 rounded-xl bg-slate-100 px-3 text-sm ring-teal-600/40 transition focus-within:bg-white focus-within:ring-2 dark:bg-slate-800 dark:focus-within:bg-slate-900">
+            <Search className="size-4 shrink-0 text-slate-400" aria-hidden="true" />
+            <input
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Buscar en el tarifario… (endo, resina)"
+              aria-label="Buscar tratamiento en el tarifario"
+              className="w-full bg-transparent text-slate-800 outline-none placeholder:text-slate-400 dark:text-slate-100"
+            />
+          </label>
+          <ul className="mt-2 max-h-52 space-y-0.5 overflow-y-auto" aria-label="Tratamientos del tarifario">
+            {results.length === 0 ? (
+              <li className="px-2 py-3 text-center text-xs text-slate-400">
+                {clinicalAreas.length === 0 ? "Cargando tarifario…" : "Sin coincidencias en el tarifario"}
+              </li>
+            ) : (
+              results.map(({ area, treatment }) => (
+                <li key={treatment.slug}>
+                  <button
+                    type="button"
+                    aria-label={`Agregar ${treatment.name} al plan`}
+                    onClick={() => {
+                      onChange(addPlannedTreatment(value, fdi, treatment));
+                      setQuery("");
+                    }}
+                    className="group flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs transition hover:bg-teal-50 dark:hover:bg-teal-950/40"
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-medium text-slate-800 dark:text-slate-100">
+                        {treatment.name}
+                      </span>
+                      <span className="block text-[11px] text-slate-400">
+                        {area.name}
+                        {treatment.odontogramStatus ? "" : " · sin dibujo en la carta"}
+                      </span>
+                    </span>
+                    <Plus
+                      className="size-4 shrink-0 text-slate-300 transition group-hover:text-teal-700 dark:text-slate-600 dark:group-hover:text-teal-300"
+                      aria-hidden="true"
+                    />
+                  </button>
+                </li>
+              ))
+            )}
+          </ul>
+        </div>
+      )}
 
       <div>
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
-          Plan del diente {fdi}
-        </p>
+        <p className={SECTION_TITLE}>Plan de la pieza {fdi}</p>
         {planned.length === 0 ? (
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            Nada planificado en esta pieza.
+          <p className="rounded-xl bg-slate-50 px-3 py-4 text-center text-xs text-slate-500 dark:bg-slate-800/40 dark:text-slate-400">
+            Sin tratamientos para esta pieza.
           </p>
         ) : (
-          <ul className="flex flex-col gap-3">
+          <ul className="flex flex-col gap-1.5">
             {planned.map(({ mark, index }) => {
               const done = mark.layer === "hecho";
+              const name = formatToothMark(mark, treatmentNames) || "Sin tratamiento";
               return (
                 <li
                   key={`${index}-${mark.treatment ?? mark.status}`}
-                  className={`rounded-xl p-3 ring-1 ${
-                    done
-                      ? "bg-emerald-50/60 ring-emerald-200 dark:bg-emerald-950/30 dark:ring-emerald-900"
-                      : "bg-white ring-slate-200 dark:bg-slate-900 dark:ring-slate-700"
+                  className={`rounded-xl p-2.5 ${
+                    done ? "bg-teal-50 dark:bg-teal-950/40" : "bg-slate-50 dark:bg-slate-800/60"
                   }`}
                 >
-                  <p
-                    className={`text-sm font-semibold ${
-                      done
-                        ? "text-emerald-800 line-through decoration-1 dark:text-emerald-200"
-                        : "text-slate-700 dark:text-slate-100"
-                    }`}
-                  >
-                    {formatToothMark(mark, treatmentNames) || "Sin tratamiento"}
-                  </p>
-                  {done && mark.doneByName ? (
-                    <p className="mt-0.5 text-xs text-emerald-700 dark:text-emerald-300">
-                      Realizado por {mark.doneByName}
-                      {mark.doneAt ? ` · ${formatDoneAt(mark.doneAt)}` : ""}
-                    </p>
-                  ) : null}
-                  {done && !mark.doneByName ? (
-                    <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                      Se registra quién lo realizó al guardar.
-                    </p>
-                  ) : null}
-                  {mark.treatment ? null : (
-                    <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
-                      Sin tratamiento del tarifario: no aparece en el banco. Quítalo y
-                      agrega el tratamiento.
-                    </p>
-                  )}
+                  <div className="flex items-start gap-2.5">
+                    <div className="min-w-0 flex-1">
+                      <p
+                        className={`text-xs font-medium text-slate-800 dark:text-slate-100 ${
+                          done ? "line-through decoration-teal-700/40" : ""
+                        }`}
+                      >
+                        {name}
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                        {done
+                          ? mark.doneByName
+                            ? `Realizado por ${mark.doneByName}${mark.doneAt ? ` · ${formatDoneAt(mark.doneAt)}` : ""}`
+                            : "Se registra quién lo realizó al guardar."
+                          : mark.treatment
+                            ? "Pendiente · visible en el banco de pacientes"
+                            : "Sin tratamiento del tarifario: no aparece en el banco. Quítalo y agrega el tratamiento."}
+                      </p>
+                    </div>
+                    {readOnly ? null : (
+                      <button
+                        type="button"
+                        aria-label={`Quitar del plan: ${name}`}
+                        title="Quitar del plan"
+                        onClick={() => onChange(removeMark(value, fdi, index))}
+                        className="flex size-6 shrink-0 items-center justify-center rounded-md text-slate-400 transition hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40 dark:hover:text-rose-400"
+                      >
+                        <X className="size-3.5" aria-hidden="true" />
+                      </button>
+                    )}
+                  </div>
                   {!done && mark.status && SURFACE_STATUSES.includes(mark.status) ? (
                     <div className="mt-2">
                       <OdontogramSurfaceDiagram
@@ -449,28 +458,16 @@ function PlanSection({
                       />
                     </div>
                   ) : null}
-                  {readOnly ? null : (
-                    <div className="mt-2 flex items-center gap-4">
-                      {mark.treatment ? (
-                        <label className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200">
-                          <input
-                            type="checkbox"
-                            checked={done}
-                            onChange={(event) =>
-                              onChange(setDone(value, fdi, index, event.target.checked))
-                            }
-                          />
-                          Realizado
-                        </label>
-                      ) : null}
-                      <button
-                        type="button"
-                        onClick={() => onChange(removeMark(value, fdi, index))}
-                        className="text-xs font-semibold text-red-700 hover:underline dark:text-red-300"
-                      >
-                        Quitar
-                      </button>
-                    </div>
+                  {readOnly || !mark.treatment ? null : (
+                    <label className="mt-2 inline-flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200">
+                      <input
+                        type="checkbox"
+                        className="size-4 accent-teal-700"
+                        checked={done}
+                        onChange={(event) => onChange(setDone(value, fdi, index, event.target.checked))}
+                      />
+                      Realizado
+                    </label>
                   )}
                 </li>
               );
