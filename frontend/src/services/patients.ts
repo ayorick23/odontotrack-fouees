@@ -145,8 +145,13 @@ export type PatientAssignee = {
 
 export type DirectoryPeriod = "1m" | "6m" | "1a";
 
+/** Columnas por las que se puede ordenar el directorio; "-" = descendente. */
+export type DirectoryOrderField = "name" | "created_at";
+export type DirectoryOrdering = DirectoryOrderField | `-${DirectoryOrderField}`;
+
 export type ListPatientsParams = {
   page?: number;
+  ordering?: DirectoryOrdering;
   search?: string;
   caseStatus?: CaseStatus;
   clinicalArea?: string;
@@ -154,16 +159,22 @@ export type ListPatientsParams = {
   period?: DirectoryPeriod;
 } & PracticeFilters;
 
+/** Listado del directorio: además trae cuántos pacientes hay en cada estado
+ * con la búsqueda y los demás filtros (sin el filtro de estado). */
+export type PatientDirectoryResponse = PaginatedResponse<PatientListItem> & {
+  status_counts: Record<CaseStatus, number>;
+};
+
 export function listPatients(
   params: ListPatientsParams = {},
-): Promise<PaginatedResponse<PatientListItem>> {
+): Promise<PatientDirectoryResponse> {
   const query = directoryQuery(params);
   if (params.page && params.page > 1) {
     query.page = params.page;
   }
 
   return api
-    .get<PaginatedResponse<PatientListItem>>("/patients/", { params: query })
+    .get<PatientDirectoryResponse>("/patients/", { params: query })
     .then((response) => response.data);
 }
 
@@ -203,6 +214,9 @@ function directoryQuery(
   }
   if (params.period) {
     query.period = params.period;
+  }
+  if (params.ordering) {
+    query.ordering = params.ordering;
   }
   return { ...query, ...practiceQuery(params) };
 }

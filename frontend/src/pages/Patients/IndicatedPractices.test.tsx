@@ -22,9 +22,9 @@ describe("IndicatedPractices", () => {
         ]}
       />,
     );
-    expect(screen.getByText("11 · a")).toBeInTheDocument();
-    expect(screen.getByText("12 · b")).toBeInTheDocument();
-    expect(screen.queryByText("13 · c")).not.toBeInTheDocument();
+    expect(screen.getByTitle("11 · a")).toHaveTextContent("11 · a");
+    expect(screen.getByTitle("12 · b")).toBeInTheDocument();
+    expect(screen.queryByTitle("13 · c")).not.toBeInTheDocument();
     expect(screen.getByText("+2")).toHaveAttribute("title", "13 · c\n14 · d");
   });
 
@@ -34,8 +34,8 @@ describe("IndicatedPractices", () => {
         practices={[practice(18, "endo", true), practice(17, "resina")]}
       />,
     );
-    expect(screen.getByText("18 · endo").className).toContain("bg-teal-600");
-    expect(screen.getByText("17 · resina").className).not.toContain("bg-teal-600");
+    expect(screen.getByTitle("18 · endo").className).toContain("bg-teal-700");
+    expect(screen.getByTitle("17 · resina").className).not.toContain("bg-teal-700");
   });
 
   it("acepta dos tratamientos en la misma pieza", () => {
