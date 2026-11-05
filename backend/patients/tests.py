@@ -1802,6 +1802,21 @@ class DirectoryStatusCountsAndOrderingTests(APITestCase):
         self.assertEqual(self._names({"ordering": "dui"}), ["Bruno", "Ana", "Carla"])
         self.assertEqual(self._names({}), ["Bruno", "Ana", "Carla"])
 
+    def _available_names(self, params):
+        response = self.client.get("/api/patients/available/", params)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        return [row["first_name"] for row in response.json()["results"]]
+
+    def test_available_orders_by_waiting_time(self):
+        # Carla está finalizada: no aparece. Bruno lleva más días esperando.
+        self.assertEqual(self._available_names({"ordering": "created_at"}), ["Bruno", "Ana"])
+        self.assertEqual(self._available_names({"ordering": "-created_at"}), ["Ana", "Bruno"])
+        self.assertEqual(self._available_names({}), ["Bruno", "Ana"])
+
+    def test_available_filters_by_clinical_area(self):
+        self.assertEqual(self._available_names({"clinical_area": "operatoria"}), ["Ana"])
+        self.assertEqual(self._available_names({"clinical_area": "endodoncia"}), ["Bruno"])
+
     def test_export_uses_the_same_ordering(self):
         response = self.client.get("/api/patients/export/", {"ordering": "name"})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
