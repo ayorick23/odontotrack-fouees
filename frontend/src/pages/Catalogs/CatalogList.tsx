@@ -1,4 +1,4 @@
-import { BookOpen, Plus, Search, Trash2 } from "lucide-react";
+import { BookOpen, Plus, Search, Trash2 } from "../../components/icons";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
@@ -195,7 +195,7 @@ export function CatalogList() {
                       <div
                         className={`flex items-center gap-1 rounded-xl ${
                           selected
-                            ? "bg-teal-50 dark:bg-teal-950/40"
+                            ? "bg-lime-soft "
                             : "hover:bg-slate-50 dark:hover:bg-slate-800/80"
                         }`}
                       >
@@ -207,7 +207,7 @@ export function CatalogList() {
                           <p
                             className={`truncate text-sm font-medium ${
                               selected
-                                ? "text-teal-800 dark:text-teal-200"
+                                ? "text-lime-ink "
                                 : "text-slate-800 dark:text-slate-100"
                             }`}
                           >

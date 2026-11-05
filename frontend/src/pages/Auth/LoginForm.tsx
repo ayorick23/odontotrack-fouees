@@ -69,7 +69,7 @@ export function LoginForm({ onSwitch }: { onSwitch: () => void }) {
           <label className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
             <input
               type="checkbox"
-              className="size-4 rounded border-slate-300 accent-teal-700 dark:border-slate-600"
+              className="size-4 rounded border-slate-300 accent-action dark:border-slate-600"
               {...register("remember")}
             />
             Recuérdame
@@ -79,7 +79,7 @@ export function LoginForm({ onSwitch }: { onSwitch: () => void }) {
             aria-expanded={showResetHelp}
             aria-controls="reset-help"
             onClick={() => setShowResetHelp((open) => !open)}
-            className="font-medium text-teal-700 hover:text-teal-800 dark:text-teal-300"
+            className="font-medium text-lime-ink hover:text-lime-ink"
           >
             ¿Olvidaste tu contraseña?
           </button>
@@ -104,7 +104,7 @@ export function LoginForm({ onSwitch }: { onSwitch: () => void }) {
         <button
           type="button"
           onClick={onSwitch}
-          className="font-semibold text-teal-700 hover:text-teal-800 dark:text-teal-300"
+          className="font-semibold text-lime-ink hover:text-lime-ink"
         >
           Crear cuenta
         </button>

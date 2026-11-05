@@ -5,7 +5,7 @@ import {
   Loader2Icon,
   OctagonXIcon,
   TriangleAlertIcon,
-} from "lucide-react"
+} from "../icons"
 import { Toaster as Sonner, type ToasterProps } from "sonner"
 
 import { useTheme } from "@/hooks/useTheme"

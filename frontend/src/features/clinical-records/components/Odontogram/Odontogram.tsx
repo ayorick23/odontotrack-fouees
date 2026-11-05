@@ -312,7 +312,7 @@ export function Odontogram({
                     }
                   />
                   <span
-                    className="relative h-5 w-9 rounded-full bg-slate-200 transition peer-checked:bg-teal-700 peer-focus-visible:ring-2 peer-focus-visible:ring-teal-600/40 after:absolute after:top-0.5 after:left-0.5 after:size-4 after:rounded-full after:bg-white after:shadow after:transition peer-checked:after:translate-x-4 dark:bg-slate-700"
+                    className="relative h-5 w-9 rounded-full bg-slate-200 transition peer-checked:bg-action peer-focus-visible:ring-2 peer-focus-visible:ring-focus after:absolute after:top-0.5 after:left-0.5 after:size-4 after:rounded-full after:bg-white after:shadow after:transition peer-checked:after:translate-x-4 dark:bg-slate-700"
                     aria-hidden="true"
                   />
                   Dentición temporal / mixta
@@ -349,7 +349,7 @@ export function Odontogram({
                       onClick={() => focusTooth(fdi)}
                       className={`rounded-md px-2 py-1 text-xs font-semibold ring-1 ${
                         focusedFdi === fdi
-                          ? "bg-teal-600 text-white ring-teal-600"
+                          ? "bg-action text-on-action ring-lime-strong"
                           : "bg-white text-slate-600 ring-slate-200 dark:bg-slate-900 dark:text-slate-300 dark:ring-slate-700"
                       }`}
                     >

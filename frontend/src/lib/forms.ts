@@ -4,5 +4,5 @@ export const fieldInputClass =
 export function fieldBorder(hasError: boolean): string {
   return hasError
     ? "border-red-400 focus:border-red-500 dark:border-red-500"
-    : "border-slate-200 focus:border-[#2ad4c5] dark:border-slate-700";
+    : "border-slate-200 focus:border-action dark:border-slate-700";
 }

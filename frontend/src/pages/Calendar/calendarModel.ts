@@ -54,23 +54,24 @@ export const KIND_STYLE: Record<
 > = {
   programada: {
     label: APPOINTMENT_STATUS_LABELS.programada,
-    bar: "#0d9488",
-    chip: "bg-teal-50 text-teal-900 dark:bg-teal-950/60 dark:text-teal-100",
+    // Variable CSS: tinta en claro, lima en oscuro (usar solo en style).
+    bar: "var(--action)",
+    chip: "bg-slate-100 text-ink dark:bg-white/[.07] dark:text-white",
   },
   pendiente: {
     label: "Sin registrar",
     bar: "#d97706",
-    chip: "bg-amber-50 text-amber-900 dark:bg-amber-950/50 dark:text-amber-100",
+    chip: "bg-amber-50 text-amber-900 dark:bg-amber-500/15 dark:text-amber-100",
   },
   atendida: {
     label: APPOINTMENT_STATUS_LABELS.atendida,
-    bar: "#6250d6",
-    chip: "bg-violet-50 text-violet-900 dark:bg-violet-950/60 dark:text-violet-100",
+    bar: "#8b7fe8",
+    chip: "bg-lavender/15 text-ink dark:bg-lavender/20 dark:text-white",
   },
   cancelada: {
     label: APPOINTMENT_STATUS_LABELS.cancelada,
-    bar: "#94a3b8",
-    chip: "bg-slate-100 text-slate-500 dark:bg-slate-800/70 dark:text-slate-400",
+    bar: "#9c9b95",
+    chip: "bg-slate-50 text-slate-400 dark:bg-white/[.03] dark:text-slate-500",
   },
 };
 
@@ -166,4 +167,9 @@ export function appointmentsOn(appointments: Appointment[], day: Date): Appointm
 
 export function capitalize(text: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+/** Clave de día para marcar los que tienen citas ("2026-11-04"). */
+export function dayKey(date: Date): string {
+  return format(date, "yyyy-MM-dd");
 }

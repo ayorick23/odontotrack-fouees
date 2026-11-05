@@ -1,6 +1,7 @@
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
-import { Bell } from "lucide-react";
+import { Bell } from "./icons";
+import { ICON_BUTTON } from "./listing/styles";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -115,9 +116,9 @@ export function NotificationBell() {
           unread > 0 ? `Notificaciones (${unread} sin leer)` : "Notificaciones"
         }
         aria-expanded={open}
-        className="relative grid size-10 place-items-center rounded-full bg-white text-slate-500 transition-colors hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 dark:bg-slate-900 dark:text-slate-300 dark:hover:text-white"
+        className={`${ICON_BUTTON} anim-ring`}
       >
-        <Bell className="size-4" />
+        <Bell className="size-[17px]" />
         {unread > 0 ? (
           <span className="absolute -right-0.5 -top-0.5 min-w-4 rounded-full bg-rose-500 px-1 text-center text-[10px] font-semibold leading-4 text-white">
             {badge}
@@ -129,7 +130,7 @@ export function NotificationBell() {
         <div
           role="dialog"
           aria-label="Notificaciones"
-          className="absolute right-0 z-50 mt-2 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl bg-white shadow-lg ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-white/10"
+          className="anim-rise absolute right-0 z-50 mt-3 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl bg-white/75 shadow-[0_20px_50px_-16px_rgba(22,24,28,0.3)] ring-1 ring-ink/5 backdrop-blur-xl backdrop-saturate-150 [animation-duration:.25s] dark:bg-[#1f2228]/80 dark:ring-white/10"
         >
           <div className="flex items-center justify-between border-b border-slate-100 px-4 py-2.5 dark:border-slate-800">
             <p className="text-sm font-semibold text-slate-700 dark:text-slate-100">

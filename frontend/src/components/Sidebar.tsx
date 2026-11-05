@@ -1,20 +1,20 @@
 import {
-  BookOpen,
+  AddressBook,
+  Books,
   CalendarDays,
   ChevronDown,
   ChevronLeft,
-  ClipboardCheck,
-  ClipboardList,
-  FolderOpen,
-  GraduationCap,
+  Eye,
   Headset,
   LayoutDashboard,
   LogOut,
   Shield,
-  UserCog,
+  Student,
+  Tooth,
   UserPlus,
-  Users,
-} from "lucide-react";
+  UsersThree,
+  UserSwitch,
+} from "./icons";
 import { Tooltip } from "radix-ui";
 import { useEffect, useState, type ReactNode } from "react";
 import { NavLink, useLocation } from "react-router-dom";
@@ -46,6 +46,8 @@ const ROW = "h-10"; // ítem principal
 const SUB_ROW = "h-9"; // subítem de Pacientes
 const SECTION_ROW = "h-7"; // título de sección
 const ICON = "size-5 shrink-0";
+/** Íconos del menú: duotono (identidad 2026-11). */
+const ICON_WEIGHT = "duotone" as const;
 
 /** Contador junto al ítem: ámbar si pide acción, gris si es informativo. */
 type Badge = { count: number; alert: boolean };
@@ -64,8 +66,8 @@ function badgeFor(to: string, counters: MenuCounters | null): Badge | null {
 }
 
 /**
- * Menú lateral. Va pintado sobre el marco (mismo color que el fondo y la
- * barra superior, sin bordes); solo el panel de contenido se eleva.
+ * Menú lateral, liso y directo sobre el fondo desenfocado: los ítems no
+ * llevan caja; solo el activo va en píldora lima.
  * Se puede colapsar a íconos; la preferencia se recuerda en el navegador.
  */
 export function Sidebar({
@@ -103,7 +105,7 @@ export function Sidebar({
     };
   }, [user, location.pathname]);
 
-  const width = collapsed ? "w-[72px]" : "w-64";
+  const width = collapsed ? "w-[72px]" : "w-60";
 
   if (user === null) {
     return (
@@ -128,7 +130,7 @@ export function Sidebar({
           title={collapsed ? "Expandir menú" : "Colapsar menú"}
           aria-label={collapsed ? "Expandir menú" : "Colapsar menú"}
           aria-expanded={!collapsed}
-          className="absolute -right-3 top-[92px] z-10 grid size-6 cursor-pointer place-items-center rounded-full bg-white text-slate-500 shadow-[0_2px_8px_rgba(15,23,42,0.15)] transition hover:text-teal-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 dark:bg-slate-800 dark:text-slate-300 dark:hover:text-teal-300"
+          className="press absolute -right-3 top-[92px] z-10 grid size-6 cursor-pointer place-items-center rounded-full bg-white text-slate-500 shadow-[0_2px_8px_rgba(22,24,28,0.15)] transition hover:bg-lime hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-lime dark:hover:text-ink"
         >
           <ChevronLeft
             className={`size-3.5 transition-transform duration-200 ${collapsed ? "rotate-180" : ""}`}
@@ -159,7 +161,7 @@ export function Sidebar({
                   {collapsed ? (
                     <span className="h-px w-5 bg-slate-300 dark:bg-slate-700" aria-hidden="true" />
                   ) : (
-                    <p className="whitespace-nowrap text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                    <p className="whitespace-nowrap text-[10.5px] font-semibold uppercase tracking-[.14em] text-slate-400 dark:text-slate-500">
                       {section.label}
                     </p>
                   )}
@@ -209,7 +211,7 @@ export function Sidebar({
               onClick={onLogout}
               aria-label="Cerrar sesión"
               title="Cerrar sesión"
-              className="ml-auto grid size-8 shrink-0 cursor-pointer place-items-center rounded-lg text-slate-400 transition-colors hover:bg-white hover:text-slate-700 dark:hover:bg-slate-900 dark:hover:text-slate-200"
+              className="press anim-out glass-chip ml-auto grid size-8 shrink-0 cursor-pointer place-items-center rounded-full text-slate-500 transition-colors hover:bg-white hover:text-ink dark:hover:bg-white/10 dark:hover:text-white"
             >
               <LogOut className="size-4" />
             </button>
@@ -242,7 +244,7 @@ export function initials(user: AuthUser): string {
 export function Avatar({ user, size = "size-9" }: { user: AuthUser; size?: string }) {
   return (
     <span
-      className={`grid ${size} shrink-0 place-items-center rounded-full bg-gradient-to-br from-teal-500 to-cyan-600 text-sm font-semibold text-white`}
+      className={`grid ${size} shrink-0 place-items-center rounded-full bg-lavender text-sm font-semibold text-ink`}
       aria-hidden="true"
     >
       {initials(user)}
@@ -273,7 +275,7 @@ function WithTooltip({
         <Tooltip.Content
           side="right"
           sideOffset={12}
-          className="z-50 rounded-lg bg-slate-900 px-2.5 py-1 text-xs font-medium text-white shadow-lg dark:bg-slate-700"
+          className="z-50 rounded-full bg-ink px-2.5 py-1 text-xs font-medium text-white shadow-lg dark:bg-lime dark:text-ink"
         >
           {label}
         </Tooltip.Content>
@@ -289,17 +291,15 @@ function BadgeView({ badge, collapsed }: { badge: Badge | null; collapsed: boole
   if (collapsed) {
     return (
       <span
-        className={`absolute right-2.5 top-2 size-2 rounded-full ring-2 ring-slate-100 dark:ring-slate-950 ${badge.alert ? "bg-amber-400" : "bg-slate-400"}`}
+        className={`absolute right-2.5 top-2 size-2 rounded-full ring-2 ring-[#e9e8e3] dark:ring-slate-950 ${badge.alert ? "bg-amber-400" : "bg-ink dark:bg-lime"}`}
         aria-hidden="true"
       />
     );
   }
   return (
     <span
-      className={`ml-auto rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums ${
-        badge.alert
-          ? "bg-amber-400 text-amber-950"
-          : "bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-200"
+      className={`num ml-auto rounded-full px-1.5 py-px text-[10.5px] font-bold ${
+        badge.alert ? "bg-amber-400 text-amber-950" : "bg-ink text-lime"
       }`}
     >
       {badge.count}
@@ -308,11 +308,12 @@ function BadgeView({ badge, collapsed }: { badge: Badge | null; collapsed: boole
 }
 
 const ITEM =
-  "relative flex w-full cursor-pointer items-center gap-3 rounded-xl px-3.5 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500";
+  "press anim-nudge relative flex w-full cursor-pointer items-center gap-3 rounded-full px-3.5 text-[13.5px] font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus";
+// Liso: sin caja; al pasar el mouse, un velo blanco muy suave.
 const ITEM_IDLE =
-  "text-slate-600 hover:bg-white hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-slate-100";
-// Teal profundo: el teal claro de la marca no contrasta con texto blanco.
-const ITEM_ACTIVE = "bg-teal-700 text-white shadow-sm shadow-teal-900/20";
+  "text-slate-600 hover:bg-white/45 hover:text-ink dark:text-slate-400 dark:hover:bg-white/[.06] dark:hover:text-white";
+// Activo: píldora lima con texto tinta (igual en claro y oscuro).
+const ITEM_ACTIVE = "bg-lime text-ink shadow-[0_8px_20px_-10px_rgba(150,180,20,.9)]";
 
 function PatientsGroup({
   entry,
@@ -348,12 +349,10 @@ function PatientsGroup({
           aria-expanded={open}
           aria-label={collapsed ? entry.label : undefined}
           className={`${ITEM} ${ROW} text-left ${
-            childActive && !open
-              ? "bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100"
-              : ITEM_IDLE
+            childActive && !open ? ITEM_ACTIVE : ITEM_IDLE
           }`}
         >
-          <FolderOpen className={ICON} />
+          <Tooth className={ICON} weight={ICON_WEIGHT} />
           <span className={`whitespace-nowrap transition-opacity duration-150 ${collapsed ? "opacity-0" : ""}`}>
             {entry.label}
           </span>
@@ -369,7 +368,7 @@ function PatientsGroup({
         // alineados con el resto para que todos los íconos formen una columna.
         <div
           className={`mt-0.5 flex flex-col gap-0.5 ${
-            collapsed ? "" : "ml-[23px] border-l border-slate-200 pl-2 dark:border-slate-800"
+            collapsed ? "" : "ml-[23px] border-l border-ink/10 pl-2 dark:border-white/10"
           }`}
         >
           {children.map((child) => (
@@ -409,6 +408,10 @@ function SidebarLink({
       <NavLink
         to={to}
         end={to === "/patients"}
+        // View Transition: el ítem activo se llama "nav-pill", así la píldora
+        // lima se desliza del ítem anterior al nuevo (index.css).
+        viewTransition
+        style={({ isActive }) => (isActive ? { viewTransitionName: "nav-pill" } : undefined)}
         aria-label={collapsed ? label : undefined}
         className={({ isActive }) => `${ITEM} ${row} ${isActive ? ITEM_ACTIVE : ITEM_IDLE}`}
       >
@@ -427,30 +430,30 @@ function SidebarLink({
 function navIcon(icon: Exclude<NavEntry["icon"], "patients">): ReactNode {
   switch (icon) {
     case "dashboard":
-      return <LayoutDashboard className={ICON} />;
+      return <LayoutDashboard className={ICON} weight={ICON_WEIGHT} />;
     case "calendar":
-      return <CalendarDays className={ICON} />;
+      return <CalendarDays className={ICON} weight={ICON_WEIGHT} />;
     case "supervision":
-      return <ClipboardCheck className={ICON} />;
+      return <Eye className={ICON} weight={ICON_WEIGHT} />;
     case "students":
-      return <GraduationCap className={ICON} />;
+      return <Student className={ICON} weight={ICON_WEIGHT} />;
     case "users":
-      return <UserCog className={ICON} />;
+      return <UsersThree className={ICON} weight={ICON_WEIGHT} />;
     case "roles":
-      return <Shield className={ICON} />;
+      return <Shield className={ICON} weight={ICON_WEIGHT} />;
     case "catalogs":
-      return <BookOpen className={ICON} />;
+      return <Books className={ICON} weight={ICON_WEIGHT} />;
     case "support":
-      return <Headset className={ICON} />;
+      return <Headset className={ICON} weight={ICON_WEIGHT} />;
   }
 }
 
 function childIcon(to: string): ReactNode {
   if (to === "/patients/new") {
-    return <UserPlus className={ICON} />;
+    return <UserPlus className={ICON} weight={ICON_WEIGHT} />;
   }
   if (to === "/assignments") {
-    return <ClipboardList className={ICON} />;
+    return <UserSwitch className={ICON} weight={ICON_WEIGHT} />;
   }
-  return <Users className={ICON} />;
+  return <AddressBook className={ICON} weight={ICON_WEIGHT} />;
 }

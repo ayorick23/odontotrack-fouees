@@ -59,9 +59,9 @@ export function AuthPage() {
   return (
     // Pantalla completa: formulario y panel ocupan media pantalla cada uno;
     // el panel deja un margen leve y tiene esquinas redondeadas.
-    <div className="relative min-h-svh overflow-hidden bg-white dark:bg-slate-900">
+    <div className="relative min-h-svh overflow-hidden bg-surface">
       <div className="absolute right-5 top-5 z-30">
-        <ThemeToggle />
+        <ThemeToggle className="glass-chip size-10" />
       </div>
 
       <div className="relative min-h-svh md:h-svh">
@@ -128,21 +128,25 @@ function BrandPanel({
 }) {
   return (
     <div
-      className={`relative isolate h-full overflow-hidden rounded-[28px] bg-teal-950 text-white ${
+      // Claro: base arena con manchas pastel y texto tinta. Oscuro: tinta con
+      // manchas intensas y texto blanco.
+      className={`relative isolate h-full overflow-hidden rounded-[28px] bg-[#f1f0ea] text-ink dark:bg-ink dark:text-white ${
         compact ? "px-6 py-6" : "p-12 lg:p-16"
       }`}
     >
       {/* Manchas de color difuminadas: el "degradado" del panel. */}
-      <div className="absolute -left-[10%] -top-[15%] -z-10 aspect-square w-[70%] rounded-full bg-teal-400/70 blur-[90px]" />
-      <div className="absolute -right-[15%] top-[30%] -z-10 aspect-square w-[55%] rounded-full bg-cyan-300/45 blur-[90px]" />
-      <div className="absolute -bottom-[25%] left-[15%] -z-10 aspect-square w-[75%] rounded-full bg-sky-600/70 blur-[100px]" />
-      <div className="absolute inset-0 -z-10 bg-gradient-to-t from-teal-950/70 via-transparent to-transparent" />
+      <div className="absolute -left-[10%] -top-[15%] -z-10 aspect-square w-[70%] rounded-full bg-lime/80 blur-[90px] dark:bg-lime/70" />
+      <div className="absolute -right-[15%] top-[30%] -z-10 aspect-square w-[55%] rounded-full bg-[#b9c6ff]/70 blur-[90px] dark:bg-[#8fa3ff]/45" />
+      <div className="absolute -bottom-[25%] left-[15%] -z-10 aspect-square w-[75%] rounded-full bg-[#d8c3f0]/75 blur-[100px] dark:bg-[#c9a8f0]/55" />
+      <div className="absolute -right-[10%] -bottom-[15%] -z-10 aspect-square w-[45%] rounded-full bg-[#f6c7b4]/60 blur-[90px] dark:bg-[#f6c7b4]/35" />
+      <div className="absolute -left-[15%] bottom-[10%] -z-10 aspect-square w-[40%] rounded-full bg-[#bfe2a6]/60 blur-[90px] dark:hidden" />
+      <div className="absolute inset-0 -z-10 bg-gradient-to-t from-white/55 via-transparent to-transparent dark:from-ink/70" />
 
       <div
         className={`flex h-full ${compact ? "items-center gap-4" : "flex-col justify-between"}`}
       >
         <div className="flex items-center gap-3">
-          <span className="grid size-14 place-items-center rounded-full bg-white/95 p-2 shadow-lg shadow-teal-950/30">
+          <span className="grid size-14 place-items-center rounded-full bg-white p-2 shadow-lg shadow-ink/15 dark:bg-white/95 dark:shadow-ink/30">
             <img
               src={logoSello}
               alt="Universidad Evangélica de El Salvador"
@@ -151,7 +155,7 @@ function BrandPanel({
           </span>
           <div>
             <p className="text-lg font-semibold tracking-tight">OdontoTrack</p>
-            <p className="text-xs text-white/75">FOUEES</p>
+            <p className="text-xs text-ink/60 dark:text-white/75">FOUEES</p>
           </div>
         </div>
 
@@ -161,13 +165,13 @@ function BrandPanel({
             key={mode}
             className="animate-in fade-in slide-in-from-bottom-2 duration-700 motion-reduce:animate-none"
           >
-            <p className="text-sm font-medium text-white/80">
+            <p className="text-sm font-medium text-ink/70 dark:text-white/80">
               {PANEL_TEXT[mode].kicker}
             </p>
-            <p className="mt-3 max-w-md text-4xl font-semibold leading-tight tracking-tight">
+            <p className="mt-3 max-w-md text-4xl font-bold leading-tight tracking-[-0.03em]">
               {PANEL_TEXT[mode].title}
             </p>
-            <p className="mt-6 text-xs text-white/60">
+            <p className="mt-6 text-xs text-ink/55 dark:text-white/60">
               2026 © Sistema FOUEES - Facultad de Odontología UEES
             </p>
           </div>

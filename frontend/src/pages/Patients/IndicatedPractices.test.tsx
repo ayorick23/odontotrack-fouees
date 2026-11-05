@@ -34,8 +34,8 @@ describe("IndicatedPractices", () => {
         practices={[practice(18, "endo", true), practice(17, "resina")]}
       />,
     );
-    expect(screen.getByTitle("18 · endo").className).toContain("bg-teal-700");
-    expect(screen.getByTitle("17 · resina").className).not.toContain("bg-teal-700");
+    expect(screen.getByTitle("18 · endo").className).toContain("bg-action");
+    expect(screen.getByTitle("17 · resina").className).not.toContain("bg-action");
   });
 
   it("acepta dos tratamientos en la misma pieza", () => {

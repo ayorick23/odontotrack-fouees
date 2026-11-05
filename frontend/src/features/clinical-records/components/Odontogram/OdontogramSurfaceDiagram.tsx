@@ -58,7 +58,7 @@ export function OdontogramSurfaceDiagram({
                 ? mode === "caries"
                   ? "border-amber-400 bg-amber-100 text-amber-800 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200"
                   : "border-violet-400 bg-violet-100 text-violet-800 dark:border-violet-700 dark:bg-violet-950 dark:text-violet-200"
-                : "border-slate-200 bg-white text-slate-600 hover:border-teal-300 hover:text-teal-700 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300"
+                : "border-slate-200 bg-white text-slate-600 hover:border-lime-strong hover:text-lime-ink dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300"
             }`}
           >
             {TOOTH_SURFACE_CODES[zone.surface]}

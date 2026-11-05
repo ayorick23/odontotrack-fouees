@@ -1,8 +1,8 @@
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff } from "../../components/icons";
 import { forwardRef, useId, useState, type InputHTMLAttributes, type ReactNode } from "react";
 
 const INPUT =
-  "w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-100 dark:focus:border-teal-400";
+  "w-full rounded-xl border border-transparent bg-slate-100 px-3.5 py-2.5 text-sm text-ink outline-none transition placeholder:text-slate-400 hover:bg-slate-200/70 focus:bg-white focus:ring-2 focus:ring-focus dark:bg-white/[.06] dark:text-slate-100 dark:hover:bg-white/[.09] dark:focus:bg-white/[.08]";
 
 type AuthFieldProps = InputHTMLAttributes<HTMLInputElement> & {
   label: string;
@@ -65,4 +65,4 @@ export const AuthField = forwardRef<HTMLInputElement, AuthFieldProps>(function A
 });
 
 export const PRIMARY_BUTTON =
-  "w-full rounded-xl bg-teal-700 py-2.5 text-sm font-semibold text-white shadow-sm shadow-teal-900/20 transition hover:bg-teal-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-teal-500/30 disabled:cursor-not-allowed disabled:opacity-60";
+  "w-full rounded-xl bg-action py-2.5 text-sm font-semibold text-on-action shadow-sm shadow-ink/20 transition hover:bg-action-hover focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-focus disabled:cursor-not-allowed disabled:opacity-60";

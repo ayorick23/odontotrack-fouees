@@ -1,4 +1,4 @@
-import { Check, Undo2, X } from "lucide-react";
+import { Check, Undo2, X } from "../../../../components/icons";
 import { useState } from "react";
 
 import {
@@ -248,7 +248,7 @@ function RecordRowView({
     <tr
       onClick={onLocate}
       className={`group cursor-pointer border-t border-slate-100 transition hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/40 ${
-        focused ? "bg-teal-50/60 dark:bg-teal-950/30" : ""
+        focused ? "bg-lime-soft " : ""
       }`}
     >
       <td className="px-4 py-2.5">
@@ -278,7 +278,7 @@ function RecordRowView({
       <td className="px-3 py-2.5">
         <span
           className={`font-medium text-slate-800 dark:text-slate-100 ${
-            done ? "line-through decoration-teal-700/40" : ""
+            done ? "line-through decoration-lime-ink/40" : ""
           }`}
         >
           {row.description}
@@ -305,7 +305,7 @@ function RecordRowView({
                 className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold transition ${
                   done
                     ? "text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
-                    : "text-teal-700 hover:bg-teal-50 dark:text-teal-300 dark:hover:bg-teal-950/40"
+                    : "text-lime-ink hover:bg-lime-soft "
                 }`}
               >
                 {done ? (
@@ -352,7 +352,7 @@ function KindLabel({ kind }: { kind: RecordKind }) {
     <span className="inline-flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300">
       <span
         className={`size-2 rounded-full ${
-          kind === "realizado" ? "bg-teal-600" : "border-2 border-dashed border-violet-500"
+          kind === "realizado" ? "bg-action" : "border-2 border-dashed border-violet-500"
         }`}
         aria-hidden="true"
       />
@@ -384,7 +384,7 @@ function StateLabel({ row }: { row: RecordRow }) {
   }
   const by = row.mark?.doneByName;
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-teal-50 px-2 py-0.5 text-xs font-medium text-teal-800 dark:bg-teal-950/60 dark:text-teal-200">
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-lime-soft px-2 py-0.5 text-xs font-medium text-lime-ink">
       <Check className="size-3" aria-hidden="true" />
       {by
         ? `${by}${row.mark?.doneAt ? ` · ${formatDoneAt(row.mark.doneAt)}` : ""}`

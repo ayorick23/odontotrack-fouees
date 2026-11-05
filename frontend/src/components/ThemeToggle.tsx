@@ -1,10 +1,15 @@
-import { Moon, Sun } from "lucide-react";
+import { Moon, Sun } from "./icons";
 
 import { useTheme } from "../hooks/useTheme";
+import { ICON_BUTTON } from "./listing/styles";
 
-export function ThemeToggle() {
+/** Sol y luna están siempre montados: al cambiar, uno gira y se encoge
+ * mientras el otro entra girando (respeta "reducir movimiento"). */
+export function ThemeToggle({ className = "" }: { className?: string }) {
   const { theme, toggleTheme } = useTheme();
   const isDark = theme === "dark";
+  const icon =
+    "absolute size-[17px] transition-[transform,opacity] duration-500 ease-[cubic-bezier(.2,.8,.2,1)] motion-reduce:transition-none";
 
   return (
     <button
@@ -13,9 +18,16 @@ export function ThemeToggle() {
       title={isDark ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
       aria-label={isDark ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
       aria-pressed={isDark}
-      className="grid size-10 place-items-center rounded-full bg-white text-slate-500 transition-colors hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 dark:bg-slate-900 dark:text-slate-300 dark:hover:text-white"
+      className={`${ICON_BUTTON} ${className}`}
     >
-      {isDark ? <Sun className="size-4" /> : <Moon className="size-4" />}
+      <Moon
+        aria-hidden="true"
+        className={`${icon} ${isDark ? "rotate-90 scale-50 opacity-0" : "rotate-0 scale-100 opacity-100"}`}
+      />
+      <Sun
+        aria-hidden="true"
+        className={`${icon} ${isDark ? "rotate-0 scale-100 opacity-100" : "-rotate-90 scale-50 opacity-0"}`}
+      />
     </button>
   );
 }

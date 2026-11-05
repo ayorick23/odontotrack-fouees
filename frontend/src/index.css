@@ -3,6 +3,38 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* ==========================================================================
+   Identidad visual OdontoTrack (2026-11): vidrio sobre fondo desenfocado,
+   tinta + lima. Ver maqueta aprobada "identidad-vidrio-v2".
+   ========================================================================== */
+@theme {
+  /* Satoshi (Fontshare, se carga en index.html); mientras carga, la del sistema. */
+  --font-sans: "Satoshi", ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+
+  /* Colores de marca: fijos en claro y oscuro. */
+  --color-ink: #16181c;
+  --color-lime: #dcf26a;
+  --color-lime-strong: #c8e43c;
+  --color-lavender: #8b7fe8;
+  --color-sand: #ecebe6;
+  --color-olive: #5f7a00;
+
+  /* "slate" se redefine como gris neutro (antes azulado de Tailwind): así
+     todo el código existente (text-slate-500, bg-slate-100…) combina con
+     la tinta y el lima sin tocar las clases. */
+  --color-slate-50: #f7f7f4;
+  --color-slate-100: #eeede8;
+  --color-slate-200: #e1e0da;
+  --color-slate-300: #c8c7c0;
+  --color-slate-400: #9c9b95;
+  --color-slate-500: #74736e;
+  --color-slate-600: #56565a;
+  --color-slate-700: #3c3d41;
+  --color-slate-800: #26282d;
+  --color-slate-900: #181b20;
+  --color-slate-950: #0e1013;
+}
+
 @theme inline {
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
@@ -26,75 +58,101 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --color-brand: #2ad4c5;
-  --color-brand-hover: #24c4b6;
+
+  /* Tokens semánticos: cambian solos entre claro y oscuro (no hace falta dark:). */
+  --color-action: var(--action); /* botón principal: tinta / lima */
+  --color-action-hover: var(--action-hover);
+  --color-on-action: var(--on-action); /* texto sobre action */
+  --color-lime-soft: var(--lime-soft); /* fondo suave de resaltado */
+  --color-lime-ink: var(--lime-ink); /* texto/enlace de acento: oliva / lima */
+  --color-focus: var(--focus); /* anillo de foco */
+  --color-surface: var(--surface); /* bloque sólido (tablas, formularios) */
+  /* Compatibilidad: lo que aún use bg-brand es la acción principal. */
+  --color-brand: var(--action);
+  --color-brand-hover: var(--action-hover);
 }
 
 :root {
   --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  --action: #16181c;
+  --action-hover: #000000;
+  --on-action: #ffffff;
+  --lime-soft: rgb(220 242 106 / 0.38);
+  --lime-ink: #4f6500;
+  --focus: rgb(22 24 28 / 0.22);
+  --surface: #ffffff;
+
+  --background: #ffffff;
+  --foreground: #16181c;
+  --card: #ffffff;
+  --card-foreground: #16181c;
+  --popover: #ffffff;
+  --popover-foreground: #16181c;
+  --primary: #16181c;
+  --primary-foreground: #ffffff;
+  --secondary: #eeede8;
+  --secondary-foreground: #16181c;
+  --muted: #eeede8;
+  --muted-foreground: #74736e;
+  --accent: #eeede8;
+  --accent-foreground: #16181c;
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --toast-success-bg: #e8faf7;
-  --toast-success-text: #0f766e;
-  --toast-success-border: #99f6e4;
+  --border: #e1e0da;
+  --input: #e1e0da;
+  --ring: #9c9b95;
+  --toast-success-bg: #f5fbd9;
+  --toast-success-text: #3f5200;
+  --toast-success-border: #dcf26a;
   --toast-warning-bg: #fff7ed;
   --toast-warning-text: #c2410c;
   --toast-warning-border: #fed7aa;
   --toast-error-bg: #fef2f2;
   --toast-error-text: #b91c1c;
   --toast-error-border: #fecaca;
-  --toast-info-bg: #f1f5f9;
-  --toast-info-text: #334155;
-  --toast-info-border: #e2e8f0;
+  --toast-info-bg: #f7f7f4;
+  --toast-info-text: #3c3d41;
+  --toast-info-border: #e1e0da;
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
+  --action: #dcf26a;
+  --action-hover: #c8e43c;
+  --on-action: #16181c;
+  --lime-soft: rgb(220 242 106 / 0.1);
+  --lime-ink: #dcf26a;
+  --focus: rgb(220 242 106 / 0.45);
+  --surface: #1f2228;
+
+  --background: #0e1013;
+  --foreground: #eceef1;
+  --card: #181b20;
+  --card-foreground: #eceef1;
+  --popover: #1d2026;
+  --popover-foreground: #eceef1;
+  --primary: #dcf26a;
+  --primary-foreground: #16181c;
+  --secondary: #26282d;
+  --secondary-foreground: #eceef1;
+  --muted: #26282d;
+  --muted-foreground: #9c9b95;
+  --accent: #26282d;
+  --accent-foreground: #eceef1;
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --toast-success-bg: #134e4a;
-  --toast-success-text: #99f6e4;
-  --toast-success-border: #115e59;
+  --border: rgb(255 255 255 / 0.08);
+  --input: rgb(255 255 255 / 0.12);
+  --ring: #74736e;
+  --toast-success-bg: #2a3108;
+  --toast-success-text: #e6f59a;
+  --toast-success-border: #4f6500;
   --toast-warning-bg: #7c2d12;
   --toast-warning-text: #fed7aa;
   --toast-warning-border: #9a3412;
   --toast-error-bg: #450a0a;
   --toast-error-text: #fca5a5;
   --toast-error-border: #7f1d1d;
-  --toast-info-bg: #1e293b;
-  --toast-info-text: #cbd5e1;
-  --toast-info-border: #334155;
+  --toast-info-bg: #1d2026;
+  --toast-info-text: #c8c7c0;
+  --toast-info-border: #26282d;
 }
 
 html,
@@ -103,37 +161,334 @@ body,
   min-height: 100%;
 }
 
-body {
+/* "html body" y no "body": la librería del odontograma trae
+   `body{font-family: system-ui…; background: radial-gradient(…)}` sin capa,
+   que al abrir una ficha cambiaba la fuente de toda la app. */
+html body {
   margin: 0;
-  background-color: #eef3f8;
-  color: #1e293b;
+  background: #e9e8e3;
+  color: #16181c;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
 }
 
 html.dark body {
-  background-color: #020617;
-  color: #f1f5f9;
+  background: #0e1013;
+  color: #eceef1;
+}
+
+/* Cifras: dígitos de ancho fijo y algo más juntos (KPI, tablas). */
+.num {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+}
+
+/* ---------- Fondo: manchas desenfocadas + grano (AppBackground) ---------- */
+.app-scene {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background: #e9e8e3;
+}
+.dark .app-scene {
+  background: #0e1013;
+}
+.app-blob {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(80px);
+}
+.app-blob-1 {
+  width: 46vw;
+  height: 46vw;
+  right: -8vw;
+  bottom: -14vw;
+  background: radial-gradient(circle at 30% 30%, #8fa3ff, #c9a8f0 50%, #f6c7b4 62%, transparent 72%);
+  animation: app-drift 26s ease-in-out infinite alternate;
+}
+.app-blob-2 {
+  width: 36vw;
+  height: 36vw;
+  left: -10vw;
+  bottom: -12vw;
+  background: radial-gradient(circle, #bfe2a6, transparent 68%);
+  animation: app-drift 32s ease-in-out infinite alternate-reverse;
+}
+.app-blob-3 {
+  width: 26vw;
+  height: 26vw;
+  right: 22vw;
+  top: -10vw;
+  opacity: 0.9;
+  background: radial-gradient(circle, #e9f57a, transparent 66%);
+  animation: app-drift 22s ease-in-out infinite alternate;
+}
+.dark .app-blob-1 {
+  opacity: 0.7;
+  background: radial-gradient(circle at 30% 30%, #2c3a7a, #4a2d63 55%, transparent 70%);
+}
+.dark .app-blob-2 {
+  opacity: 0.8;
+  background: radial-gradient(circle, #2d4a1c, transparent 68%);
+}
+.dark .app-blob-3 {
+  opacity: 0.45;
+  background: radial-gradient(circle, #59661c, transparent 66%);
+}
+@keyframes app-drift {
+  to {
+    transform: translate(-4vw, -3vw) scale(1.08);
+  }
+}
+.app-grain {
+  position: absolute;
+  inset: -50%;
+  opacity: 0.16;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.dark .app-grain {
+  mix-blend-mode: screen;
+  opacity: 0.07;
+}
+
+@layer components {
+  /* Vidrio: solo para contenedores. El texto denso va sobre bg-surface. */
+  .glass {
+    background: rgb(255 255 255 / 0.34);
+    backdrop-filter: blur(28px) saturate(1.4);
+    -webkit-backdrop-filter: blur(28px) saturate(1.4);
+    /* Sin borde ni brillo interior: se separa del fondo solo por opacidad. */
+    box-shadow: 0 20px 50px -28px rgb(30 30 40 / 0.22);
+  }
+  .dark .glass {
+    background: rgb(28 31 37 / 0.45);
+    box-shadow: 0 20px 50px -28px rgb(0 0 0 / 0.6);
+  }
+  /* Chip translúcido (grupos de botones, íconos en círculo). */
+  .glass-chip {
+    background: rgb(255 255 255 / 0.55);
+  }
+  .dark .glass-chip {
+    background: rgb(255 255 255 / 0.06);
+  }
+
+  /* Pestaña unida al bloque sólido de abajo, con esquinas cóncavas
+     (fondo1). El bloque lleva rounded-tl-none si la activa es la primera. */
+  .tab-joined {
+    position: relative;
+    border-radius: 16px 16px 0 0;
+  }
+  .tab-joined[data-active="true"] {
+    background: var(--surface);
+  }
+  .tab-joined[data-active="true"]::before,
+  .tab-joined[data-active="true"]::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    width: 16px;
+    height: 16px;
+    pointer-events: none;
+  }
+  .tab-joined[data-active="true"]::before {
+    left: -16px;
+    background: radial-gradient(circle at 0 0, transparent 15.5px, var(--surface) 16px);
+  }
+  .tab-joined[data-active="true"]::after {
+    right: -16px;
+    background: radial-gradient(circle at 100% 0, transparent 15.5px, var(--surface) 16px);
+  }
+  .tab-joined[data-first="true"]::before {
+    display: none;
+  }
+}
+
+/* ---------- Micro-animaciones de botones ---------- */
+.press {
+  transition:
+    transform 0.15s,
+    background-color 0.2s,
+    color 0.2s;
+}
+.press:active:not(:disabled) {
+  transform: scale(0.95);
+}
+.lift {
+  transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.lift:hover {
+  transform: translateY(-2px);
+}
+/* Flecha que "viaja" al pasar el mouse. */
+.anim-arrow svg {
+  transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.anim-arrow:hover svg {
+  transform: translate(2px, -2px);
+}
+/* "+" que gira (Registrar paciente y otras altas). */
+.anim-spin-plus svg {
+  transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.anim-spin-plus:hover svg {
+  transform: rotate(90deg);
+}
+/* Cerrar sesión: la flecha sale por la derecha y vuelve a entrar. */
+.anim-out:hover svg {
+  animation: anim-out 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes anim-out {
+  40% {
+    transform: translateX(5px);
+    opacity: 0;
+  }
+  41% {
+    transform: translateX(-5px);
+  }
+  100% {
+    transform: none;
+    opacity: 1;
+  }
+}
+/* Campana que se balancea. */
+.anim-ring:hover svg {
+  animation: anim-ring 0.6s ease;
+  transform-origin: 50% 10%;
+}
+@keyframes anim-ring {
+  20% {
+    transform: rotate(14deg);
+  }
+  40% {
+    transform: rotate(-12deg);
+  }
+  60% {
+    transform: rotate(7deg);
+  }
+  80% {
+    transform: rotate(-4deg);
+  }
+}
+/* Ícono del menú que se inclina un poco. */
+.anim-nudge svg {
+  transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.anim-nudge:hover svg {
+  transform: scale(1.12) rotate(-6deg);
+}
+/* Entrada escalonada (style={{ animationDelay }}). */
+.anim-rise {
+  animation: anim-rise 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+@keyframes anim-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+/* ---------- Transición entre secciones ----------
+   AppLayout pone .anim-page en el contenedor de la ruta (key = pathname):
+   el contenido entra con fundido, sube un poco y se enfoca; sus bloques
+   aparecen escalonados. */
+/* Solo opacidad + subida corta (sin blur: recalcular el vidrio de toda la
+   página en cada cuadro la trababa). fill-mode "backwards" y no "both": un
+   transform que queda aplicado convierte al contenedor en la referencia de
+   todo lo `position: fixed` de adentro (tooltips, modales) y los desplaza. */
+.anim-page {
+  animation: anim-page 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+@keyframes anim-page {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+.anim-page > * > * {
+  animation: anim-rise 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+.anim-page > * > *:nth-child(2) { animation-delay: 0.04s; }
+.anim-page > * > *:nth-child(3) { animation-delay: 0.08s; }
+.anim-page > * > *:nth-child(n + 4) { animation-delay: 0.12s; }
+
+/* Cambio de página dentro de un listado: las filas entran con fundido. */
+.anim-fade {
+  animation: anim-fade 0.25s ease-out backwards;
+}
+@keyframes anim-fade {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+/* View Transitions (NavLink viewTransition): la página no hace fundido de
+   pantalla completa (lo anima .anim-page); solo la píldora lima del menú
+   se desliza del ítem anterior al nuevo (view-transition-name: nav-pill). */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+}
+::view-transition-group(nav-pill) {
+  animation-duration: 0.45s;
+  animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+::view-transition-old(nav-pill),
+::view-transition-new(nav-pill) {
+  height: 100%;
+  animation-duration: 0.45s;
+}
+
+/* Línea de gráfico que se dibuja al cargar. */
+.anim-draw {
+  stroke-dasharray: 1600;
+  stroke-dashoffset: 1600;
+  animation: anim-draw 1.4s 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+@keyframes anim-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-blob,
+  .anim-page,
+  .anim-page > * > *,
+  .anim-fade,
+  ::view-transition-group(nav-pill),
+  .anim-rise,
+  .anim-draw,
+  .anim-out:hover svg,
+  .anim-ring:hover svg {
+    animation: none !important;
+  }
+  .anim-draw {
+    stroke-dashoffset: 0;
+  }
 }
 
 /* FullCalendar (pantalla de calendario, rediseño 2026-11): la barra es
    propia (CalendarControls); aquí solo la grilla y las citas, que dibuja
    renderEvent con los colores de calendarModel. */
 .fouees-calendar .fc {
-  --fc-border-color: #f1f5f9;
-  --fc-page-bg-color: #ffffff;
-  --fc-neutral-bg-color: #f8fafc;
-  --fc-today-bg-color: rgb(13 148 136 / 0.05);
-  --fc-now-indicator-color: #f43f5e;
-  --fc-highlight-color: rgb(13 148 136 / 0.12);
-  color: #334155;
+  --fc-border-color: #eeede8;
+  --fc-page-bg-color: var(--surface);
+  --fc-neutral-bg-color: #f7f7f4;
+  --fc-today-bg-color: rgb(220 242 106 / 0.16);
+  --fc-now-indicator-color: #ff6b4a;
+  --fc-highlight-color: rgb(220 242 106 / 0.3);
+  color: #3c3d41;
   font-size: 0.8125rem;
 }
 
 .dark .fouees-calendar .fc {
-  --fc-border-color: #1e293b;
-  --fc-page-bg-color: #0f172a;
-  --fc-neutral-bg-color: #1e293b;
-  --fc-today-bg-color: rgb(13 148 136 / 0.08);
-  color: #cbd5e1;
+  --fc-border-color: #26282d;
+  --fc-page-bg-color: var(--surface);
+  --fc-neutral-bg-color: #1d2026;
+  --fc-today-bg-color: rgb(220 242 106 / 0.06);
+  color: #c8c7c0;
 }
 
 /* Sin el borde exterior de la tabla: la tarjeta ya enmarca. */
@@ -157,7 +512,7 @@ html.dark body {
 
 .fouees-calendar .fc .fc-timegrid-slot-label,
 .fouees-calendar .fc .fc-timegrid-axis {
-  color: #94a3b8;
+  color: #9c9b95;
   font-size: 10px;
   font-variant-numeric: tabular-nums;
 }
@@ -191,7 +546,7 @@ html.dark body {
 .fouees-calendar .fc .fc-daygrid-more-link {
   font-size: 11px;
   font-weight: 600;
-  color: #64748b;
+  color: #74736e;
 }
 
 /* Franja de almuerzo (calendarModel: LUNCH_START_HOUR..LUNCH_END_HOUR). */
@@ -207,6 +562,17 @@ html.dark body {
 
 .fouees-calendar .fc .fc-timegrid-now-indicator-line {
   border-width: 2px 0 0;
+}
+
+/* Autocompletado del navegador: Chrome pinta los campos de azul (y en
+   oscuro, azul marino). Se tapa con el color de la superficie. */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: currentColor;
+  -webkit-box-shadow: 0 0 0 1000px var(--surface) inset;
+  caret-color: currentColor;
+  transition: background-color 9999s ease-in-out 0s;
 }
 
 /* Tailwind 4 dejó los botones con cursor por defecto (en v3 era la mano).

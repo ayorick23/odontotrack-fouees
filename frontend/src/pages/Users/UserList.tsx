@@ -1,6 +1,6 @@
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { KeyRound, Lock, LockOpen, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { KeyRound, Lock, LockOpen, Pencil, Plus, Search, Trash2 } from "../../components/icons";
 import { useEffect, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 

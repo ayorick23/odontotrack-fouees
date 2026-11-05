@@ -1,6 +1,9 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 
+import { ArrowUpRight } from "../../components/icons";
+import { smoothPath } from "./smoothPath";
+
 import type {
   CaseStatusCounts,
   DashboardAreaStatus,
@@ -24,7 +27,8 @@ import {
  * mouse (TipLayer). Se pone como texto, nunca como HTML.
  */
 
-export const CARD = "rounded-2xl bg-white dark:bg-slate-900";
+/** Tarjeta del dashboard: vidrio sobre el fondo desenfocado. */
+export const CARD = "glass rounded-[24px]";
 
 export function TipLayer({ children }: { children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -66,8 +70,16 @@ export function TipLayer({ children }: { children: ReactNode }) {
       {tip ? (
         <div
           role="tooltip"
-          className="pointer-events-none fixed z-50 whitespace-pre-line rounded-lg bg-slate-900 px-2.5 py-1.5 text-xs text-white shadow-xl dark:bg-slate-700"
-          style={{ left: tip.x + 14, top: tip.y + 14 }}
+          className="pointer-events-none fixed z-50 whitespace-pre-line rounded-xl bg-ink px-2.5 py-1.5 text-xs text-white shadow-xl dark:bg-white dark:text-ink"
+          // Cerca del borde derecho o inferior se voltea hacia el cursor:
+          // nunca sale de la pantalla (antes generaba scroll).
+          style={{
+            left: tip.x + 14,
+            top: tip.y + 14,
+            transform: `translate(${tip.x > window.innerWidth - 260 ? "calc(-100% - 28px)" : "0"}, ${
+              tip.y > window.innerHeight - 120 ? "calc(-100% - 28px)" : "0"
+            })`,
+          }}
         >
           {tip.text}
         </div>
@@ -88,27 +100,32 @@ export function Card({
   children: ReactNode;
 }) {
   return (
-    <section className={`${CARD} flex min-h-0 flex-col p-4 ${className}`} aria-label={title}>
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100">{title}</h2>
+    // Doble fondo: título sobre el vidrio y el gráfico sobre un bloque sólido.
+    <section className={`${CARD} flex min-h-0 flex-col p-2 ${className}`} aria-label={title}>
+      <div className="flex min-h-9 items-center justify-between gap-2 px-2.5 pt-1 pb-2">
+        <h2 className="text-[14px] font-semibold text-ink dark:text-white">{title}</h2>
         {action}
       </div>
-      <div className="min-h-0 flex-1">{children}</div>
+      <div className="min-h-0 flex-1 rounded-[18px] bg-surface p-3.5">{children}</div>
     </section>
   );
 }
 
 export function CardLink({ to, children }: { to: string; children: ReactNode }) {
   return (
-    <Link to={to} className="text-xs font-semibold text-teal-700 hover:underline dark:text-teal-300">
-      {children} →
+    <Link
+      to={to}
+      className="press anim-arrow glass-chip inline-flex items-center gap-1 rounded-full py-1 pr-2 pl-3 text-xs font-semibold text-ink transition hover:bg-white dark:text-white dark:hover:bg-white/10"
+    >
+      {children}
+      <ArrowUpRight className="size-3.5" aria-hidden="true" />
     </Link>
   );
 }
 
 export function Pill({ children }: { children: ReactNode }) {
   return (
-    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+    <span className="glass-chip rounded-full px-2.5 py-1 text-[11px] font-medium text-slate-600 dark:text-slate-300">
       {children}
     </span>
   );
@@ -123,21 +140,21 @@ export function Sparkline({ values, color }: { values: number[]; color: string }
   const h = 36;
   const max = Math.max(...values);
   const min = Math.min(...values);
-  const points = values.map((value, index) => [
+  const points = values.map((value, index): [number, number] => [
     index * (w / (values.length - 1)),
     h - 4 - ((value - min) / (max - min || 1)) * (h - 8),
   ]);
-  const d = points.map(([x, y], index) => `${index ? "L" : "M"}${x.toFixed(1)} ${y.toFixed(1)}`).join(" ");
+  const d = smoothPath(points);
   return (
     <svg viewBox={`0 0 ${w} ${h}`} className="h-9 w-28 shrink-0" preserveAspectRatio="none" aria-hidden="true">
       <defs>
         <linearGradient id={id} x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0" stopColor={color} stopOpacity=".35" />
-          <stop offset="1" stopColor={color} stopOpacity="0" />
+          <stop offset="0" style={{ stopColor: color, stopOpacity: 0.35 }} />
+          <stop offset="1" style={{ stopColor: color, stopOpacity: 0 }} />
         </linearGradient>
       </defs>
       <path d={`${d} L${w} ${h} L0 ${h} Z`} fill={`url(#${id})`} />
-      <path d={d} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d={d} fill="none" style={{ stroke: color }} strokeWidth="2" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
     </svg>
   );
 }
@@ -156,30 +173,44 @@ export function KpiCard({ label, metric, icon, lowerIsBetter = false, featured =
   const trend = metric?.trend ?? null;
   const good = trend == null ? null : lowerIsBetter ? trend <= 0 : trend >= 0;
   const trendTone = featured
-    ? "text-teal-100"
+    ? "text-lime dark:text-ink"
     : good
-      ? "text-emerald-600 dark:text-emerald-400"
+      ? "text-olive dark:text-lime"
       : "text-rose-600 dark:text-rose-400";
   return (
     <article
-      className={`flex flex-col justify-between rounded-2xl p-4 ${featured ? "bg-teal-700 text-white" : CARD}`}
+      className={`lift relative flex flex-col justify-between overflow-hidden rounded-[22px] p-4 ${
+        featured ? "bg-ink text-white dark:bg-lime dark:text-ink" : CARD
+      }`}
       aria-label={label}
     >
-      <div className="flex items-center gap-2">
+      {featured ? (
         <span
-          className={`grid size-8 shrink-0 place-items-center rounded-xl ${
-            featured ? "bg-white/15" : "bg-teal-50 text-teal-700 dark:bg-teal-950/60 dark:text-teal-300"
+          className="pointer-events-none absolute -top-10 -right-10 size-32 rounded-full bg-lime/25 blur-2xl dark:bg-white/40"
+          aria-hidden="true"
+        />
+      ) : null}
+      <div className="relative flex items-center justify-between gap-2">
+        <p
+          className={`text-[12.5px] font-medium ${
+            featured ? "text-white/60 dark:text-ink/60" : "text-slate-500 dark:text-slate-400"
+          }`}
+        >
+          {label}
+        </p>
+        <span
+          className={`grid size-8 shrink-0 place-items-center rounded-full ${
+            featured ? "bg-lime text-ink dark:bg-ink dark:text-lime" : "glass-chip text-ink dark:text-white"
           }`}
         >
           {icon}
         </span>
-        <p className={`text-xs font-medium ${featured ? "text-teal-50" : "text-slate-500"}`}>{label}</p>
       </div>
-      <div className="mt-2 flex items-end justify-between gap-2">
+      <div className="relative mt-2 flex items-end justify-between gap-2">
         <div>
           <p
-            className={`text-[28px] font-semibold leading-none tracking-tight tabular-nums ${
-              featured ? "" : "text-slate-900 dark:text-white"
+            className={`num text-[38px] leading-none font-bold ${
+              featured ? "text-lime dark:text-ink" : "text-ink dark:text-white"
             }`}
           >
             {value == null ? "—" : value.toLocaleString("es-SV")}
@@ -188,15 +219,17 @@ export function KpiCard({ label, metric, icon, lowerIsBetter = false, featured =
             ) : null}
           </p>
           {trend == null ? null : (
-            <p className={`mt-1.5 text-[11px] font-medium ${trendTone}`}>
+            <p className={`mt-2 text-[12px] font-semibold ${trendTone}`}>
               {trend >= 0 ? "↑" : "↓"} {Math.abs(trend)}%{" "}
-              <span className={featured ? "text-teal-100/80" : "text-slate-400"}>
+              <span className={`font-normal ${featured ? "text-white/55 dark:text-ink/60" : "text-slate-500 dark:text-slate-400"}`}>
                 {metric?.trend_label ?? "vs mes anterior"}
               </span>
             </p>
           )}
         </div>
-        <Sparkline values={metric?.spark ?? []} color={featured ? "#ffffff" : SINGLE_SERIES_COLOR} />
+        <span className={featured ? "text-lime dark:text-ink" : "text-ink dark:text-lime"}>
+          <Sparkline values={metric?.spark ?? []} color="currentColor" />
+        </span>
       </div>
     </article>
   );
@@ -251,7 +284,7 @@ export function MonthBars({ rows, unit }: { rows: MonthCount[]; unit: string }) 
   const max = Math.max(...rows.map((row) => row.count), 1);
   const current = rows.length - 1;
   return (
-    <div className="flex h-full items-end gap-1.5">
+    <div className="flex h-full items-end justify-between gap-1.5">
       {rows.map((row, index) => (
         <div
           key={row.month}
@@ -259,20 +292,19 @@ export function MonthBars({ rows, unit }: { rows: MonthCount[]; unit: string }) 
           data-tip={`${row.label}: ${row.count} ${unit}`}
         >
           {index === current ? (
-            <span className="rounded-md bg-slate-900 px-1.5 py-0.5 text-[10px] font-semibold text-white dark:bg-white dark:text-slate-900">
-              {row.count}
-            </span>
+            <span className="num text-[11px] font-bold text-ink dark:text-white">{row.count}</span>
           ) : null}
           <div
-            className="w-full rounded-t-md rounded-b-sm"
-            style={{
-              height: `${Math.max((row.count / max) * 78, row.count ? 3 : 1)}%`,
-              background: index === current ? SINGLE_SERIES_COLOR : "rgba(13,148,136,.18)",
-            }}
+            className={`w-full max-w-[30px] rounded-full transition-colors ${
+              index === current
+                ? "bg-lime-strong shadow-[0_8px_20px_-8px_rgba(160,190,20,.8)] dark:bg-lime"
+                : "bg-ink/80 hover:bg-ink dark:bg-white/15 dark:hover:bg-white/25"
+            }`}
+            style={{ height: `${Math.max((row.count / max) * 78, row.count ? 4 : 2)}%` }}
           />
           <span
             className={`text-[10px] ${
-              index === current ? "font-semibold text-slate-700 dark:text-slate-200" : "text-slate-400"
+              index === current ? "font-semibold text-ink dark:text-white" : "text-slate-400"
             }`}
           >
             {row.label}
@@ -287,8 +319,8 @@ export function Legend({ items }: { items: Array<[string, string]> }) {
   return (
     <div className="flex flex-wrap gap-x-4 gap-y-1">
       {items.map(([label, color]) => (
-        <span key={label} className="flex items-center gap-1.5 text-[11px] text-slate-500">
-          <span className="size-2 rounded-full" style={{ background: color }} />
+        <span key={label} className="flex items-center gap-1.5 text-[11.5px] font-medium text-slate-600 dark:text-slate-400">
+          <span className="h-[3px] w-3.5 rounded-full" style={{ background: color }} />
           {label}
         </span>
       ))}
@@ -299,46 +331,53 @@ export function Legend({ items }: { items: Array<[string, string]> }) {
 export function StatusDonut({ counts }: { counts: CaseStatusCounts }) {
   const { status } = useChartTheme();
   const total = CASE_STATUS_ORDER.reduce((sum, key) => sum + counts[key], 0);
-  const r = 52;
+  // Extremos redondeados con separación: el hueco se reparte a cada lado.
+  const r = 62;
   const c = 2 * Math.PI * r;
-  let offset = 0;
+  const present = CASE_STATUS_ORDER.filter((key) => counts[key] > 0);
+  const gap = present.length > 1 ? 10 : 0;
+  // Dónde empieza cada segmento: suma de los anteriores (sin mutar en el render).
+  const lengths = present.map((key) => (counts[key] / total) * c);
+  const starts = lengths.map((_, index) => lengths.slice(0, index).reduce((sum, value) => sum + value, 0));
   return (
     <div className="flex h-full items-center gap-5">
-      <svg viewBox="0 0 140 140" className="h-full max-h-40 shrink-0 -rotate-90" aria-hidden="true">
-        {total === 0 ? (
-          <circle r={r} cx="70" cy="70" fill="none" strokeWidth="16" className="stroke-slate-100 dark:stroke-slate-800" />
-        ) : (
-          CASE_STATUS_ORDER.filter((key) => counts[key] > 0).map((key) => {
-            const length = (counts[key] / total) * c;
-            const arc = (
+      <div className="relative aspect-square h-full max-h-40 shrink-0">
+        <svg viewBox="0 0 160 160" className="size-full -rotate-90" aria-hidden="true">
+          <circle r={r} cx="80" cy="80" fill="none" strokeWidth="14" className="stroke-ink/5 dark:stroke-white/5" />
+          {present.map((key, index) => (
               <circle
                 key={key}
                 r={r}
-                cx="70"
-                cy="70"
+                cx="80"
+                cy="80"
                 fill="none"
-                stroke={status[key]}
-                strokeWidth="16"
-                strokeDasharray={`${Math.max(length - 3, 0.5)} ${c}`}
-                strokeDashoffset={-offset}
+                style={{ stroke: status[key] }}
+                strokeWidth="14"
+                strokeLinecap="round"
+                strokeDasharray={`${Math.max(lengths[index] - gap, 1)} ${c}`}
+                strokeDashoffset={-(starts[index] + gap / 2)}
+                className="cursor-pointer transition-[stroke-width] duration-200 hover:[stroke-width:19]"
                 data-tip={`${CASE_STATUS_LABELS[key]}: ${counts[key]} (${Math.round((counts[key] / total) * 100)}%)`}
               />
-            );
-            offset += length;
-            return arc;
-          })
-        )}
-      </svg>
-      <div className="space-y-2">
-        <p className="text-[26px] font-semibold leading-none text-slate-900 dark:text-white">
-          {total}
-          <span className="ml-1 text-xs font-medium text-slate-400">pacientes</span>
-        </p>
+          ))}
+        </svg>
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+          <p className="num text-[30px] leading-none font-bold text-ink dark:text-white">{total}</p>
+          <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">pacientes</p>
+        </div>
+      </div>
+      <div className="min-w-0 flex-1 space-y-1">
         {CASE_STATUS_ORDER.map((key) => (
-          <p key={key} className="flex items-center gap-2 text-xs text-slate-500">
-            <span className="size-2 rounded-full" style={{ background: status[key] }} />
+          <p
+            key={key}
+            className="flex items-center gap-2.5 rounded-full px-2 py-1 text-[12.5px] text-slate-600 transition hover:bg-white/50 dark:text-slate-300 dark:hover:bg-white/5"
+          >
+            <span className="size-2.5 shrink-0 rounded-full" style={{ background: status[key] }} />
             {CASE_STATUS_LABELS[key]}
-            <b className="ml-auto pl-3 font-semibold text-slate-700 dark:text-slate-200">{counts[key]}</b>
+            <b className="num ml-auto pl-3 font-semibold text-ink dark:text-white">{counts[key]}</b>
+            <span className="num w-9 text-right text-[11px] text-slate-400">
+              {total ? Math.round((counts[key] / total) * 100) : 0}%
+            </span>
           </p>
         ))}
       </div>
@@ -384,10 +423,10 @@ export function AreaStatusBars({ rows }: { rows: DashboardAreaStatus[] }) {
   );
 }
 
-const HEAT_LIGHT = ["#f0fdfa", "#ccfbf1", "#99f6e4", "#5eead4", "#2dd4bf", "#14b8a6", "#0d9488"];
-const HEAT_DARK = ["#0f1f24", "#123b3a", "#115e59", "#0f766e", "#0d9488", "#14b8a6", "#2dd4bf"];
+const HEAT_LIGHT = ["#f7f7f4", "#f3f8d6", "#ebf5b0", "#dcf26a", "#c8e43c", "#a3bf1c", "#6f8a00"];
+const HEAT_DARK = ["#1d2026", "#262d0c", "#364112", "#4f6500", "#7f9a00", "#a9c41f", "#dcf26a"];
 
-/** Citas por día y franja: una sola gama de teal (claro = pocas). */
+/** Citas por día y franja: una sola gama de lima (claro = pocas). */
 export function OccupancyHeatmap({ data }: { data: Occupancy }) {
   const { dark } = useChartTheme();
   const scale = dark ? HEAT_DARK : HEAT_LIGHT;
@@ -466,7 +505,7 @@ export function AgendaToday({
         {HOURS.map((hour) => (
           <div
             key={hour}
-            className="absolute bottom-0 top-0 border-l border-dashed border-slate-200 dark:border-slate-800"
+            className="absolute bottom-0 top-0 border-l border-dashed border-ink/10 dark:border-white/10"
             style={{ left: `${position(hour)}%` }}
           />
         ))}
@@ -482,12 +521,11 @@ export function AgendaToday({
           return (
             <div
               key={row.id}
-              className="absolute rounded-lg px-2 py-1 text-[11px] leading-tight text-white shadow-sm"
+              className={`absolute rounded-xl px-2 py-1 text-[11px] leading-tight shadow-sm ${done ? "bg-lavender/25 text-ink dark:text-white" : "bg-action text-on-action"}`}
               style={{
                 left: `${position(hour)}%`,
                 width: `${Math.max((row.duration_minutes / 60) * 10 - 0.5, 6)}%`,
                 top: `${(index % 3) * 34}%`,
-                background: done ? "#94a3b8" : SINGLE_SERIES_COLOR,
               }}
               data-tip={`${time.format(start)} · ${row.patient_name} con ${row.student_name}${done ? " (atendida)" : ""}`}
             >
@@ -531,8 +569,9 @@ export function LineChart({
               x2={W - P.r}
               y1={y(value)}
               y2={y(value)}
-              className="stroke-slate-200 dark:stroke-slate-800"
-              strokeDasharray="3 4"
+              className="stroke-ink/10 dark:stroke-white/10"
+              strokeDasharray="2 5"
+              vectorEffect="non-scaling-stroke"
             />
             <text x={P.l - 6} y={y(value) + 3} textAnchor="end" className="fill-slate-400" fontSize="10">
               {value}
@@ -548,17 +587,28 @@ export function LineChart({
         ) : null,
       )}
       {series.map((item, seriesIndex) => {
-        const d = item.values.map((value, index) => `${index ? "L" : "M"}${x(index)} ${y(value)}`).join(" ");
+        const d = smoothPath(item.values.map((value, index): [number, number] => [x(index), y(value)]));
         return (
           <g key={item.name}>
             {seriesIndex === 0 ? (
-              <path d={`${d} L${x(labels.length - 1)} ${y(0)} L${x(0)} ${y(0)} Z`} fill={item.color} fillOpacity=".1" />
+              <path
+                d={`${d} L${x(labels.length - 1)} ${y(0)} L${x(0)} ${y(0)} Z`}
+                style={{ fill: item.color, fillOpacity: 0.08 }}
+              />
             ) : null}
-            <path d={d} fill="none" stroke={item.color} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+            <path
+              d={d}
+              fill="none"
+              style={{ stroke: item.color }}
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              vectorEffect="non-scaling-stroke"
+              className="anim-draw"
+            />
           </g>
         );
       })}
-      <line data-crossline x1="0" x2="0" y1={P.t} y2={H - P.b} className="stroke-slate-300 dark:stroke-slate-600" style={{ visibility: "hidden" }} />
+      <line data-crossline x1="0" x2="0" y1={P.t} y2={H - P.b} className="stroke-ink/20 dark:stroke-white/20" vectorEffect="non-scaling-stroke" style={{ visibility: "hidden" }} />
       {labels.map((label, index) => (
         <rect
           key={`hit-${index}`}
@@ -586,7 +636,7 @@ export function QuickActions({
         <Link
           key={action.to + action.label}
           to={action.to}
-          className="flex flex-col items-center justify-center gap-1.5 rounded-xl bg-slate-50 text-xs font-medium text-slate-700 transition hover:bg-teal-50 hover:text-teal-800 dark:bg-slate-800/60 dark:text-slate-200 dark:hover:bg-teal-950/50"
+          className="press anim-nudge flex flex-col items-center justify-center gap-1.5 rounded-2xl bg-slate-100 text-xs font-medium text-slate-700 transition hover:bg-lime hover:text-ink dark:bg-white/[.05] dark:text-slate-200 dark:hover:bg-lime dark:hover:text-ink"
         >
           {action.icon}
           {action.label}

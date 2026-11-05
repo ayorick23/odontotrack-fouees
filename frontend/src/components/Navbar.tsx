@@ -1,6 +1,6 @@
-import { KeyRound, LogOut, Search } from "lucide-react";
+import { KeyRound, LogOut, Search } from "./icons";
 import { DropdownMenu } from "radix-ui";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import { can } from "../acl/can";
@@ -10,6 +10,7 @@ import {
   type AuthUser,
 } from "../context/AuthContext";
 import { ChangePasswordModal } from "./ChangePasswordModal";
+import { ICON_BUTTON } from "./listing/styles";
 import { Avatar } from "./Sidebar";
 import { NotificationBell } from "./NotificationBell";
 import { ThemeToggle } from "./ThemeToggle";
@@ -79,49 +80,34 @@ export function Navbar({
   const meta = pageMeta(location.pathname, user);
   const [passwordOpen, setPasswordOpen] = useState(false);
   const navigate = useNavigate();
-  const [query, setQuery] = useState("");
 
   return (
-    // Pintada sobre el marco: sin tarjeta, mismo color que el fondo.
-    <header className="flex items-center justify-between gap-4 px-3 py-4">
+    // Directo sobre el fondo: título a la izquierda y, a la derecha, una
+    // cápsula de vidrio con búsqueda, tema y notificaciones.
+    // relative z-30: el vidrio (backdrop-filter) crea su propio apilamiento y
+    // sin esto los menús desplegables (notificaciones, cuenta) quedaban
+    // detrás del contenido de la página.
+    <header className="relative z-30 flex items-center justify-between gap-4 px-1 pt-5 pb-4">
       <div className="min-w-0">
-        <h1 className="truncate text-xl font-semibold tracking-tight text-slate-900 dark:text-white">
+        <h1 className="truncate text-[26px] leading-tight font-bold tracking-[-0.03em] text-ink dark:text-white">
           {meta.title}
         </h1>
-        <p className="text-xs text-slate-500">{meta.crumb}</p>
+        <p className="text-xs text-slate-500 dark:text-slate-400">{meta.crumb}</p>
       </div>
 
       <div className="flex items-center gap-2">
-        {can(user, "patients.view") ? (
-          // Búsqueda rápida: lleva al directorio filtrado (nombre, DUI o teléfono).
-          <form
-            role="search"
-            className="hidden items-center gap-2 rounded-full bg-white px-3.5 py-2.5 text-sm text-slate-400 transition focus-within:ring-2 focus-within:ring-teal-500/40 dark:bg-slate-900 md:flex"
-            onSubmit={(event) => {
-              event.preventDefault();
-              const term = query.trim();
-              navigate(term ? `/patients?search=${encodeURIComponent(term)}` : "/patients");
-              setQuery("");
-            }}
-          >
-            <Search className="size-4" />
-            <input
-              type="search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Buscar paciente"
-              aria-label="Buscar paciente por nombre, DUI o teléfono"
-              className="w-52 bg-transparent text-slate-700 outline-none placeholder:text-slate-400 dark:text-slate-100"
-            />
-          </form>
-        ) : null}
-        <ThemeToggle />
-        {can(user, "notifications.view") ? <NotificationBell /> : null}
+        {/* Sin .glass a propósito: un backdrop-filter aquí impediría que el
+            panel de notificaciones (hijo) desenfoque la página. */}
+        <div className="flex items-center gap-0.5 rounded-full bg-white/55 p-1 shadow-[0_10px_30px_-18px_rgba(22,24,28,0.35)] dark:bg-white/[.06]">
+          {can(user, "patients.view") ? <QuickSearch onSearch={navigate} /> : null}
+          <ThemeToggle />
+          {can(user, "notifications.view") ? <NotificationBell /> : null}
+        </div>
         {user ? (
           <DropdownMenu.Root>
             <DropdownMenu.Trigger
               aria-label="Menú de la cuenta"
-              className="rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500"
+              className="rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
             >
               <Avatar user={user} size="size-10" />
             </DropdownMenu.Trigger>
@@ -129,7 +115,7 @@ export function Navbar({
               <DropdownMenu.Content
                 align="end"
                 sideOffset={8}
-                className="z-50 w-60 rounded-2xl bg-white p-1.5 shadow-[0_12px_40px_-8px_rgba(15,23,42,0.25)] dark:bg-slate-900 dark:ring-1 dark:ring-white/10"
+                className="z-50 w-60 rounded-2xl bg-white/75 p-1.5 shadow-[0_20px_50px_-16px_rgba(22,24,28,0.3)] ring-1 ring-ink/5 backdrop-blur-xl backdrop-saturate-150 dark:bg-[#1f2228]/80 dark:ring-white/10"
               >
                 <div className="px-3 py-2">
                   <p className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
@@ -147,7 +133,7 @@ export function Navbar({
                 </DropdownMenu.Item>
                 <DropdownMenu.Item
                   onSelect={onLogout}
-                  className="flex cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-sm text-rose-700 outline-none data-[highlighted]:bg-rose-50 dark:text-rose-300 dark:data-[highlighted]:bg-rose-950/50"
+                  className="anim-out flex cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-sm text-rose-700 outline-none data-[highlighted]:bg-rose-50 dark:text-rose-300 dark:data-[highlighted]:bg-rose-950/50"
                 >
                   <LogOut className="size-4" />
                   Cerrar sesión
@@ -159,5 +145,102 @@ export function Navbar({
         <ChangePasswordModal isOpen={passwordOpen} onClose={() => setPasswordOpen(false)} />
       </div>
     </header>
+  );
+}
+
+/**
+ * Búsqueda rápida: la lupa despliega el campo de derecha a izquierda.
+ * Enter lleva al directorio filtrado (nombre, DUI o teléfono); Escape o
+ * salir del campo vacío lo cierra. Atajo: "/" fuera de un campo de texto.
+ */
+function QuickSearch({ onSearch }: { onSearch: (to: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      const target = event.target as HTMLElement | null;
+      const typing = target?.closest("input, textarea, select, [contenteditable='true']");
+      if (event.key === "/" && !typing) {
+        event.preventDefault();
+        setOpen(true);
+        inputRef.current?.focus();
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  function close() {
+    setQuery("");
+    setOpen(false);
+  }
+
+  return (
+    <form
+      role="search"
+      // max-md:hidden y no "hidden md:flex": el CSS de la librería del
+      // odontograma trae un .hidden sin capa que le gana a md:flex.
+      className="flex items-center max-md:hidden"
+      onSubmit={(event) => {
+        event.preventDefault();
+        const term = query.trim();
+        onSearch(term ? `/patients?search=${encodeURIComponent(term)}` : "/patients");
+        close();
+        inputRef.current?.blur();
+      }}
+    >
+      <input
+        ref={inputRef}
+        type="search"
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+        onBlur={(event) => {
+          // Si el foco pasa a la lupa, ella decide (abrir/cerrar) en su clic.
+          if (event.relatedTarget === buttonRef.current) {
+            return;
+          }
+          if (!query.trim()) {
+            setOpen(false);
+          }
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            close();
+            inputRef.current?.blur();
+          }
+        }}
+        tabIndex={open ? 0 : -1}
+        placeholder="Buscar paciente, DUI o teléfono…"
+        aria-label="Buscar paciente por nombre, DUI o teléfono"
+        className={`h-9 bg-transparent text-[13px] text-ink outline-none transition-[width,opacity,padding] duration-[450ms] ease-[cubic-bezier(.2,.8,.2,1)] placeholder:text-slate-400 motion-reduce:transition-none dark:text-slate-100 ${
+          open ? "w-60 pl-3 opacity-100" : "w-0 p-0 opacity-0"
+        }`}
+      />
+      <button
+        ref={buttonRef}
+        type="button"
+        // Mantiene el foco en el campo: si no, el blur lo cerraba y el clic
+        // lo volvía a abrir.
+        onMouseDown={(event) => event.preventDefault()}
+        onClick={() => {
+          if (open) {
+            close();
+            inputRef.current?.blur();
+          } else {
+            setOpen(true);
+            inputRef.current?.focus();
+          }
+        }}
+        title={open ? "Cerrar búsqueda" : "Buscar paciente (/)"}
+        aria-label={open ? "Cerrar búsqueda" : "Abrir búsqueda de pacientes"}
+        aria-expanded={open}
+        className={ICON_BUTTON}
+      >
+        <Search className="size-[17px]" />
+      </button>
+    </form>
   );
 }

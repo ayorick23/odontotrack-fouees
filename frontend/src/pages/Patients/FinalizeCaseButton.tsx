@@ -1,4 +1,4 @@
-import { CircleCheckBig } from "lucide-react";
+import { CircleCheckBig } from "../../components/icons";
 import { useState } from "react";
 import { toast } from "sonner";
 

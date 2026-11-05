@@ -201,6 +201,19 @@ class OdontogramApiTests(APITestCase):
         # Volver a pendiente borra el autor.
         self.assertNotIn("doneBy", self._put_mark_18(self.admin, "plan"))
 
+    def test_recepcion_sees_odontogram_but_cannot_edit_it(self):
+        recepcion = User.objects.create_user(
+            username="recepcion-odonto", password="pass12345", role=User.Role.RECEPCION
+        )
+        self.client.force_authenticate(user=recepcion)
+        self.assertEqual(self.client.get(self.url).status_code, status.HTTP_200_OK)
+        response = self.client.put(
+            self.url,
+            {"placa": False, "sangrado": False, "sarro": False, "teeth": default_tooth_findings()},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
     def test_get_creates_empty_odontogram_with_thirty_two_teeth(self):
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)

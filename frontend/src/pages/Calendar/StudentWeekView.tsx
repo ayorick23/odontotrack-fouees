@@ -1,6 +1,6 @@
 import { format, isSameDay } from "date-fns";
 import { es } from "date-fns/locale";
-import { AlertTriangle, Check } from "lucide-react";
+import { AlertTriangle, Check } from "../../components/icons";
 
 import type { Appointment } from "../../services/appointments";
 import {
@@ -68,7 +68,7 @@ export function StudentWeekView({
               key={day.toISOString()}
               role="columnheader"
               className={`flex items-end gap-2 px-3 py-2.5 ${
-                today ? "bg-teal-50/60 text-teal-700 dark:bg-teal-950/30 dark:text-teal-300" : "text-slate-500"
+                today ? "bg-lime-soft text-lime-ink " : "text-slate-500"
               }`}
             >
               <span
@@ -122,7 +122,7 @@ export function StudentWeekView({
                   key={day.toISOString()}
                   role="cell"
                   className={`flex min-h-[4.5rem] flex-col gap-1 border-l border-slate-100 p-1.5 dark:border-slate-800 ${
-                    isSameDay(day, now) ? "bg-teal-50/30 dark:bg-teal-950/10" : ""
+                    isSameDay(day, now) ? "bg-lime-soft " : ""
                   }`}
                 >
                   {items.slice(0, VISIBLE_PER_DAY).map((item) => (
