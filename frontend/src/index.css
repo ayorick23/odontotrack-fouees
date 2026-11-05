@@ -121,7 +121,7 @@
   --lime-soft: rgb(220 242 106 / 0.1);
   --lime-ink: #dcf26a;
   --focus: rgb(220 242 106 / 0.45);
-  --surface: #181b20;
+  --surface: #1f2228;
 
   --background: #0e1013;
   --foreground: #eceef1;
@@ -391,6 +391,46 @@ html.dark body {
     transform: translateY(10px);
   }
 }
+/* ---------- Transición entre secciones ----------
+   AppLayout pone .anim-page en el contenedor de la ruta (key = pathname):
+   el contenido entra con fundido, sube un poco y se enfoca; sus bloques
+   aparecen escalonados. */
+.anim-page {
+  animation: anim-page 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes anim-page {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.995);
+    filter: blur(6px);
+  }
+}
+.anim-page > * > * {
+  animation: anim-rise 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.anim-page > * > *:nth-child(2) { animation-delay: 0.05s; }
+.anim-page > * > *:nth-child(3) { animation-delay: 0.1s; }
+.anim-page > * > *:nth-child(4) { animation-delay: 0.15s; }
+.anim-page > * > *:nth-child(5) { animation-delay: 0.2s; }
+.anim-page > * > *:nth-child(n + 6) { animation-delay: 0.25s; }
+
+/* View Transitions (NavLink viewTransition): la página no hace fundido de
+   pantalla completa (lo anima .anim-page); solo la píldora lima del menú
+   se desliza del ítem anterior al nuevo (view-transition-name: nav-pill). */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+}
+::view-transition-group(nav-pill) {
+  animation-duration: 0.45s;
+  animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+::view-transition-old(nav-pill),
+::view-transition-new(nav-pill) {
+  height: 100%;
+  animation-duration: 0.45s;
+}
+
 /* Línea de gráfico que se dibuja al cargar. */
 .anim-draw {
   stroke-dasharray: 1600;
@@ -404,6 +444,9 @@ html.dark body {
 }
 @media (prefers-reduced-motion: reduce) {
   .app-blob,
+  .anim-page,
+  .anim-page > * > *,
+  ::view-transition-group(nav-pill),
   .anim-rise,
   .anim-draw,
   .anim-out:hover svg,
@@ -420,10 +463,10 @@ html.dark body {
    renderEvent con los colores de calendarModel. */
 .fouees-calendar .fc {
   --fc-border-color: #eeede8;
-  --fc-page-bg-color: #ffffff;
+  --fc-page-bg-color: var(--surface);
   --fc-neutral-bg-color: #f7f7f4;
   --fc-today-bg-color: rgb(220 242 106 / 0.16);
-  --fc-now-indicator-color: #f43f5e;
+  --fc-now-indicator-color: #ff6b4a;
   --fc-highlight-color: rgb(220 242 106 / 0.3);
   color: #3c3d41;
   font-size: 0.8125rem;
@@ -431,7 +474,7 @@ html.dark body {
 
 .dark .fouees-calendar .fc {
   --fc-border-color: #26282d;
-  --fc-page-bg-color: #181b20;
+  --fc-page-bg-color: var(--surface);
   --fc-neutral-bg-color: #1d2026;
   --fc-today-bg-color: rgb(220 242 106 / 0.06);
   color: #c8c7c0;
@@ -508,6 +551,17 @@ html.dark body {
 
 .fouees-calendar .fc .fc-timegrid-now-indicator-line {
   border-width: 2px 0 0;
+}
+
+/* Autocompletado del navegador: Chrome pinta los campos de azul (y en
+   oscuro, azul marino). Se tapa con el color de la superficie. */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: currentColor;
+  -webkit-box-shadow: 0 0 0 1000px var(--surface) inset;
+  caret-color: currentColor;
+  transition: background-color 9999s ease-in-out 0s;
 }
 
 /* Tailwind 4 dejó los botones con cursor por defecto (en v3 era la mano).

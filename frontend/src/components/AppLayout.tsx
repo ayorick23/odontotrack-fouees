@@ -75,7 +75,11 @@ export function AppLayout() {
             se ubicaba respecto al documento, lo estiraba por debajo de la
             ventana y aparecía un segundo scroll en la página. */}
         <main className="relative min-h-0 min-w-0 flex-1 overflow-auto p-1">
-          <Outlet />
+          {/* key = ruta: al cambiar de sección el contenido se vuelve a
+              montar y entra con .anim-page (fundido + subida + enfoque). */}
+          <div key={location.pathname} className="anim-page h-full">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>

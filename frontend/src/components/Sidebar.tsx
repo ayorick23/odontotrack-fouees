@@ -408,6 +408,10 @@ function SidebarLink({
       <NavLink
         to={to}
         end={to === "/patients"}
+        // View Transition: el ítem activo se llama "nav-pill", así la píldora
+        // lima se desliza del ítem anterior al nuevo (index.css).
+        viewTransition
+        style={({ isActive }) => (isActive ? { viewTransitionName: "nav-pill" } : undefined)}
         aria-label={collapsed ? label : undefined}
         className={({ isActive }) => `${ITEM} ${row} ${isActive ? ITEM_ACTIVE : ITEM_IDLE}`}
       >

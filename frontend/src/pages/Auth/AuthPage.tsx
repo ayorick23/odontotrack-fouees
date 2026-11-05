@@ -134,8 +134,9 @@ function BrandPanel({
     >
       {/* Manchas de color difuminadas: el "degradado" del panel. */}
       <div className="absolute -left-[10%] -top-[15%] -z-10 aspect-square w-[70%] rounded-full bg-lime/70 blur-[90px]" />
-      <div className="absolute -right-[15%] top-[30%] -z-10 aspect-square w-[55%] rounded-full bg-cyan-300/45 blur-[90px]" />
-      <div className="absolute -bottom-[25%] left-[15%] -z-10 aspect-square w-[75%] rounded-full bg-sky-600/70 blur-[100px]" />
+      <div className="absolute -right-[15%] top-[30%] -z-10 aspect-square w-[55%] rounded-full bg-[#8fa3ff]/45 blur-[90px]" />
+      <div className="absolute -bottom-[25%] left-[15%] -z-10 aspect-square w-[75%] rounded-full bg-[#c9a8f0]/55 blur-[100px]" />
+      <div className="absolute -right-[10%] -bottom-[15%] -z-10 aspect-square w-[45%] rounded-full bg-[#f6c7b4]/35 blur-[90px]" />
       <div className="absolute inset-0 -z-10 bg-gradient-to-t from-ink/70 via-transparent to-transparent" />
 
       <div

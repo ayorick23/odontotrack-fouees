@@ -1,5 +1,8 @@
-import { CalendarPlus, ChevronDown, ChevronLeft, ChevronRight, GraduationCap } from "../../components/icons";
+import type { ReactNode } from "react";
 
+import { ChevronDown, ChevronLeft, ChevronRight, GraduationCap, Plus } from "../../components/icons";
+import { FolderTabs } from "../../components/Panel";
+import { ICON_BUTTON, PRIMARY_BUTTON, PRIMARY_ICON_DOT } from "../../components/listing/styles";
 import type { Appointment } from "../../services/appointments";
 import {
   KIND_ORDER,
@@ -9,92 +12,77 @@ import {
   type CalendarView,
 } from "./calendarModel";
 
-const OUTLINE_BUTTON =
-  "border border-slate-200 text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800";
-
+/**
+ * Encabezado del panel principal (sobre el vidrio): navegación y título
+ * arriba; abajo las vistas como pestañas de carpeta unidas a la grilla.
+ */
 export function CalendarToolbar({
   title,
   view,
   views,
-  canCreate,
+  summary,
   onPrevious,
   onNext,
   onToday,
   onViewChange,
-  onNew,
 }: {
   title: string;
   view: CalendarView;
   views: CalendarView[];
-  canCreate: boolean;
+  /** Texto a la derecha de las pestañas (p. ej. "7 citas esta semana"). */
+  summary?: ReactNode;
   onPrevious: () => void;
   onNext: () => void;
   onToday: () => void;
   onViewChange: (view: CalendarView) => void;
-  onNew: () => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-4">
-      <div className="flex items-center gap-2">
-        <div className="flex">
-          <button
-            type="button"
-            aria-label="Anterior"
-            title="Anterior"
-            onClick={onPrevious}
-            className={`flex size-9 items-center justify-center rounded-l-full ${OUTLINE_BUTTON}`}
-          >
-            <ChevronLeft className="size-4" aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            aria-label="Siguiente"
-            title="Siguiente"
-            onClick={onNext}
-            className={`-ml-px flex size-9 items-center justify-center rounded-r-full ${OUTLINE_BUTTON}`}
-          >
-            <ChevronRight className="size-4" aria-hidden="true" />
-          </button>
-        </div>
-        <button
-          type="button"
-          onClick={onToday}
-          className={`h-9 rounded-full px-3.5 text-sm font-medium ${OUTLINE_BUTTON}`}
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-3 pt-1.5">
+        <h2
+          className="text-[22px] leading-tight font-bold tracking-[-0.03em] text-ink first-letter:uppercase dark:text-white"
+          aria-live="polite"
         >
-          Hoy
-        </button>
-        <h2 className="ml-2 text-lg font-semibold tracking-tight text-slate-900 dark:text-white" aria-live="polite">
           {title}
         </h2>
-      </div>
-      <div className="flex items-center gap-2">
-        <div className="flex gap-0.5 rounded-full bg-slate-100 p-1 dark:bg-slate-800" role="group" aria-label="Vista">
-          {views.map((item) => (
-            <button
-              key={item}
-              type="button"
-              aria-pressed={view === item}
-              onClick={() => onViewChange(item)}
-              className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                view === item
-                  ? "bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white"
-                  : "text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
-              }`}
-            >
-              {VIEW_LABELS[item]}
-            </button>
-          ))}
-        </div>
-        {canCreate ? (
+        <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={onNew}
-            className="inline-flex h-9 items-center gap-2 rounded-full bg-action px-4 text-sm font-semibold text-on-action shadow-sm shadow-ink/20 transition hover:bg-action-hover active:scale-[.98]"
+            onClick={onToday}
+            className="press glass-chip h-9 rounded-full px-4 text-sm font-semibold text-ink transition hover:bg-white dark:text-white dark:hover:bg-white/10"
           >
-            <CalendarPlus className="size-4" aria-hidden="true" />
-            Nueva cita
+            Hoy
           </button>
-        ) : null}
+          <div className="glass-chip flex rounded-full p-0.5">
+            <button
+              type="button"
+              aria-label="Anterior"
+              title="Anterior"
+              onClick={onPrevious}
+              className={`${ICON_BUTTON} size-8`}
+            >
+              <ChevronLeft className="size-4" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              aria-label="Siguiente"
+              title="Siguiente"
+              onClick={onNext}
+              className={`${ICON_BUTTON} size-8`}
+            >
+              <ChevronRight className="size-4" aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+      </div>
+      <div className="flex flex-wrap items-end justify-between gap-3 pr-3">
+        <FolderTabs
+          tabs={views.map((item) => ({ value: item, label: VIEW_LABELS[item] }))}
+          value={view}
+          onChange={onViewChange}
+          ariaLabel="Vista"
+        />
+        {summary ? <div className="pb-3">{summary}</div> : null}
       </div>
     </div>
   );
@@ -107,6 +95,10 @@ const RANGE_NOUN: Record<CalendarView, string> = {
   estudiante: "esta semana",
 };
 
+/**
+ * Columna lateral (vidrio con bloques sólidos): nueva cita, mes pequeño,
+ * estados como lista que se activa con clic, estudiante y domingo.
+ */
 export function CalendarFilters({
   view,
   total,
@@ -119,6 +111,9 @@ export function CalendarFilters({
   showStudentFilter,
   showSunday,
   onShowSundayChange,
+  canCreate,
+  onNew,
+  miniMonth,
 }: {
   view: CalendarView;
   total: number;
@@ -131,51 +126,86 @@ export function CalendarFilters({
   showStudentFilter: boolean;
   showSunday: boolean;
   onShowSundayChange: (show: boolean) => void;
+  canCreate: boolean;
+  onNew: () => void;
+  miniMonth: ReactNode;
 }) {
   const weekly = view === "semana" || view === "estudiante";
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 pt-3 pb-3 dark:border-slate-800">
-      <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Mostrar estados">
-        <span className="mr-1 text-xs text-slate-500 dark:text-slate-400">
-          {total} {total === 1 ? "cita" : "citas"} {RANGE_NOUN[view]}
-        </span>
-        {KIND_ORDER.map((kind) => {
-          const style = KIND_STYLE[kind];
-          const shown = !hidden.has(kind);
-          const alert = kind === "pendiente" && counts.pendiente > 0;
-          return (
-            <button
-              key={kind}
-              type="button"
-              aria-pressed={shown}
-              onClick={() => onToggleKind(kind)}
-              title={
-                kind === "pendiente"
-                  ? "Programadas cuya hora ya pasó: falta marcarlas como atendidas o canceladas"
-                  : shown
-                    ? `Ocultar ${style.label.toLowerCase()}s`
-                    : `Mostrar ${style.label.toLowerCase()}s`
-              }
-              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold transition ${
-                shown
-                  ? "border-slate-200 bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
-                  : "border-transparent bg-slate-100 text-slate-400 line-through dark:bg-slate-800"
-              } ${alert ? "ring-1 ring-amber-400/60" : ""}`}
-            >
-              <span className="size-2 rounded-full" style={{ background: style.bar }} aria-hidden="true" />
-              {style.label}
-              <span className="tabular-nums text-slate-400" aria-label={`${counts[kind]} citas`}>
-                {counts[kind]}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-      <div className="flex items-center gap-3">
+    <aside
+      className="glass flex shrink-0 flex-col gap-2 rounded-[24px] p-2 lg:w-[272px]"
+      aria-label="Filtros del calendario"
+    >
+      {canCreate ? (
+        <button
+          type="button"
+          onClick={onNew}
+          className={`${PRIMARY_BUTTON} anim-spin-plus m-1 justify-start py-1.5 pl-1.5`}
+        >
+          <span className={PRIMARY_ICON_DOT}>
+            <Plus className="size-4" weight="bold" aria-hidden="true" />
+          </span>
+          Nueva cita
+        </button>
+      ) : null}
+
+      <div className="rounded-[18px] bg-surface p-3">{miniMonth}</div>
+
+      <div className="flex min-h-0 flex-1 flex-col gap-4 rounded-[18px] bg-surface p-3">
+        <div role="group" aria-label="Mostrar estados">
+          <p className="mb-2 px-1 text-xs text-slate-500 dark:text-slate-400">
+            {total} {total === 1 ? "cita" : "citas"} {RANGE_NOUN[view]}
+          </p>
+          <div className="flex flex-col gap-0.5">
+            {KIND_ORDER.map((kind) => {
+              const style = KIND_STYLE[kind];
+              const shown = !hidden.has(kind);
+              const alert = kind === "pendiente" && counts.pendiente > 0;
+              return (
+                <button
+                  key={kind}
+                  type="button"
+                  aria-pressed={shown}
+                  onClick={() => onToggleKind(kind)}
+                  title={
+                    kind === "pendiente"
+                      ? "Programadas cuya hora ya pasó: falta marcarlas como atendidas o canceladas"
+                      : shown
+                        ? `Ocultar ${style.label.toLowerCase()}s`
+                        : `Mostrar ${style.label.toLowerCase()}s`
+                  }
+                  className={`press flex items-center gap-2.5 rounded-full px-2.5 py-1.5 text-[13px] font-medium transition ${
+                    shown
+                      ? "text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/[.06]"
+                      : "text-slate-400 line-through opacity-60 hover:opacity-100"
+                  } ${alert ? "bg-amber-50 dark:bg-amber-950/40" : ""}`}
+                >
+                  <span
+                    className={`size-2.5 shrink-0 rounded-full transition ${shown ? "" : "scale-75"}`}
+                    style={{ background: style.bar }}
+                    aria-hidden="true"
+                  />
+                  {style.label}
+                  <span
+                    className={`num ml-auto rounded-full px-1.5 text-[11px] font-semibold ${
+                      alert ? "bg-amber-400 text-amber-950" : "bg-ink/5 text-slate-500 dark:bg-white/10 dark:text-slate-400"
+                    }`}
+                    aria-label={`${counts[kind]} citas`}
+                  >
+                    {counts[kind]}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {showStudentFilter ? (
-          <label className="flex h-9 items-center gap-2 rounded-full bg-slate-100 pr-1 pl-3 text-xs dark:bg-slate-800">
-            <GraduationCap className="size-3.5 text-slate-400" aria-hidden="true" />
-            <span className="text-slate-500 dark:text-slate-400">Estudiante</span>
+          <label className="block">
+            <span className="mb-1.5 flex items-center gap-1.5 px-1 text-xs font-medium text-slate-500 dark:text-slate-400">
+              <GraduationCap className="size-3.5" aria-hidden="true" />
+              Estudiante
+            </span>
             <span className="relative flex items-center">
               <select
                 aria-label="Filtrar por estudiante"
@@ -183,7 +213,7 @@ export function CalendarFilters({
                 onChange={(event) =>
                   onStudentChange(event.target.value ? Number(event.target.value) : null)
                 }
-                className="max-w-48 appearance-none truncate rounded-full bg-white py-1 pr-7 pl-2.5 font-semibold text-slate-700 outline-none focus-visible:ring-2 focus-visible:ring-focus dark:bg-slate-900 dark:text-slate-100"
+                className="h-10 w-full appearance-none truncate rounded-xl bg-slate-100 pr-8 pl-3 text-sm font-medium text-slate-700 outline-none transition hover:bg-slate-200/70 focus-visible:ring-2 focus-visible:ring-focus dark:bg-white/[.06] dark:text-slate-100"
               >
                 <option value="">Todos</option>
                 {students.map((student) => (
@@ -193,14 +223,16 @@ export function CalendarFilters({
                 ))}
               </select>
               <ChevronDown
-                className="pointer-events-none absolute right-2 size-3.5 text-slate-400"
+                className="pointer-events-none absolute right-3 size-3.5 text-slate-400"
                 aria-hidden="true"
               />
             </span>
           </label>
         ) : null}
+
         {weekly ? (
-          <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-300">
+          <label className="mt-auto inline-flex cursor-pointer items-center justify-between gap-2 px-1 text-[13px] font-medium text-slate-600 dark:text-slate-300">
+            Mostrar domingo
             <input
               type="checkbox"
               role="switch"
@@ -209,13 +241,12 @@ export function CalendarFilters({
               onChange={(event) => onShowSundayChange(event.target.checked)}
             />
             <span
-              className="relative h-5 w-9 rounded-full bg-slate-200 transition peer-checked:bg-action peer-focus-visible:ring-2 peer-focus-visible:ring-focus after:absolute after:top-0.5 after:left-0.5 after:size-4 after:rounded-full after:bg-white after:shadow after:transition peer-checked:after:translate-x-4 dark:bg-slate-700"
+              className="relative h-5 w-9 rounded-full bg-slate-200 transition peer-checked:bg-action peer-focus-visible:ring-2 peer-focus-visible:ring-focus after:absolute after:top-0.5 after:left-0.5 after:size-4 after:rounded-full after:bg-white after:shadow after:transition peer-checked:after:translate-x-4 dark:bg-slate-700 dark:after:bg-slate-300 dark:peer-checked:after:bg-ink"
               aria-hidden="true"
             />
-            Domingo
           </label>
         ) : null}
       </div>
-    </div>
+    </aside>
   );
 }

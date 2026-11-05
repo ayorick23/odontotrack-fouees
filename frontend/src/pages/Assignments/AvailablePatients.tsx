@@ -311,11 +311,11 @@ export function AvailablePatients() {
   const total = state.status === "ready" ? state.count : null;
 
   return (
-    <section className="relative flex h-full min-h-[36rem] flex-col rounded-2xl bg-white dark:bg-slate-900">
-      {/* Encabezado: qué es la lista y cuántos esperan */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-3 dark:border-slate-800">
+    <section className="glass relative flex h-full min-h-[36rem] flex-col rounded-[24px] p-2">
+      {/* Sobre el vidrio: qué es la lista y cuántos esperan */}
+      <div className="flex flex-wrap items-center justify-between gap-3 px-3 pt-1.5 pb-3">
         <div className="flex items-center gap-3">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-ink text-lime dark:bg-lime dark:text-ink">
             <Hourglass className="size-4" aria-hidden="true" />
           </span>
           <div>
@@ -335,13 +335,18 @@ export function AvailablePatients() {
           </div>
         </div>
         {canViewPatient ? (
-          <Link to="/patients?case_status=pendiente" className={SECONDARY_BUTTON}>
+          <Link
+            to="/patients?case_status=pendiente"
+            className="press anim-arrow glass-chip inline-flex items-center gap-2 rounded-full px-3.5 py-2 text-sm font-medium text-slate-700 transition hover:bg-white dark:text-slate-200 dark:hover:bg-white/10"
+          >
             <Users className="size-4" aria-hidden="true" />
             Ver en el directorio
           </Link>
         ) : null}
       </div>
 
+      {/* Bloque sólido: filtros, tabla y paginación */}
+      <div className="relative flex min-h-0 flex-1 flex-col rounded-[18px] bg-surface">
       {/* Filtros: los mismos del directorio */}
       <div className="grid grid-cols-1 gap-3 px-5 pt-4 sm:grid-cols-2 xl:grid-cols-[minmax(0,1.5fr)_repeat(3,minmax(0,1fr))]">
         <ListSearch
@@ -524,6 +529,7 @@ export function AvailablePatients() {
           onPageChange={goToPage}
         />
       ) : null}
+      </div>
 
       <Modal
         isOpen={targets.length > 0}

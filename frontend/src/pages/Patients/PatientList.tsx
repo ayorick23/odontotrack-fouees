@@ -4,8 +4,8 @@ import {
   FilterX,
   Pencil,
   PencilOff,
+  Plus,
   Trash2,
-  UserPlus,
 } from "../../components/icons";
 import { format, formatDistanceStrict } from "date-fns";
 import { es } from "date-fns/locale";
@@ -15,6 +15,7 @@ import { toast } from "sonner";
 
 import { can } from "../../acl/can";
 import { ConfirmDeleteDialog } from "../../components/ConfirmDeleteDialog";
+import { FolderTabs, type FolderTab } from "../../components/Panel";
 import { ListFilter, ListSearch } from "../../components/listing/ListFilters";
 import {
   HeaderCell,
@@ -26,7 +27,10 @@ import {
 } from "../../components/listing/ListTable";
 import {
   FILTER_ALL,
+  folderBody,
   LIST_CELL as CELL,
+  PRIMARY_BUTTON,
+  PRIMARY_ICON_DOT,
   LIST_FIRST_CELL,
   ROW_ACTION,
   ROW_ICON_ACTION,
@@ -359,17 +363,17 @@ export function PatientList() {
   }
 
   return (
-    <section className="flex h-full min-h-[36rem] flex-col rounded-2xl bg-white dark:bg-slate-900">
-      {/* Pestañas de estado + periodo + acciones */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 pt-3 dark:border-slate-800">
+    <section className="glass flex h-full min-h-[36rem] flex-col rounded-[24px] p-2">
+      {/* Sobre el vidrio: pestañas tipo carpeta + periodo + acciones */}
+      <div className="flex flex-wrap items-end justify-between gap-3 pr-1">
         <StatusTabs
           selected={caseStatus}
           counts={state.status === "ready" ? state.statusCounts : null}
           onSelect={(value) => updateParam("case_status", value)}
         />
-        <div className="flex flex-wrap items-center gap-2 pb-3">
+        <div className="flex flex-wrap items-center gap-2 pb-2">
           <div
-            className="flex gap-0.5 rounded-full bg-slate-100 p-1 dark:bg-slate-800"
+            className="glass-chip flex gap-0.5 rounded-full p-1"
             role="group"
             aria-label="Filtrar por fecha de registro"
           >
@@ -382,9 +386,9 @@ export function PatientList() {
                   title={filter.hint}
                   aria-pressed={selected}
                   onClick={() => updateParam("period", filter.value)}
-                  className={`rounded-full px-2.5 py-1 text-xs font-semibold transition ${
+                  className={`press rounded-full px-2.5 py-1 text-xs font-semibold transition ${
                     selected
-                      ? "bg-white text-slate-800 shadow-sm dark:bg-slate-700 dark:text-white"
+                      ? "bg-white text-ink shadow-sm dark:bg-white/15 dark:text-white"
                       : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
                   }`}
                 >
@@ -398,7 +402,7 @@ export function PatientList() {
               type="button"
               onClick={handleExport}
               disabled={exporting}
-              className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+              className="press glass-chip inline-flex items-center gap-2 rounded-full px-3.5 py-2 text-sm font-medium text-slate-700 transition hover:bg-white disabled:opacity-60 dark:text-slate-200 dark:hover:bg-white/10"
             >
               <Download className="size-4" aria-hidden="true" />
               {exporting ? "Exportando…" : "Exportar CSV"}
@@ -407,15 +411,20 @@ export function PatientList() {
           {canRegister ? (
             <Link
               to="/patients/new"
-              className="inline-flex items-center gap-2 rounded-full bg-action px-4 py-2 text-sm font-semibold text-on-action shadow-sm shadow-ink/20 transition hover:bg-action-hover active:scale-[.98]"
+              className={`${PRIMARY_BUTTON} anim-spin-plus py-1.5 pl-1.5`}
             >
-              <UserPlus className="size-4" aria-hidden="true" />
+              <span className={PRIMARY_ICON_DOT}>
+                <Plus className="size-4" weight="bold" aria-hidden="true" />
+              </span>
               Registrar paciente
             </Link>
           ) : null}
         </div>
       </div>
 
+      {/* Bloque sólido: filtros, tabla y paginación. Sin esquina superior
+          izquierda cuando la pestaña activa ("Todos") es la primera. */}
+      <div className={`relative flex min-h-0 flex-1 flex-col ${folderBody(caseStatus === undefined)}`}>
       {/* Filtros con la etiqueta encima */}
       <div className="grid grid-cols-1 gap-3 px-5 pt-4 sm:grid-cols-2 xl:grid-cols-[minmax(0,1.5fr)_repeat(4,minmax(0,1fr))]">
         <ListSearch
@@ -563,6 +572,7 @@ export function PatientList() {
           onPageChange={goToPage}
         />
       ) : null}
+      </div>
 
       <ConfirmDeleteDialog
         open={pendingDelete !== null}
@@ -594,58 +604,17 @@ function StatusTabs({
 }) {
   const { status: colors } = useChartTheme();
   const total = counts ? CASE_STATUS_ORDER.reduce((sum, key) => sum + counts[key], 0) : null;
-  const tabs: Array<{ value: CaseStatus | typeof ALL; label: string; count: number | null }> = [
+  const tabs: FolderTab<CaseStatus | typeof ALL>[] = [
     { value: ALL, label: "Todos", count: total },
     ...CASE_STATUS_ORDER.map((key) => ({
       value: key,
       label: TAB_LABELS[key],
       count: counts ? counts[key] : null,
+      dot: colors[key],
     })),
   ];
-
   return (
-    <div className="-mb-px flex flex-wrap items-center gap-1" role="group" aria-label="Estado del caso">
-      {tabs.map((tab) => {
-        const active = tab.value === ALL ? selected === undefined : selected === tab.value;
-        return (
-          <button
-            key={tab.value}
-            type="button"
-            aria-pressed={active}
-            onClick={() => onSelect(tab.value)}
-            className={`group relative flex items-center gap-2 px-3 pt-1.5 pb-3 text-sm font-medium transition ${
-              active
-                ? "text-slate-900 dark:text-white"
-                : "text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
-            }`}
-          >
-            {tab.value !== ALL ? (
-              <span
-                className="size-2 rounded-full"
-                style={{ background: colors[tab.value] }}
-                aria-hidden="true"
-              />
-            ) : null}
-            {tab.label}
-            <span
-              className={`min-w-6 rounded-full px-1.5 py-px text-center text-[11px] font-semibold tabular-nums ${
-                active
-                  ? "bg-action text-on-action"
-                  : "bg-slate-100 text-slate-500 group-hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400"
-              }`}
-            >
-              {tab.count === null ? "·" : tab.count.toLocaleString("es-SV")}
-            </span>
-            <span
-              className={`absolute inset-x-2 bottom-0 h-0.5 rounded-full transition ${
-                active ? "bg-action " : "bg-transparent"
-              }`}
-              aria-hidden="true"
-            />
-          </button>
-        );
-      })}
-    </div>
+    <FolderTabs tabs={tabs} value={selected ?? ALL} onChange={onSelect} ariaLabel="Estado del caso" />
   );
 }
 

@@ -19,6 +19,7 @@ import { AlertTriangle, Check } from "../../components/icons";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { can } from "../../acl/can";
+import { folderBody } from "../../components/listing/styles";
 import { useAuth } from "../../hooks/useAuth";
 import { listAppointments, type Appointment } from "../../services/appointments";
 import { AppointmentDetailModal } from "./AppointmentDetailModal";
@@ -38,7 +39,9 @@ import {
   visibleRange,
   type AppointmentKind,
   type CalendarView,
+  dayKey,
 } from "./calendarModel";
+import { MiniMonth } from "./MiniMonth";
 import { NewAppointmentModal } from "./NewAppointmentModal";
 import { StudentWeekView } from "./StudentWeekView";
 
@@ -193,8 +196,8 @@ export function Calendar() {
     }
     const count = appointmentsOn(visible, arg.date).length;
     return (
-      <span className={`flex items-end gap-2 px-1 py-1 ${arg.isToday ? "text-lime-ink " : "text-slate-500 dark:text-slate-400"}`}>
-        <span className={`text-2xl leading-none font-semibold tracking-tight ${arg.isToday ? "" : "text-slate-800 dark:text-slate-100"}`}>
+      <span className={`flex items-end gap-2 px-1 py-1 ${arg.isToday ? "text-ink dark:text-white" : "text-slate-500 dark:text-slate-400"}`}>
+        <span className={`num text-2xl leading-none font-bold ${arg.isToday ? "" : "text-slate-800 dark:text-slate-100"}`}>
           {format(arg.date, "d")}
         </span>
         <span className="pb-0.5 text-left text-[11px] leading-tight font-semibold uppercase">
@@ -204,7 +207,7 @@ export function Calendar() {
           </span>
         </span>
         {arg.isToday ? (
-          <span className="mb-1 ml-auto rounded-full bg-action px-2 py-0.5 text-[10px] font-semibold text-on-action">Hoy</span>
+          <span className="mb-1 ml-auto rounded-full bg-lime px-2 py-0.5 text-[10px] font-semibold text-ink">Hoy</span>
         ) : null}
       </span>
     );
@@ -233,7 +236,7 @@ export function Calendar() {
         )}
         <span
           className={`flex size-6 items-center justify-center rounded-full text-xs font-semibold ${
-            arg.isToday ? "bg-action text-on-action" : ""
+            arg.isToday ? "bg-lime text-ink" : ""
           }`}
         >
           {arg.dayNumberText}
@@ -242,19 +245,20 @@ export function Calendar() {
     );
   }
 
+  const marked = useMemo(
+    () => new Set(visible.map((item) => dayKey(new Date(item.starts_at)))),
+    [visible],
+  );
+  const summary = (
+    <p className="text-xs text-slate-500 dark:text-slate-400" aria-hidden="true">
+      {loadState === "loading" ? "Cargando citas…" : `${inView.length} ${inView.length === 1 ? "cita" : "citas"}`}
+    </p>
+  );
+
+  // Columna lateral (nueva cita, mes, filtros) + panel principal: título y
+  // vistas sobre el vidrio, la grilla en el bloque sólido.
   return (
-    <section className="flex h-full min-h-[36rem] flex-col rounded-2xl bg-white dark:bg-slate-900">
-      <CalendarToolbar
-        title={rangeTitle(view, anchor, range)}
-        view={view}
-        views={views}
-        canCreate={canCreate}
-        onPrevious={() => setAnchor((current) => shiftAnchor(view, current, -1))}
-        onNext={() => setAnchor((current) => shiftAnchor(view, current, 1))}
-        onToday={() => setAnchor(new Date())}
-        onViewChange={changeView}
-        onNew={() => setNewStart(suggestedStart())}
-      />
+    <div className="flex h-full min-h-[36rem] flex-col gap-4 lg:flex-row">
       <CalendarFilters
         view={view}
         total={inView.length}
@@ -267,10 +271,36 @@ export function Calendar() {
         showStudentFilter={seesOthers}
         showSunday={showSunday}
         onShowSundayChange={setShowSunday}
+        canCreate={canCreate}
+        onNew={() => setNewStart(suggestedStart())}
+        miniMonth={
+          <MiniMonth
+            key={format(anchor, "yyyy-MM")}
+            anchor={anchor}
+            now={now}
+            rangeStart={range.start}
+            rangeEnd={range.end}
+            marked={marked}
+            onPick={(day) => setAnchor(day)}
+          />
+        }
       />
 
+    <section className="glass flex min-h-[32rem] min-w-0 flex-1 flex-col rounded-[24px] p-2">
+      <CalendarToolbar
+        title={rangeTitle(view, anchor, range)}
+        view={view}
+        views={views}
+        summary={summary}
+        onPrevious={() => setAnchor((current) => shiftAnchor(view, current, -1))}
+        onNext={() => setAnchor((current) => shiftAnchor(view, current, 1))}
+        onToday={() => setAnchor(new Date())}
+        onViewChange={changeView}
+      />
+
+      <div className={`relative flex min-h-0 flex-1 flex-col overflow-hidden ${folderBody(view === views[0])}`}>
       {loadState === "error" ? (
-        <div className="flex items-center justify-between gap-3 bg-red-50 px-5 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300" role="alert">
+        <div className="flex items-center justify-between gap-3 rounded-t-[18px] bg-red-50 px-5 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300" role="alert">
           No se pudieron cargar las citas. Revisa tu conexión e intenta de nuevo.
           <button type="button" onClick={() => setReloadToken((token) => token + 1)} className="font-semibold hover:underline">
             Reintentar
@@ -327,6 +357,8 @@ export function Calendar() {
           </div>
         )}
       </div>
+      </div>
+    </section>
 
       {newStart ? (
         <NewAppointmentModal
@@ -350,7 +382,7 @@ export function Calendar() {
           }}
         />
       ) : null}
-    </section>
+    </div>
   );
 }
 
@@ -387,7 +419,7 @@ function renderEvent(info: EventContentArg) {
   if (info.view.type === FULLCALENDAR_VIEW.mes) {
     return (
       <div
-        className={`flex w-full items-center gap-1.5 overflow-hidden rounded-md px-1.5 py-0.5 text-[11px] ${style.chip}`}
+        className={`flex w-full items-center gap-1.5 overflow-hidden rounded-full px-2 py-0.5 text-[11px] ${style.chip}`}
         style={{ boxShadow: `inset 2px 0 0 ${style.bar}` }}
         title={`${info.timeText} · ${appointment.patient.name} · ${style.label}`}
       >
@@ -401,7 +433,7 @@ function renderEvent(info: EventContentArg) {
   const end = new Date(appointment.ends_at);
   return (
     <div
-      className={`flex h-full flex-col overflow-hidden rounded-lg px-2 py-1 ${style.chip}`}
+      className={`flex h-full flex-col overflow-hidden rounded-xl px-2.5 py-1.5 ${style.chip}`}
       style={{ boxShadow: `inset 3px 0 0 ${style.bar}` }}
       title={`${format(start, "HH:mm")}–${format(end, "HH:mm")} · ${appointment.patient.name}\n${appointment.student.name}\n${style.label}`}
     >

@@ -92,12 +92,13 @@ export function Card({
   children: ReactNode;
 }) {
   return (
-    <section className={`${CARD} flex min-h-0 flex-col p-4 ${className}`} aria-label={title}>
-      <div className="mb-2 flex items-center justify-between gap-2">
+    // Doble fondo: título sobre el vidrio y el gráfico sobre un bloque sólido.
+    <section className={`${CARD} flex min-h-0 flex-col p-2 ${className}`} aria-label={title}>
+      <div className="flex min-h-9 items-center justify-between gap-2 px-2.5 pt-1 pb-2">
         <h2 className="text-[14px] font-semibold text-ink dark:text-white">{title}</h2>
         {action}
       </div>
-      <div className="min-h-0 flex-1">{children}</div>
+      <div className="min-h-0 flex-1 rounded-[18px] bg-surface p-3.5">{children}</div>
     </section>
   );
 }
@@ -627,7 +628,7 @@ export function QuickActions({
         <Link
           key={action.to + action.label}
           to={action.to}
-          className="press anim-nudge glass-chip flex flex-col items-center justify-center gap-1.5 rounded-2xl text-xs font-medium text-slate-700 transition hover:bg-lime hover:text-ink dark:text-slate-200 dark:hover:bg-lime dark:hover:text-ink"
+          className="press anim-nudge flex flex-col items-center justify-center gap-1.5 rounded-2xl bg-slate-100 text-xs font-medium text-slate-700 transition hover:bg-lime hover:text-ink dark:bg-white/[.05] dark:text-slate-200 dark:hover:bg-lime dark:hover:text-ink"
         >
           {action.icon}
           {action.label}

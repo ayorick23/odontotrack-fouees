@@ -44,5 +44,22 @@ export const PRIMARY_ICON_DOT =
 export const ICON_BUTTON =
   "press relative grid size-9 shrink-0 place-items-center rounded-full text-slate-600 transition hover:bg-white hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white";
 
+/* ---------- Doble fondo: vidrio afuera, bloque sólido adentro ---------- */
+
+/** Marco de vidrio de una sección (tarjeta, listado, ficha). */
+export const GLASS_PANEL = "glass rounded-[24px] p-2";
+
+/** Título y acciones de la sección, sobre el vidrio (encima del bloque). */
+export const PANEL_HEADER = "flex flex-wrap items-center justify-between gap-3 px-3 pt-2 pb-3";
+
+/** Bloque sólido con el contenido denso (texto, tablas, formularios). */
+export const SOLID_BLOCK = "rounded-[18px] bg-surface p-4 sm:p-5";
+
+/** Bloque sólido bajo pestañas tipo carpeta: sin esquina superior izquierda
+ * cuando la pestaña activa es la primera (así la unión queda continua). */
+export function folderBody(firstActive: boolean): string {
+  return `rounded-[18px] bg-surface ${firstActive ? "rounded-tl-none" : ""}`;
+}
+
 /** Valor de "sin filtro" en los selects de los listados. */
 export const FILTER_ALL = "todos";

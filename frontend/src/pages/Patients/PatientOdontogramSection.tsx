@@ -12,15 +12,13 @@ import {
   type OdontogramValue,
   type OralGeneralMark,
 } from "../../features/clinical-records/types";
+import { GLASS_PANEL, SOLID_BLOCK } from "../../components/listing/styles";
 import { secondaryActionClass } from "../../lib/actions";
 import {
   listOdontogramHistory,
   revisionToDomain,
   type OdontogramRevisionRecord,
 } from "../../services/odontogram";
-
-const cardClass =
-  "rounded-2xl bg-white p-5 dark:bg-slate-900 sm:p-6";
 
 const REVISION_DATE = new Intl.DateTimeFormat("es-SV", {
   day: "numeric",
@@ -144,15 +142,16 @@ export function PatientOdontogramSection({
   }, [handleSave, isDirty, isSaving, loadStatus, readOnly, undo, viewingRevisionId]);
 
   return (
-    <section className={cardClass}>
+    <section className={GLASS_PANEL}>
       <UnsavedChangesGuard
         when={isDirty && !readOnly && loadStatus === "ready"}
         subject="el odontograma"
         onSave={handleSave}
       />
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+      {/* Sobre el vidrio: título y herramientas; la carta va en el bloque sólido. */}
+      <div className="flex flex-wrap items-start justify-between gap-3 px-3 pt-2 pb-3">
         <div>
-          <h2 className="text-lg font-semibold tracking-tight text-slate-900 dark:text-white">
+          <h2 className="text-[15px] font-semibold tracking-tight text-ink dark:text-white">
             Odontograma
           </h2>
           <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
@@ -174,7 +173,7 @@ export function PatientOdontogramSection({
         <div className="flex flex-wrap items-center gap-2">
           {revisions.length > 0 ? (
             <label
-              className="flex h-9 items-center gap-2 rounded-full bg-slate-100 pr-1 pl-3 text-xs dark:bg-slate-800"
+              className="glass-chip flex h-9 items-center gap-2 rounded-full pr-1 pl-3 text-xs"
               title="Historial: ver cómo estaba la carta en una versión guardada antes"
             >
               <History className="size-3.5 text-slate-400" aria-hidden="true" />
@@ -258,6 +257,7 @@ export function PatientOdontogramSection({
         </div>
       </div>
 
+      <div className={SOLID_BLOCK}>
       {viewingRevision ? (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-sky-50 px-4 py-2.5 text-sm text-sky-900 dark:bg-sky-950/40 dark:text-sky-100">
           <span>Estás viendo la versión del {revisionLabel(viewingRevision)}. Es de solo lectura.</span>
@@ -303,6 +303,7 @@ export function PatientOdontogramSection({
           patientName={patientName}
         />
       ) : null}
+      </div>
     </section>
   );
 }

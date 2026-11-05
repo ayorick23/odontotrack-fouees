@@ -11,6 +11,7 @@ import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { can } from "../../acl/can";
+import { GLASS_PANEL, SOLID_BLOCK } from "../../components/listing/styles";
 import { FinalizeCaseButton } from "./FinalizeCaseButton";
 import { ReleasePatientButton } from "./ReleasePatientButton";
 import { PatientClinicalTabs, hasClinicalTabs } from "./PatientClinicalTabs";
@@ -41,8 +42,8 @@ const PatientOdontogramSection = lazy(() =>
   })),
 );
 
-const cardClass =
-  "rounded-2xl bg-white p-5 dark:bg-slate-900 sm:p-6";
+/** Bloque sólido dentro del marco de vidrio (doble fondo). */
+const cardClass = SOLID_BLOCK;
 
 const STATUS_ICONS: Record<CaseStatus, AppIcon> = {
   pendiente: Clock3,
@@ -210,6 +211,7 @@ export function PatientDetail() {
         </p>
       ) : null}
 
+      <div className={GLASS_PANEL}>
       <section className={cardClass}>
         <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
           {patient.photo ? (
@@ -228,7 +230,7 @@ export function PatientDetail() {
           )}
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <h1 className="text-2xl font-semibold tracking-tight text-slate-800 dark:text-slate-100">
+              <h1 className="text-[26px] leading-tight font-bold tracking-[-0.03em] text-ink dark:text-white">
                 {patientFullName(patient)}
               </h1>
               <StatusBadge status={patient.case_status} />
@@ -280,8 +282,10 @@ export function PatientDetail() {
           </div>
         </div>
       </section>
+      </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      {/* Dos bloques sólidos dentro de un mismo marco de vidrio. */}
+      <div className={`${GLASS_PANEL} grid gap-2 lg:grid-cols-2`}>
         <section className={cardClass}>
           <h2 className="mb-4 text-base font-semibold text-slate-800 dark:text-slate-100">
             Contacto

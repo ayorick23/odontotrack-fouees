@@ -84,7 +84,10 @@ export function Navbar({
   return (
     // Directo sobre el fondo: título a la izquierda y, a la derecha, una
     // cápsula de vidrio con búsqueda, tema y notificaciones.
-    <header className="flex items-center justify-between gap-4 px-1 pt-5 pb-4">
+    // relative z-30: el vidrio (backdrop-filter) crea su propio apilamiento y
+    // sin esto los menús desplegables (notificaciones, cuenta) quedaban
+    // detrás del contenido de la página.
+    <header className="relative z-30 flex items-center justify-between gap-4 px-1 pt-5 pb-4">
       <div className="min-w-0">
         <h1 className="truncate text-[26px] leading-tight font-bold tracking-[-0.03em] text-ink dark:text-white">
           {meta.title}
@@ -152,6 +155,7 @@ function QuickSearch({ onSearch }: { onSearch: (to: string) => void }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
@@ -175,7 +179,9 @@ function QuickSearch({ onSearch }: { onSearch: (to: string) => void }) {
   return (
     <form
       role="search"
-      className="hidden items-center md:flex"
+      // max-md:hidden y no "hidden md:flex": el CSS de la librería del
+      // odontograma trae un .hidden sin capa que le gana a md:flex.
+      className="flex items-center max-md:hidden"
       onSubmit={(event) => {
         event.preventDefault();
         const term = query.trim();
@@ -189,7 +195,11 @@ function QuickSearch({ onSearch }: { onSearch: (to: string) => void }) {
         type="search"
         value={query}
         onChange={(event) => setQuery(event.target.value)}
-        onBlur={() => {
+        onBlur={(event) => {
+          // Si el foco pasa a la lupa, ella decide (abrir/cerrar) en su clic.
+          if (event.relatedTarget === buttonRef.current) {
+            return;
+          }
           if (!query.trim()) {
             setOpen(false);
           }
@@ -208,15 +218,22 @@ function QuickSearch({ onSearch }: { onSearch: (to: string) => void }) {
         }`}
       />
       <button
-        type={open && query.trim() ? "submit" : "button"}
+        ref={buttonRef}
+        type="button"
+        // Mantiene el foco en el campo: si no, el blur lo cerraba y el clic
+        // lo volvía a abrir.
+        onMouseDown={(event) => event.preventDefault()}
         onClick={() => {
-          if (!open) {
+          if (open) {
+            close();
+            inputRef.current?.blur();
+          } else {
             setOpen(true);
             inputRef.current?.focus();
           }
         }}
-        title="Buscar paciente (/)"
-        aria-label={open ? "Buscar" : "Abrir búsqueda de pacientes"}
+        title={open ? "Cerrar búsqueda" : "Buscar paciente (/)"}
+        aria-label={open ? "Cerrar búsqueda" : "Abrir búsqueda de pacientes"}
         aria-expanded={open}
         className={ICON_BUTTON}
       >
