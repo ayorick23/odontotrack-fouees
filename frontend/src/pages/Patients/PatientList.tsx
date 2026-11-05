@@ -1,51 +1,45 @@
 import {
-  ArrowDown,
-  ArrowUp,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsUpDown,
   Download,
   FileText,
   FilterX,
   Pencil,
   PencilOff,
-  Search,
-  SearchX,
   Trash2,
   UserPlus,
-  X,
 } from "lucide-react";
 import { format, formatDistanceStrict } from "date-fns";
 import { es } from "date-fns/locale";
-import { useEffect, useMemo, useState, type MouseEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type MouseEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
 import { can } from "../../acl/can";
 import { ConfirmDeleteDialog } from "../../components/ConfirmDeleteDialog";
+import { ListFilter, ListSearch } from "../../components/listing/ListFilters";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../../components/ui/select";
+  HeaderCell,
+  ListEmpty,
+  ListError,
+  ListPagination,
+  ListSkeleton,
+  SortableHeader,
+} from "../../components/listing/ListTable";
+import {
+  FILTER_ALL,
+  LIST_CELL as CELL,
+  LIST_FIRST_CELL,
+  ROW_ACTION,
+  ROW_ICON_ACTION,
+} from "../../components/listing/styles";
 import { useAuth } from "../../hooks/useAuth";
-import {
-  areaLabel,
-  listClinicalAreas,
-  treatmentLabel,
-  type ClinicalAreaRecord,
-} from "../../services/catalogs";
+import { listClinicalAreas, type ClinicalAreaRecord } from "../../services/catalogs";
 import {
   CASE_STATUS_LABELS,
   deletePatient,
   exportPatients,
   listAssignees,
   listPatients,
-  patientDocumentLabel,
   patientFullName,
-  patientInitials,
   type CaseStatus,
   type DirectoryOrderField,
   type DirectoryOrdering,
@@ -55,6 +49,7 @@ import {
 } from "../../services/patients";
 import { CASE_STATUS_ORDER, useChartTheme } from "../Dashboard/chartColors";
 import { IndicatedPractices } from "./IndicatedPractices";
+import { PatientArea, PatientIdentity } from "./PatientCells";
 import {
   PRACTICE_ALL,
   TOOTH_OPTIONS,
@@ -64,7 +59,7 @@ import {
 } from "./practiceFilters";
 
 const PAGE_SIZE = 20;
-const ALL = "todos";
+const ALL = FILTER_ALL;
 const PERIOD_FILTERS: Array<{ value: DirectoryPeriod | typeof ALL; label: string; hint: string }> = [
   { value: ALL, label: "Todos", hint: "Todos los registrados" },
   { value: "1m", label: "1M", hint: "Registrados en el último mes" },
@@ -423,44 +418,35 @@ export function PatientList() {
 
       {/* Filtros con la etiqueta encima */}
       <div className="grid grid-cols-1 gap-3 px-5 pt-4 sm:grid-cols-2 xl:grid-cols-[minmax(0,1.5fr)_repeat(4,minmax(0,1fr))]">
-        <label className="block sm:col-span-2 xl:col-span-1">
-          <span className="mb-1.5 block text-xs font-medium text-slate-500 dark:text-slate-400">
-            Buscar
-          </span>
-          <span className="flex h-10 items-center gap-2 rounded-xl bg-slate-100 px-3 text-sm ring-teal-600/40 transition focus-within:bg-white focus-within:ring-2 dark:bg-slate-800 dark:focus-within:bg-slate-900">
-            <Search className="size-4 shrink-0 text-slate-400" aria-hidden="true" />
-            <input
-              type="search"
-              value={searchInput}
-              onChange={(event) => setSearchInput(event.target.value)}
-              placeholder="Nombre, DUI, teléfono o pieza…"
-              aria-label="Buscar paciente"
-              className="w-full bg-transparent text-slate-800 outline-none placeholder:text-slate-400 dark:text-slate-100"
-            />
-          </span>
-        </label>
-        <DirectoryFilter
+        <ListSearch
+          value={searchInput}
+          onChange={setSearchInput}
+          placeholder="Nombre, DUI, teléfono o pieza…"
+          ariaLabel="Buscar paciente"
+          className="sm:col-span-2 xl:col-span-1"
+        />
+        <ListFilter
           id="directory-area"
           label="Área clínica"
           value={clinicalArea ?? ALL}
           options={areaOptions}
           onChange={setAreaFilter}
         />
-        <DirectoryFilter
+        <ListFilter
           id="directory-tooth"
           label="Pieza"
           value={tooth ?? PRACTICE_ALL}
           options={TOOTH_OPTIONS}
           onChange={(value) => updateParam("tooth", value)}
         />
-        <DirectoryFilter
+        <ListFilter
           id="directory-treatment"
           label="Tratamiento"
           value={treatment ?? PRACTICE_ALL}
           options={practiceTreatmentOptions}
           onChange={(value) => updateParam("treatment", value)}
         />
-        <DirectoryFilter
+        <ListFilter
           id="directory-assignee"
           label="Asignado a"
           value={assignedTo ?? ALL}
@@ -495,21 +481,13 @@ export function PatientList() {
 
       {/* Solo la tabla se desplaza; el encabezado queda fijo */}
       <div className="relative min-h-0 flex-1 overflow-auto px-2">
-        {state.status === "loading" ? <DirectorySkeleton /> : null}
+        {state.status === "loading" ? <ListSkeleton /> : null}
 
         {state.status === "error" ? (
-          <div className="px-2 py-12 text-center">
-            <p className="text-sm text-red-700 dark:text-red-400" role="alert">
-              {state.message}
-            </p>
-            <button
-              type="button"
-              onClick={() => setReloadToken((token) => token + 1)}
-              className="mt-4 rounded-full bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800"
-            >
-              Reintentar
-            </button>
-          </div>
+          <ListError
+            message={state.message}
+            onRetry={() => setReloadToken((token) => token + 1)}
+          />
         ) : null}
 
         {state.status === "ready" && state.patients.length === 0 ? (
@@ -575,10 +553,13 @@ export function PatientList() {
       </div>
 
       {state.status === "ready" && state.count > 0 ? (
-        <Pagination
+        <ListPagination
           page={page}
           pageCount={pageCount}
           count={state.count}
+          pageSize={PAGE_SIZE}
+          noun="pacientes"
+          label="Paginación del directorio"
           onPageChange={goToPage}
         />
       ) : null}
@@ -668,59 +649,6 @@ function StatusTabs({
   );
 }
 
-const HEADER_CLASS =
-  "whitespace-nowrap border-b border-slate-100 bg-white px-3 py-2.5 text-xs font-medium text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400";
-
-function HeaderCell({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return (
-    <th scope="col" className={`${HEADER_CLASS} ${className}`}>
-      {children}
-    </th>
-  );
-}
-
-function SortableHeader({
-  label,
-  field,
-  ordering,
-  onSort,
-  className = "",
-}: {
-  label: string;
-  field: DirectoryOrderField;
-  ordering: DirectoryOrdering;
-  onSort: (field: DirectoryOrderField) => void;
-  className?: string;
-}) {
-  const active = ordering.replace(/^-/, "") === field;
-  const descending = ordering.startsWith("-");
-  const Icon = !active ? ChevronsUpDown : descending ? ArrowDown : ArrowUp;
-  return (
-    <th
-      scope="col"
-      aria-sort={active ? (descending ? "descending" : "ascending") : "none"}
-      className={`${HEADER_CLASS} ${className}`}
-    >
-      <button
-        type="button"
-        onClick={() => onSort(field)}
-        className={`inline-flex items-center gap-1 rounded-md transition hover:text-slate-800 dark:hover:text-slate-200 ${
-          active ? "text-slate-800 dark:text-slate-100" : ""
-        }`}
-      >
-        {label}
-        <Icon
-          className={`size-3.5 ${active ? "text-teal-700 dark:text-teal-300" : "opacity-50"}`}
-          aria-hidden="true"
-        />
-      </button>
-    </th>
-  );
-}
-
-const CELL =
-  "border-b border-slate-100 px-3 py-2.5 align-middle transition-colors group-hover:bg-slate-50 dark:border-slate-800/70 dark:group-hover:bg-slate-800/40";
-
 function PatientRow({
   patient,
   areas,
@@ -740,52 +668,17 @@ function PatientRow({
 }) {
   const created = new Date(patient.created_at);
   const stop = (event: MouseEvent) => event.stopPropagation();
-  const document =
-    patient.document_type === "dui" && patient.dui
-      ? `DUI ${patient.dui}`
-      : patientDocumentLabel(patient);
-  const secondary = [`#${patient.id}`, document, patient.phone_number]
-    .filter(Boolean)
-    .join(" · ");
 
   return (
     <tr
       onClick={canView ? onOpen : undefined}
       className={`group ${canView ? "cursor-pointer" : ""}`}
     >
-      {/* Barra teal a la izquierda al pasar el mouse */}
-      <td className={`${CELL} pl-4 shadow-[inset_3px_0_0_transparent] group-hover:shadow-[inset_3px_0_0_#0d9488]`}>
-        <div className="flex items-center gap-3">
-          {patient.photo ? (
-            <img src={patient.photo} alt="" className="size-9 shrink-0 rounded-full object-cover" />
-          ) : (
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-teal-50 text-xs font-semibold text-teal-700 dark:bg-teal-950/60 dark:text-teal-300">
-              {patientInitials(patient)}
-            </span>
-          )}
-          <div className="min-w-0">
-            <p className="truncate font-medium text-slate-800 group-hover:text-teal-800 dark:text-slate-100 dark:group-hover:text-teal-200">
-              {patientFullName(patient)}
-            </p>
-            <p className="truncate text-xs text-slate-500 dark:text-slate-400">{secondary}</p>
-          </div>
-        </div>
+      <td className={`${CELL} ${LIST_FIRST_CELL}`}>
+        <PatientIdentity patient={patient} />
       </td>
       <td className={CELL}>
-        {patient.clinical_area ? (
-          <>
-            <p className="text-slate-700 dark:text-slate-200">
-              {areaLabel(areas, patient.clinical_area)}
-            </p>
-            {patient.clinical_subcategory ? (
-              <p className="max-w-[11rem] truncate text-xs text-slate-500 dark:text-slate-400">
-                {treatmentLabel(areas, patient.clinical_subcategory)}
-              </p>
-            ) : null}
-          </>
-        ) : (
-          <span className="text-xs text-slate-400">Sin área</span>
-        )}
+        <PatientArea patient={patient} areas={areas} />
       </td>
       <td className={CELL}>
         <IndicatedPractices practices={patient.indicated_practices} />
@@ -821,7 +714,7 @@ function PatientRow({
           {canView ? (
             <Link
               to={`/patients/${patient.id}`}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-teal-50 px-2.5 py-1.5 text-xs font-semibold text-teal-800 transition hover:bg-teal-700 hover:text-white dark:bg-teal-950/60 dark:text-teal-200 dark:hover:bg-teal-500 dark:hover:text-slate-950"
+              className={ROW_ACTION}
             >
               <FileText className="size-3.5" aria-hidden="true" />
               Ficha
@@ -842,7 +735,7 @@ function PatientRow({
               to={`/patients/${patient.id}/edit`}
               title="Editar"
               aria-label={`Editar a ${patientFullName(patient)}`}
-              className="flex size-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+              className={ROW_ICON_ACTION}
             >
               <Pencil className="size-4" aria-hidden="true" />
             </Link>
@@ -883,154 +776,6 @@ function StatusBadge({ status }: { status: CaseStatus }) {
   );
 }
 
-function DirectoryFilter({
-  id,
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  id: string;
-  label: string;
-  value: string;
-  options: Array<{ value: string; label: string }>;
-  onChange: (value: string) => void;
-}) {
-  const labelId = `${id}-label`;
-  const active = value !== ALL;
-
-  return (
-    <div className="min-w-0">
-      <span id={labelId} className="mb-1.5 block text-xs font-medium text-slate-500 dark:text-slate-400">
-        {label}
-      </span>
-      <div
-        className={`relative flex h-10 items-center rounded-xl text-sm transition ${
-          active
-            ? "bg-teal-50 ring-1 ring-teal-600/30 dark:bg-teal-950/40 dark:ring-teal-400/30"
-            : "bg-slate-100 hover:bg-slate-200/70 dark:bg-slate-800 dark:hover:bg-slate-700/70"
-        }`}
-      >
-        <Select value={value} onValueChange={onChange}>
-          <SelectTrigger
-            id={id}
-            aria-labelledby={labelId}
-            className={`h-full w-full min-w-0 border-0 bg-transparent pl-3 font-medium shadow-none dark:bg-transparent dark:hover:bg-transparent ${
-              active ? "pr-9 text-teal-800 dark:text-teal-200" : "text-slate-700 dark:text-slate-200"
-            }`}
-          >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent
-            position="popper"
-            align="start"
-            className="max-h-72 rounded-xl border-slate-200 bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-          >
-            {options.map((option) => (
-              <SelectItem
-                key={option.value}
-                value={option.value}
-                className="rounded-lg focus:bg-slate-100 focus:text-slate-800 dark:focus:bg-slate-700 dark:focus:text-white"
-              >
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {active ? (
-          <button
-            type="button"
-            onClick={() => onChange(ALL)}
-            aria-label={`Quitar filtro de ${label.toLowerCase()}`}
-            className="absolute right-8 flex size-5 items-center justify-center rounded-full text-teal-700 transition hover:bg-teal-100 dark:text-teal-300 dark:hover:bg-teal-900"
-          >
-            <X className="size-3.5" aria-hidden="true" />
-          </button>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
-function Pagination({
-  page,
-  pageCount,
-  count,
-  onPageChange,
-}: {
-  page: number;
-  pageCount: number;
-  count: number;
-  onPageChange: (page: number) => void;
-}) {
-  const from = (page - 1) * PAGE_SIZE + 1;
-  const to = Math.min(page * PAGE_SIZE, count);
-  const pages: Array<number | "gap"> = [];
-  for (let current = 1; current <= pageCount; current += 1) {
-    if (current === 1 || current === pageCount || Math.abs(current - page) <= 1) {
-      pages.push(current);
-    } else if (pages[pages.length - 1] !== "gap") {
-      pages.push("gap");
-    }
-  }
-  const base =
-    "flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-30";
-  const idle = "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800";
-
-  return (
-    <nav
-      aria-label="Paginación del directorio"
-      className="flex shrink-0 flex-col gap-2 border-t border-slate-100 px-5 py-3 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800"
-    >
-      <p className="text-xs text-slate-500 dark:text-slate-400">
-        Mostrando{" "}
-        <b className="font-semibold text-slate-700 dark:text-slate-200">
-          {from}–{to}
-        </b>{" "}
-        de <b className="font-semibold text-slate-700 dark:text-slate-200">{count}</b> pacientes
-      </p>
-      <div className="flex items-center gap-1">
-        <button
-          type="button"
-          disabled={page <= 1}
-          onClick={() => onPageChange(page - 1)}
-          aria-label="Página anterior"
-          className={`${base} ${idle}`}
-        >
-          <ChevronLeft className="size-4" aria-hidden="true" />
-        </button>
-        {pages.map((item, index) =>
-          item === "gap" ? (
-            <span key={`gap-${index}`} className="px-1 text-slate-400">
-              …
-            </span>
-          ) : (
-            <button
-              key={item}
-              type="button"
-              onClick={() => onPageChange(item)}
-              aria-current={item === page ? "page" : undefined}
-              aria-label={`Página ${item}`}
-              className={`${base} ${item === page ? "bg-teal-700 text-white" : idle}`}
-            >
-              {item}
-            </button>
-          ),
-        )}
-        <button
-          type="button"
-          disabled={page >= pageCount}
-          onClick={() => onPageChange(page + 1)}
-          aria-label="Página siguiente"
-          className={`${base} ${idle}`}
-        >
-          <ChevronRight className="size-4" aria-hidden="true" />
-        </button>
-      </div>
-    </nav>
-  );
-}
-
 function EmptyDirectory({
   filtered,
   status,
@@ -1046,37 +791,24 @@ function EmptyDirectory({
       ? `No hay pacientes ${TAB_LABELS[status].toLowerCase()}`
       : "Aún no hay pacientes registrados";
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-3 py-16 text-center">
-      <span className="flex size-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-400 dark:bg-slate-800">
-        <SearchX className="size-6" aria-hidden="true" />
-      </span>
-      <div>
-        <p className="font-semibold text-slate-800 dark:text-slate-100">{title}</p>
-        {filtered ? (
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Prueba con otra pieza o tratamiento, o quita algún filtro.
-          </p>
-        ) : null}
-      </div>
-      {filtered ? (
-        <button
-          type="button"
-          onClick={onClear}
-          className="rounded-full bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800"
-        >
-          Limpiar filtros
-        </button>
-      ) : null}
-    </div>
+    <ListEmpty
+      title={title}
+      description={
+        filtered ? "Prueba con otra pieza o tratamiento, o quita algún filtro." : undefined
+      }
+      action={filtered ? <ClearFiltersButton onClick={onClear} /> : undefined}
+    />
   );
 }
 
-function DirectorySkeleton() {
+function ClearFiltersButton({ onClick }: { onClick: () => void }) {
   return (
-    <div className="space-y-2 px-2 pt-2" aria-hidden="true">
-      {["a", "b", "c", "d", "e", "f"].map((row) => (
-        <div key={row} className="h-14 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800" />
-      ))}
-    </div>
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded-full bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800"
+    >
+      Limpiar filtros
+    </button>
   );
 }
