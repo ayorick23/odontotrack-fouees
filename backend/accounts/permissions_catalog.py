@@ -331,6 +331,9 @@ SYSTEM_ROLES: Final[tuple[SystemRoleSpec, ...]] = (
             "calendar.create",
             "calendar.edit",
             "students.view",
+            # Solo lectura: ve la carta dental (p. ej. para orientar al paciente
+            # o agendar), pero no la edita (sin odontogram.update).
+            "odontogram.view",
         ),
     ),
     SystemRoleSpec(
