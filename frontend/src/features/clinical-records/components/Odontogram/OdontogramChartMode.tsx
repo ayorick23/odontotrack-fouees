@@ -68,7 +68,7 @@ export function OdontogramChartMode({
                 <span
                   className={`flex size-5 items-center justify-center rounded-full text-[11px] font-semibold ${
                     active
-                      ? "bg-teal-700 text-white"
+                      ? "bg-action text-on-action"
                       : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
                   }`}
                   aria-hidden="true"
@@ -79,7 +79,7 @@ export function OdontogramChartMode({
                 <span
                   className={`rounded-full px-1.5 py-px text-[11px] font-semibold tabular-nums ${
                     active
-                      ? "bg-teal-50 text-teal-800 dark:bg-teal-950/60 dark:text-teal-200"
+                      ? "bg-lime-soft text-lime-ink "
                       : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
                   }`}
                   aria-hidden="true"
@@ -88,7 +88,7 @@ export function OdontogramChartMode({
                 </span>
                 <span
                   className={`absolute inset-x-2 bottom-0 h-0.5 rounded-full ${
-                    active ? "bg-teal-700 dark:bg-teal-400" : "bg-transparent"
+                    active ? "bg-action " : "bg-transparent"
                   }`}
                   aria-hidden="true"
                 />

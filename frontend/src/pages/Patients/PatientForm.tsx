@@ -5,8 +5,8 @@ import {
   Clock3,
   UserCheck,
   UserPlus,
-  type LucideIcon,
-} from "lucide-react";
+  type AppIcon,
+} from "../../components/icons";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -64,7 +64,7 @@ const selectClass =
   "mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 shadow-none outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 disabled:cursor-not-allowed disabled:opacity-70 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-800";
 const selectMenuClass =
   "max-h-72 rounded-xl border-slate-200 bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100";
-const STATUS_ICONS: Record<CaseStatus, LucideIcon> = {
+const STATUS_ICONS: Record<CaseStatus, AppIcon> = {
   pendiente: Clock3,
   en_proceso: UserCheck,
   finalizado: CircleCheckBig,
@@ -369,7 +369,7 @@ export function PatientForm() {
         </p>
         <Link
           to="/patients"
-          className="text-sm font-medium text-teal-600 hover:text-teal-700 dark:text-teal-400"
+          className="text-sm font-medium text-lime-ink hover:text-lime-ink"
         >
           ← Volver al directorio
         </Link>
@@ -384,7 +384,7 @@ export function PatientForm() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Link
           to="/patients"
-          className="text-sm font-medium text-teal-600 hover:text-teal-700 dark:text-teal-400"
+          className="text-sm font-medium text-lime-ink hover:text-lime-ink"
         >
           ← Volver al directorio
         </Link>
@@ -434,7 +434,7 @@ export function PatientForm() {
                 type="button"
                 disabled={!canWrite}
                 onClick={() => photoInputRef.current?.click()}
-                className="relative flex size-28 items-center justify-center overflow-hidden rounded-full bg-teal-50 text-teal-700 transition hover:bg-teal-100 disabled:cursor-not-allowed disabled:opacity-70 dark:bg-teal-950/60 dark:text-teal-300 dark:hover:bg-teal-950"
+                className="relative flex size-28 items-center justify-center overflow-hidden rounded-full bg-lime-soft text-lime-ink transition hover:bg-lime-soft disabled:cursor-not-allowed disabled:opacity-70"
                 aria-label="Subir foto del paciente"
               >
                 {displayPhoto ? (

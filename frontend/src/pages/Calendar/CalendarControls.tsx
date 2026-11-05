@@ -1,4 +1,4 @@
-import { CalendarPlus, ChevronDown, ChevronLeft, ChevronRight, GraduationCap } from "lucide-react";
+import { CalendarPlus, ChevronDown, ChevronLeft, ChevronRight, GraduationCap } from "../../components/icons";
 
 import type { Appointment } from "../../services/appointments";
 import {
@@ -89,7 +89,7 @@ export function CalendarToolbar({
           <button
             type="button"
             onClick={onNew}
-            className="inline-flex h-9 items-center gap-2 rounded-full bg-teal-700 px-4 text-sm font-semibold text-white shadow-sm shadow-teal-900/20 transition hover:bg-teal-800 active:scale-[.98]"
+            className="inline-flex h-9 items-center gap-2 rounded-full bg-action px-4 text-sm font-semibold text-on-action shadow-sm shadow-ink/20 transition hover:bg-action-hover active:scale-[.98]"
           >
             <CalendarPlus className="size-4" aria-hidden="true" />
             Nueva cita
@@ -183,7 +183,7 @@ export function CalendarFilters({
                 onChange={(event) =>
                   onStudentChange(event.target.value ? Number(event.target.value) : null)
                 }
-                className="max-w-48 appearance-none truncate rounded-full bg-white py-1 pr-7 pl-2.5 font-semibold text-slate-700 outline-none focus-visible:ring-2 focus-visible:ring-teal-600/40 dark:bg-slate-900 dark:text-slate-100"
+                className="max-w-48 appearance-none truncate rounded-full bg-white py-1 pr-7 pl-2.5 font-semibold text-slate-700 outline-none focus-visible:ring-2 focus-visible:ring-focus dark:bg-slate-900 dark:text-slate-100"
               >
                 <option value="">Todos</option>
                 {students.map((student) => (
@@ -209,7 +209,7 @@ export function CalendarFilters({
               onChange={(event) => onShowSundayChange(event.target.checked)}
             />
             <span
-              className="relative h-5 w-9 rounded-full bg-slate-200 transition peer-checked:bg-teal-700 peer-focus-visible:ring-2 peer-focus-visible:ring-teal-600/40 after:absolute after:top-0.5 after:left-0.5 after:size-4 after:rounded-full after:bg-white after:shadow after:transition peer-checked:after:translate-x-4 dark:bg-slate-700"
+              className="relative h-5 w-9 rounded-full bg-slate-200 transition peer-checked:bg-action peer-focus-visible:ring-2 peer-focus-visible:ring-focus after:absolute after:top-0.5 after:left-0.5 after:size-4 after:rounded-full after:bg-white after:shadow after:transition peer-checked:after:translate-x-4 dark:bg-slate-700"
               aria-hidden="true"
             />
             Domingo

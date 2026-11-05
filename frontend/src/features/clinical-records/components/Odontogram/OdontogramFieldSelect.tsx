@@ -18,7 +18,7 @@ const menuClass =
   "z-[80] max-h-72 rounded-xl border-slate-200 bg-white text-slate-800 shadow-lg dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100";
 
 const itemClass =
-  "rounded-lg py-2 text-sm text-slate-700 focus:bg-teal-50 focus:text-teal-900 dark:text-slate-100 dark:focus:bg-teal-950 dark:focus:text-teal-100";
+  "rounded-lg py-2 text-sm text-slate-700 focus:bg-lime-soft focus:text-lime-ink dark:text-slate-100";
 
 type OdontogramFieldSelectProps = {
   label: string;

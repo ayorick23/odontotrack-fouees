@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Check, Circle, MailCheck, ShieldCheck } from "lucide-react";
+import { Check, Circle, MailCheck, ShieldCheck } from "../../components/icons";
 import { useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
@@ -157,7 +157,7 @@ function DataStep({
                 <li
                   key={rule.id}
                   className={`flex items-center gap-1.5 ${
-                    rule.ok ? "text-teal-700 dark:text-teal-300" : "text-slate-500 dark:text-slate-400"
+                    rule.ok ? "text-lime-ink " : "text-slate-500 dark:text-slate-400"
                   }`}
                 >
                   {rule.ok ? (
@@ -192,7 +192,7 @@ function DataStep({
         <button
           type="button"
           onClick={onSwitch}
-          className="font-semibold text-teal-700 hover:text-teal-800 dark:text-teal-300"
+          className="font-semibold text-lime-ink hover:text-lime-ink"
         >
           Ingresar
         </button>
@@ -231,7 +231,7 @@ function CodeStep({ email, onVerified }: { email: string; onVerified: () => void
 
   return (
     <>
-      <span className="grid size-12 place-items-center rounded-2xl bg-teal-50 text-teal-700 dark:bg-teal-950/60 dark:text-teal-300">
+      <span className="grid size-12 place-items-center rounded-2xl bg-lime-soft text-lime-ink">
         <MailCheck className="size-6" />
       </span>
       <h1 className="mt-5 text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">
@@ -265,7 +265,7 @@ function CodeStep({ email, onVerified }: { email: string; onVerified: () => void
       <button
         type="button"
         onClick={() => void resend()}
-        className="mt-4 w-full text-center text-sm font-medium text-teal-700 hover:text-teal-800 dark:text-teal-300"
+        className="mt-4 w-full text-center text-sm font-medium text-lime-ink hover:text-lime-ink"
       >
         Reenviar código
       </button>
@@ -276,7 +276,7 @@ function CodeStep({ email, onVerified }: { email: string; onVerified: () => void
 function DoneStep({ onSwitch }: { onSwitch: () => void }) {
   return (
     <>
-      <span className="grid size-12 place-items-center rounded-2xl bg-teal-50 text-teal-700 dark:bg-teal-950/60 dark:text-teal-300">
+      <span className="grid size-12 place-items-center rounded-2xl bg-lime-soft text-lime-ink">
         <ShieldCheck className="size-6" />
       </span>
       <h1 className="mt-5 text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">

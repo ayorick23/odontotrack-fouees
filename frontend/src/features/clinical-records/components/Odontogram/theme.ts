@@ -1,25 +1,25 @@
 export const FOUEES_ODONTOGRAM_THEME = {
   colors: {
-    accent: "#0f8f82",
-    accent2: "#2ad4c5",
+    accent: "#16181c",
+    accent2: "#c8e43c",
     background: "#ffffff",
     panel: "#ffffff",
     card: "#ffffff",
-    text: "#1e293b",
-    muted: "#64748b",
-    line: "#e2e8f0",
+    text: "#16181c",
+    muted: "#74736e",
+    line: "#e1e0da",
   },
 };
 
 export const FOUEES_ODONTOGRAM_THEME_DARK = {
   colors: {
-    accent: "#2ad4c5",
-    accent2: "#0f8f82",
-    background: "#020617",
-    panel: "#0f172a",
-    card: "#0f172a",
-    text: "#f1f5f9",
-    muted: "#94a3b8",
-    line: "#334155",
+    accent: "#dcf26a",
+    accent2: "#a9c41f",
+    background: "#0e1013",
+    panel: "#181b20",
+    card: "#181b20",
+    text: "#eceef1",
+    muted: "#9c9b95",
+    line: "#26282d",
   },
 };

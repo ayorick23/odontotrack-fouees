@@ -15,7 +15,7 @@ import FullCalendar from "@fullcalendar/react";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import { format, isSameDay } from "date-fns";
 import { es } from "date-fns/locale";
-import { AlertTriangle, Check } from "lucide-react";
+import { AlertTriangle, Check } from "../../components/icons";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { can } from "../../acl/can";
@@ -193,7 +193,7 @@ export function Calendar() {
     }
     const count = appointmentsOn(visible, arg.date).length;
     return (
-      <span className={`flex items-end gap-2 px-1 py-1 ${arg.isToday ? "text-teal-700 dark:text-teal-300" : "text-slate-500 dark:text-slate-400"}`}>
+      <span className={`flex items-end gap-2 px-1 py-1 ${arg.isToday ? "text-lime-ink " : "text-slate-500 dark:text-slate-400"}`}>
         <span className={`text-2xl leading-none font-semibold tracking-tight ${arg.isToday ? "" : "text-slate-800 dark:text-slate-100"}`}>
           {format(arg.date, "d")}
         </span>
@@ -204,7 +204,7 @@ export function Calendar() {
           </span>
         </span>
         {arg.isToday ? (
-          <span className="mb-1 ml-auto rounded-full bg-teal-700 px-2 py-0.5 text-[10px] font-semibold text-white">Hoy</span>
+          <span className="mb-1 ml-auto rounded-full bg-action px-2 py-0.5 text-[10px] font-semibold text-on-action">Hoy</span>
         ) : null}
       </span>
     );
@@ -233,7 +233,7 @@ export function Calendar() {
         )}
         <span
           className={`flex size-6 items-center justify-center rounded-full text-xs font-semibold ${
-            arg.isToday ? "bg-teal-700 text-white" : ""
+            arg.isToday ? "bg-action text-on-action" : ""
           }`}
         >
           {arg.dayNumberText}

@@ -25,12 +25,12 @@ export function PatientIdentity({ patient }: { patient: PatientListItem }) {
       {patient.photo ? (
         <img src={patient.photo} alt="" className="size-9 shrink-0 rounded-full object-cover" />
       ) : (
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-teal-50 text-xs font-semibold text-teal-700 dark:bg-teal-950/60 dark:text-teal-300">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-lime-soft text-xs font-semibold text-lime-ink">
           {patientInitials(patient)}
         </span>
       )}
       <div className="min-w-0">
-        <p className="truncate font-medium text-slate-800 group-hover:text-teal-800 dark:text-slate-100 dark:group-hover:text-teal-200">
+        <p className="truncate font-medium text-slate-800 group-hover:text-lime-ink dark:text-slate-100">
           {patientFullName(patient)}
         </p>
         <p className="truncate text-xs text-slate-500 dark:text-slate-400">{secondary}</p>

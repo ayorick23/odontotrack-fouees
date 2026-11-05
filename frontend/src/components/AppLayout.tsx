@@ -6,6 +6,18 @@ import { canAccessPath, firstAllowedPath } from "./navigation";
 import { Navbar } from "./Navbar";
 import { Sidebar } from "./Sidebar";
 
+/** Fondo de la app: manchas de color desenfocadas + grano (index.css). */
+export function AppBackground() {
+  return (
+    <div className="app-scene" aria-hidden="true">
+      <div className="app-blob app-blob-1" />
+      <div className="app-blob app-blob-2" />
+      <div className="app-blob app-blob-3" />
+      <div className="app-grain" />
+    </div>
+  );
+}
+
 export function AppLayout() {
   const { user, isAuthenticated, isReady, logout } = useAuth();
   const location = useLocation();
@@ -13,8 +25,9 @@ export function AppLayout() {
 
   if (!isReady || (isAuthenticated && user === null)) {
     return (
-      <div className="flex min-h-svh items-center justify-center bg-slate-100 dark:bg-slate-950">
-        <p className="text-sm text-slate-500 dark:text-slate-400">
+      <div className="relative flex min-h-svh items-center justify-center">
+        <AppBackground />
+        <p className="relative text-sm text-slate-500 dark:text-slate-400">
           Cargando sesión...
         </p>
       </div>
@@ -31,8 +44,9 @@ export function AppLayout() {
       return <Navigate to={fallback} replace />;
     }
     return (
-      <div className="flex min-h-svh items-center justify-center bg-slate-100 dark:bg-slate-950">
-        <p className="text-sm text-slate-500 dark:text-slate-400">
+      <div className="relative flex min-h-svh items-center justify-center">
+        <AppBackground />
+        <p className="relative text-sm text-slate-500 dark:text-slate-400">
           Tu rol no tiene pantallas habilitadas. Pide a administración que revise
           la matriz de permisos.
         </p>
@@ -46,19 +60,21 @@ export function AppLayout() {
     navigate("/login", { replace: true });
   }
 
-  // Marco de un solo color (fondo, menú y barra superior, sin bordes);
-  // solo el panel de contenido se eleva y tiene su propio scroll.
+  // Identidad 2026-11: sin marco general. Menú, barra superior y contenido
+  // van directo sobre el fondo desenfocado; las tarjetas de cada página son
+  // de vidrio (.glass) con bloques sólidos (bg-surface) para el contenido denso.
   return (
-    <div className="flex h-svh bg-slate-100 dark:bg-slate-950">
+    <div className="relative flex h-svh">
+      <AppBackground />
       <Sidebar user={user} onLogout={handleLogout} />
-      <div className="flex min-w-0 flex-1 flex-col pb-3 pr-3">
+      <div className="relative flex min-w-0 flex-1 flex-col pr-5 pb-5 pl-4">
         <Navbar user={user} onLogout={handleLogout} />
         {/* `relative`: lo posicionado en absoluto dentro de las páginas (el
             <select> oculto de Radix, textos sr-only, subrayados de pestañas)
             se ubica respecto a este panel y se desplaza con él. Sin esto
             se ubicaba respecto al documento, lo estiraba por debajo de la
             ventana y aparecía un segundo scroll en la página. */}
-        <main className="relative min-h-0 min-w-0 flex-1 overflow-auto rounded-3xl bg-slate-50 p-6 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_40px_-12px_rgba(15,23,42,0.10)] dark:bg-[#0b1220] dark:shadow-none">
+        <main className="relative min-h-0 min-w-0 flex-1 overflow-auto p-1">
           <Outlet />
         </main>
       </div>

@@ -1,4 +1,4 @@
-import { Eye, Pencil, Trash2 } from "lucide-react";
+import { Eye, Pencil, Trash2 } from "./icons";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 
@@ -72,7 +72,7 @@ function ActionLink({
       to={to}
       title={label}
       aria-label={label}
-      className={`${baseClass} text-slate-500 hover:bg-teal-50 hover:text-teal-700 dark:text-slate-400 dark:hover:bg-teal-950/40 dark:hover:text-teal-300`}
+      className={`${baseClass} text-slate-500 hover:bg-lime-soft hover:text-lime-ink dark:text-slate-400 `}
     >
       {children}
     </Link>

@@ -5,8 +5,8 @@ import {
   ChevronRight,
   ChevronsUpDown,
   SearchX,
-  type LucideIcon,
-} from "lucide-react";
+  type AppIcon,
+} from "../icons";
 import type { ReactNode } from "react";
 
 import { LIST_HEADER_CELL } from "./styles";
@@ -51,7 +51,7 @@ export function SortableHeader<Field extends string>({
       >
         {label}
         <Icon
-          className={`size-3.5 ${active ? "text-teal-700 dark:text-teal-300" : "opacity-50"}`}
+          className={`size-3.5 ${active ? "text-lime-ink " : "opacity-50"}`}
           aria-hidden="true"
         />
       </button>
@@ -90,8 +90,8 @@ export function ListPagination({
     }
   }
   const base =
-    "flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-30";
-  const idle = "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800";
+    "press num flex h-8 min-w-8 items-center justify-center rounded-full px-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-30";
+  const idle = "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-white/[.06] dark:text-slate-300 dark:hover:bg-white/10";
 
   return (
     <nav
@@ -127,7 +127,7 @@ export function ListPagination({
               onClick={() => onPageChange(item)}
               aria-current={item === page ? "page" : undefined}
               aria-label={`Página ${item}`}
-              className={`${base} ${item === page ? "bg-teal-700 text-white" : idle}`}
+              className={`${base} ${item === page ? "bg-lime font-semibold text-ink" : idle}`}
             >
               {item}
             </button>
@@ -157,7 +157,7 @@ export function ListSkeleton() {
   );
 }
 
-/** Estado vacío con ícono. `tone="teal"` para un vacío "bueno" (nada pendiente). */
+/** Estado vacío con ícono. `tone="accent"` para un vacío "bueno" (nada pendiente). */
 export function ListEmpty({
   title,
   description,
@@ -167,16 +167,16 @@ export function ListEmpty({
 }: {
   title: string;
   description?: string;
-  icon?: LucideIcon;
-  tone?: "slate" | "teal";
+  icon?: AppIcon;
+  tone?: "slate" | "accent";
   action?: ReactNode;
 }) {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 py-16 text-center">
       <span
         className={`flex size-14 items-center justify-center rounded-2xl ${
-          tone === "teal"
-            ? "bg-teal-50 text-teal-600 dark:bg-teal-950/50 dark:text-teal-300"
+          tone === "accent"
+            ? "bg-lime-soft text-lime-ink "
             : "bg-slate-100 text-slate-400 dark:bg-slate-800"
         }`}
       >
@@ -202,7 +202,7 @@ export function ListError({ message, onRetry }: { message: string; onRetry: () =
       <button
         type="button"
         onClick={onRetry}
-        className="mt-4 rounded-full bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800"
+        className="mt-4 rounded-full bg-action px-4 py-2 text-sm font-semibold text-on-action hover:bg-action-hover"
       >
         Reintentar
       </button>

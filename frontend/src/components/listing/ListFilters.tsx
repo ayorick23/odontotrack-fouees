@@ -1,11 +1,11 @@
-import { Search, X } from "lucide-react";
+import { Search, X } from "../icons";
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { FILTER_ALL } from "./styles";
 
 type Option = { value: string; label: string };
 
-/** Select con la etiqueta encima; activo se resalta en teal y trae ✕. */
+/** Select con la etiqueta encima; activo se resalta en lima y trae ✕. */
 export function ListFilter({
   id,
   label,
@@ -30,7 +30,7 @@ export function ListFilter({
       <div
         className={`relative flex h-10 items-center rounded-xl text-sm transition ${
           active
-            ? "bg-teal-50 ring-1 ring-teal-600/30 dark:bg-teal-950/40 dark:ring-teal-400/30"
+            ? "bg-lime-soft ring-1 ring-lime-strong "
             : "bg-slate-100 hover:bg-slate-200/70 dark:bg-slate-800 dark:hover:bg-slate-700/70"
         }`}
       >
@@ -39,7 +39,7 @@ export function ListFilter({
             id={id}
             aria-labelledby={labelId}
             className={`h-full w-full min-w-0 border-0 bg-transparent pl-3 font-medium shadow-none dark:bg-transparent dark:hover:bg-transparent ${
-              active ? "pr-9 text-teal-800 dark:text-teal-200" : "text-slate-700 dark:text-slate-200"
+              active ? "pr-9 text-lime-ink " : "text-slate-700 dark:text-slate-200"
             }`}
           >
             <SelectValue />
@@ -65,7 +65,7 @@ export function ListFilter({
             type="button"
             onClick={() => onChange(FILTER_ALL)}
             aria-label={`Quitar filtro de ${label.toLowerCase()}`}
-            className="absolute right-8 flex size-5 items-center justify-center rounded-full text-teal-700 transition hover:bg-teal-100 dark:text-teal-300 dark:hover:bg-teal-900"
+            className="absolute right-8 flex size-5 items-center justify-center rounded-full text-lime-ink transition hover:bg-lime-soft"
           >
             <X className="size-3.5" aria-hidden="true" />
           </button>
@@ -94,7 +94,7 @@ export function ListSearch({
       <span className="mb-1.5 block text-xs font-medium text-slate-500 dark:text-slate-400">
         Buscar
       </span>
-      <span className="flex h-10 items-center gap-2 rounded-xl bg-slate-100 px-3 text-sm ring-teal-600/40 transition focus-within:bg-white focus-within:ring-2 dark:bg-slate-800 dark:focus-within:bg-slate-900">
+      <span className="flex h-10 items-center gap-2 rounded-xl bg-slate-100 px-3 text-sm ring-lime-strong transition focus-within:bg-white focus-within:ring-2 dark:bg-slate-800 dark:focus-within:bg-slate-900">
         <Search className="size-4 shrink-0 text-slate-400" aria-hidden="true" />
         <input
           type="search"

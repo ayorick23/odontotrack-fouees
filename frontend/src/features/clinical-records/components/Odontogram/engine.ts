@@ -81,7 +81,7 @@ export function applyPulpVisible(on: boolean): void {
 }
 
 export function applyPdfPatientName(name: string): void {
-  setPdfSettings({ defaultName: name, colorTheme: "teal" });
+  setPdfSettings({ defaultName: name, colorTheme: "slate" });
 }
 
 export async function exportChartPng(): Promise<void> {

@@ -1,4 +1,4 @@
-import { X } from "lucide-react";
+import { X } from "./icons";
 import { useEffect, type ReactNode } from "react";
 
 interface ModalProps {

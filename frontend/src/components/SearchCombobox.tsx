@@ -121,7 +121,7 @@ export function SearchCombobox<T extends { id: number }>({
             }
           }}
           onKeyDown={onKeyDown}
-          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none focus:border-teal-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none focus:border-focus dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
         />
         {open ? (
           <div className="absolute z-10 mt-1 max-h-56 w-full overflow-auto rounded-xl border border-slate-200 bg-white py-1 shadow-[0_10px_30px_rgba(15,40,80,0.12)] dark:border-slate-700 dark:bg-slate-900">
@@ -149,7 +149,7 @@ export function SearchCombobox<T extends { id: number }>({
                     onMouseEnter={() => setActiveIndex(index)}
                     className={`flex cursor-pointer items-center justify-between gap-3 px-3 py-2 ${
                       index === activeIndex
-                        ? "bg-teal-50 dark:bg-teal-950/60"
+                        ? "bg-lime-soft "
                         : ""
                     }`}
                   >

@@ -7,7 +7,7 @@ const VISIBLE = 2;
 const CHIP =
   "flex max-w-[12rem] items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium";
 const MATCHED =
-  "bg-teal-700 text-white dark:bg-teal-500 dark:text-slate-950";
+  "bg-action text-on-action dark:text-slate-950";
 const NORMAL =
   "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200";
 
@@ -33,7 +33,7 @@ export function IndicatedPractices({ practices = [] }: { practices?: IndicatedPr
           >
             {/* El número de pieza resalta: es lo primero que se busca. */}
             <b
-              className={`tabular-nums ${practice.matched ? "" : "text-teal-700 dark:text-teal-300"}`}
+              className={`tabular-nums ${practice.matched ? "" : "text-lime-ink "}`}
             >
               {practice.tooth}
             </b>

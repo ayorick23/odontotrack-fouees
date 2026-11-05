@@ -1,5 +1,5 @@
 import { differenceInCalendarDays } from "date-fns";
-import { Clock, FileText, FilterX, Hourglass, PartyPopper, UserCheck, Users } from "lucide-react";
+import { Clock, FileText, FilterX, Hourglass, PartyPopper, UserCheck, Users } from "../../components/icons";
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -322,7 +322,7 @@ export function AvailablePatients() {
             <h2 className="flex items-center gap-2 text-base font-semibold text-slate-900 dark:text-white">
               Pacientes disponibles
               <span
-                className="min-w-6 rounded-full bg-teal-700 px-1.5 py-px text-center text-[11px] font-semibold text-white tabular-nums"
+                className="min-w-6 rounded-full bg-action px-1.5 py-px text-center text-[11px] font-semibold text-on-action tabular-nums"
                 aria-label={total === null ? undefined : `${total} en espera`}
               >
                 {total === null ? "·" : total.toLocaleString("es-SV")}
@@ -388,7 +388,7 @@ export function AvailablePatients() {
           <button
             type="button"
             onClick={clearFilters}
-            className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold text-teal-700 transition hover:bg-teal-50 dark:text-teal-300 dark:hover:bg-teal-950/50"
+            className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold text-lime-ink transition hover:bg-lime-soft"
           >
             <FilterX className="size-3.5" aria-hidden="true" />
             Limpiar filtros
@@ -424,7 +424,7 @@ export function AvailablePatients() {
           ) : (
             <ListEmpty
               icon={PartyPopper}
-              tone="teal"
+              tone="accent"
               title="No hay pacientes esperando asignación"
               description="Cuando recepción registre un paciente nuevo aparecerá aquí."
             />
@@ -504,7 +504,7 @@ export function AvailablePatients() {
             <button
               type="button"
               onClick={() => openAssignment([...checked.values()])}
-              className="inline-flex items-center gap-2 rounded-xl bg-teal-500 px-3.5 py-1.5 font-semibold text-slate-950 transition hover:bg-teal-400"
+              className="inline-flex items-center gap-2 rounded-xl bg-lime px-3.5 py-1.5 font-semibold text-slate-950 transition hover:bg-lime"
             >
               <UserCheck className="size-4" aria-hidden="true" />
               {verb} {patientsLabel(checked.size)}
@@ -553,7 +553,7 @@ export function AvailablePatients() {
                   key={patient.id}
                   className="inline-flex items-center gap-2 rounded-full bg-slate-100 py-1 pr-3 pl-1 text-xs font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-200"
                 >
-                  <span className="flex size-6 items-center justify-center rounded-full bg-teal-50 text-[10px] font-semibold text-teal-700 dark:bg-teal-950 dark:text-teal-300">
+                  <span className="flex size-6 items-center justify-center rounded-full bg-lime-soft text-[10px] font-semibold text-lime-ink">
                     {patientInitials(patient)}
                   </span>
                   {patientFullName(patient)}
@@ -571,7 +571,7 @@ export function AvailablePatients() {
               onChange={(event) => setReason(event.target.value)}
               rows={3}
               placeholder="Ej. viene por dolor en una muela"
-              className="w-full rounded-xl bg-slate-100 px-3 py-2 text-sm text-slate-800 outline-none ring-teal-600/40 transition placeholder:text-slate-400 focus:bg-white focus:ring-2 dark:bg-slate-800 dark:text-slate-100 dark:focus:bg-slate-900"
+              className="w-full rounded-xl bg-slate-100 px-3 py-2 text-sm text-slate-800 outline-none ring-lime-strong transition placeholder:text-slate-400 focus:bg-white focus:ring-2 dark:bg-slate-800 dark:text-slate-100 dark:focus:bg-slate-900"
             />
           </label>
           {formError ? (
@@ -611,8 +611,8 @@ function AvailableRow({
   onAssign: () => void;
 }) {
   const stop = (event: MouseEvent) => event.stopPropagation();
-  // Fila marcada: teñida y con la barra teal fija (no solo al pasar el mouse).
-  const cell = `${LIST_CELL} ${selected ? "bg-teal-50/70 group-hover:bg-teal-50 dark:bg-teal-950/30 dark:group-hover:bg-teal-950/40" : ""}`;
+  // Fila marcada: teñida y con la barra de acento fija (no solo al pasar el mouse).
+  const cell = `${LIST_CELL} ${selected ? "bg-lime-soft group-hover:bg-lime-soft " : ""}`;
   const name = patientFullName(patient);
 
   return (
@@ -620,8 +620,8 @@ function AvailableRow({
       <td
         className={`${cell} pl-4 ${
           selected
-            ? "shadow-[inset_3px_0_0_#0f766e]"
-            : "shadow-[inset_3px_0_0_transparent] group-hover:shadow-[inset_3px_0_0_#0d9488]"
+            ? "shadow-[inset_3px_0_0_var(--action)]"
+            : "shadow-[inset_3px_0_0_transparent] group-hover:shadow-[inset_3px_0_0_var(--action)]"
         }`}
         onClick={stop}
       >
@@ -630,7 +630,7 @@ function AvailableRow({
           checked={selected}
           onChange={onToggle}
           aria-label={`Seleccionar a ${name}`}
-          className="size-4 accent-teal-700"
+          className="size-4 accent-action"
         />
       </td>
       <td className={cell}>
@@ -711,7 +711,7 @@ function PageCheckbox({
       checked={total > 0 && checked === total}
       onChange={onChange}
       aria-label="Seleccionar todos los de esta página"
-      className="size-4 align-middle accent-teal-700"
+      className="size-4 align-middle accent-action"
     />
   );
 }

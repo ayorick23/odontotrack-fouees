@@ -216,7 +216,7 @@ function DiagnosisFields({ readOnly }: { readOnly: boolean }) {
               {readOnly ? null : (
                 <button
                   type="button"
-                  className="text-xs font-semibold text-teal-700 hover:underline dark:text-teal-300"
+                  className="text-xs font-semibold text-lime-ink hover:underline"
                   onClick={() => clearDiagnosisFromSelection(row.key)}
                 >
                   Quitar
@@ -276,7 +276,7 @@ function ToggleChip({
       onClick={onClick}
       className={`w-fit rounded-full border px-3 py-1.5 text-sm font-semibold transition disabled:opacity-50 ${
         pressed
-          ? "border-teal-500 bg-teal-600 text-white"
+          ? "border-lime-strong bg-action text-on-action"
           : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
       }`}
     >

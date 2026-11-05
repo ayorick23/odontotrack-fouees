@@ -6,7 +6,7 @@ import {
   PencilOff,
   Trash2,
   UserPlus,
-} from "lucide-react";
+} from "../../components/icons";
 import { format, formatDistanceStrict } from "date-fns";
 import { es } from "date-fns/locale";
 import { useEffect, useMemo, useState, type MouseEvent } from "react";
@@ -407,7 +407,7 @@ export function PatientList() {
           {canRegister ? (
             <Link
               to="/patients/new"
-              className="inline-flex items-center gap-2 rounded-full bg-teal-700 px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-teal-900/20 transition hover:bg-teal-800 active:scale-[.98]"
+              className="inline-flex items-center gap-2 rounded-full bg-action px-4 py-2 text-sm font-semibold text-on-action shadow-sm shadow-ink/20 transition hover:bg-action-hover active:scale-[.98]"
             >
               <UserPlus className="size-4" aria-hidden="true" />
               Registrar paciente
@@ -471,7 +471,7 @@ export function PatientList() {
           <button
             type="button"
             onClick={clearFilters}
-            className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold text-teal-700 transition hover:bg-teal-50 dark:text-teal-300 dark:hover:bg-teal-950/50"
+            className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold text-lime-ink transition hover:bg-lime-soft"
           >
             <FilterX className="size-3.5" aria-hidden="true" />
             Limpiar filtros
@@ -630,7 +630,7 @@ function StatusTabs({
             <span
               className={`min-w-6 rounded-full px-1.5 py-px text-center text-[11px] font-semibold tabular-nums ${
                 active
-                  ? "bg-teal-700 text-white"
+                  ? "bg-action text-on-action"
                   : "bg-slate-100 text-slate-500 group-hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400"
               }`}
             >
@@ -638,7 +638,7 @@ function StatusTabs({
             </span>
             <span
               className={`absolute inset-x-2 bottom-0 h-0.5 rounded-full transition ${
-                active ? "bg-teal-700 dark:bg-teal-400" : "bg-transparent"
+                active ? "bg-action " : "bg-transparent"
               }`}
               aria-hidden="true"
             />
@@ -806,7 +806,7 @@ function ClearFiltersButton({ onClick }: { onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="rounded-full bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800"
+      className="rounded-full bg-action px-4 py-2 text-sm font-semibold text-on-action hover:bg-action-hover"
     >
       Limpiar filtros
     </button>

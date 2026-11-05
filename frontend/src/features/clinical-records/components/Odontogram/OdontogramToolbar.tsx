@@ -1,4 +1,4 @@
-import { Check, ChevronLeft, ChevronRight, Plus, Search, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Plus, Search, X } from "../../../../components/icons";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import {
@@ -189,7 +189,7 @@ function HygieneSection({
         type="button"
         aria-expanded={open}
         onClick={onToggle}
-        className="text-xs font-semibold text-teal-700 hover:underline dark:text-teal-300"
+        className="text-xs font-semibold text-lime-ink hover:underline"
       >
         {open ? "Ocultar higiene" : "Higiene: placa, sangrado, sarro"}
       </button>
@@ -212,7 +212,7 @@ function HygieneSection({
                 }
                 className={`rounded-lg px-2.5 py-2 text-xs font-medium transition disabled:opacity-50 ${
                   active
-                    ? "bg-teal-700 text-white"
+                    ? "bg-action text-on-action"
                     : "bg-slate-50 text-slate-700 hover:bg-slate-100 dark:bg-slate-800/60 dark:text-slate-200 dark:hover:bg-slate-800"
                 }`}
               >
@@ -348,7 +348,7 @@ function PlanSection({
       {readOnly ? null : (
         <div>
           <p className={SECTION_TITLE}>Agregar tratamiento</p>
-          <label className="flex h-10 items-center gap-2 rounded-xl bg-slate-100 px-3 text-sm ring-teal-600/40 transition focus-within:bg-white focus-within:ring-2 dark:bg-slate-800 dark:focus-within:bg-slate-900">
+          <label className="flex h-10 items-center gap-2 rounded-xl bg-slate-100 px-3 text-sm ring-lime-strong transition focus-within:bg-white focus-within:ring-2 dark:bg-slate-800 dark:focus-within:bg-slate-900">
             <Search className="size-4 shrink-0 text-slate-400" aria-hidden="true" />
             <input
               type="search"
@@ -374,7 +374,7 @@ function PlanSection({
                       onChange(addPlannedTreatment(value, fdi, treatment));
                       setQuery("");
                     }}
-                    className="group flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs transition hover:bg-teal-50 dark:hover:bg-teal-950/40"
+                    className="group flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs transition hover:bg-lime-soft"
                   >
                     <span className="min-w-0 flex-1">
                       <span className="block truncate font-medium text-slate-800 dark:text-slate-100">
@@ -386,7 +386,7 @@ function PlanSection({
                       </span>
                     </span>
                     <Plus
-                      className="size-4 shrink-0 text-slate-300 transition group-hover:text-teal-700 dark:text-slate-600 dark:group-hover:text-teal-300"
+                      className="size-4 shrink-0 text-slate-300 transition group-hover:text-lime-ink dark:text-slate-600"
                       aria-hidden="true"
                     />
                   </button>
@@ -412,14 +412,14 @@ function PlanSection({
                 <li
                   key={`${index}-${mark.treatment ?? mark.status}`}
                   className={`rounded-xl p-2.5 ${
-                    done ? "bg-teal-50 dark:bg-teal-950/40" : "bg-slate-50 dark:bg-slate-800/60"
+                    done ? "bg-lime-soft " : "bg-slate-50 dark:bg-slate-800/60"
                   }`}
                 >
                   <div className="flex items-start gap-2.5">
                     <div className="min-w-0 flex-1">
                       <p
                         className={`text-xs font-medium text-slate-800 dark:text-slate-100 ${
-                          done ? "line-through decoration-teal-700/40" : ""
+                          done ? "line-through decoration-lime-ink/40" : ""
                         }`}
                       >
                         {name}
@@ -462,7 +462,7 @@ function PlanSection({
                     <label className="mt-2 inline-flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200">
                       <input
                         type="checkbox"
-                        className="size-4 accent-teal-700"
+                        className="size-4 accent-action"
                         checked={done}
                         onChange={(event) => onChange(setDone(value, fdi, index, event.target.checked))}
                       />

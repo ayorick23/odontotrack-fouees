@@ -185,7 +185,7 @@ export function RoleForm() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Link
           to="/roles"
-          className="text-sm font-medium text-teal-600 hover:text-teal-700 dark:text-teal-400"
+          className="text-sm font-medium text-lime-ink hover:text-lime-ink"
         >
           ← Volver a roles
         </Link>
@@ -244,7 +244,7 @@ export function RoleForm() {
               value={name}
               onChange={(event) => setName(event.target.value)}
               disabled={!canWrite}
-              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-[#2ad4c5] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-action dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
             />
           </label>
           <label className="text-sm font-medium text-slate-600 dark:text-slate-300">
@@ -253,7 +253,7 @@ export function RoleForm() {
               value={description}
               onChange={(event) => setDescription(event.target.value)}
               disabled={!canWrite}
-              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-[#2ad4c5] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-action dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
             />
           </label>
         </div>
@@ -265,7 +265,7 @@ export function RoleForm() {
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Buscar módulo o permiso..."
-            className="w-full max-w-sm rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-[#2ad4c5] dark:border-slate-700 dark:bg-slate-800"
+            className="w-full max-w-sm rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-action dark:border-slate-700 dark:bg-slate-800"
           />
           <div className="flex flex-wrap items-center gap-3">
             <p className="text-xs font-medium text-slate-400">
@@ -283,7 +283,7 @@ export function RoleForm() {
                 >
                   <input
                     type="checkbox"
-                    className="size-4 accent-[#2ad4c5]"
+                    className="size-4 accent-action"
                     disabled={!canWrite}
                     checked={names.every((item) => selected.has(item))}
                     onChange={(event) => setMany(names, event.target.checked)}
@@ -360,7 +360,7 @@ export function RoleForm() {
                           <label className="inline-flex items-center gap-1.5 text-sm text-slate-600 dark:text-slate-300">
                             <input
                               type="checkbox"
-                              className="size-4 accent-[#2ad4c5]"
+                              className="size-4 accent-action"
                               disabled={!canWrite}
                               checked={allChecked}
                               onChange={(event) =>
@@ -378,7 +378,7 @@ export function RoleForm() {
                             >
                               <input
                                 type="checkbox"
-                                className="size-4 accent-[#2ad4c5]"
+                                className="size-4 accent-action"
                                 disabled={!canWrite}
                                 checked={selected.has(action.name)}
                                 onChange={(event) =>

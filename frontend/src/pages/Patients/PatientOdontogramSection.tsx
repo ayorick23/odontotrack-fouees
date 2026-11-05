@@ -1,4 +1,4 @@
-import { ChevronDown, History, Save, Undo2 } from "lucide-react";
+import { ChevronDown, History, Save, Undo2 } from "../../components/icons";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -163,7 +163,7 @@ export function PatientOdontogramSection({
               {activeMarks.map((label) => (
                 <span
                   key={label}
-                  className="rounded-full bg-teal-50 px-2.5 py-0.5 text-xs font-semibold text-teal-700 dark:bg-teal-950/60 dark:text-teal-300"
+                  className="rounded-full bg-lime-soft px-2.5 py-0.5 text-xs font-semibold text-lime-ink"
                 >
                   {label}
                 </span>
@@ -182,7 +182,7 @@ export function PatientOdontogramSection({
               <span className="relative flex items-center">
                 <select
                   aria-label="Historial del odontograma"
-                  className="max-w-60 appearance-none truncate rounded-full bg-white py-1 pr-7 pl-2.5 font-semibold text-slate-700 outline-none focus-visible:ring-2 focus-visible:ring-teal-600/40 dark:bg-slate-900 dark:text-slate-100"
+                  className="max-w-60 appearance-none truncate rounded-full bg-white py-1 pr-7 pl-2.5 font-semibold text-slate-700 outline-none focus-visible:ring-2 focus-visible:ring-focus dark:bg-slate-900 dark:text-slate-100"
                   value={viewingRevisionId ?? ""}
                   onChange={(event) => {
                     const next = event.target.value;
@@ -248,7 +248,7 @@ export function PatientOdontogramSection({
                 onClick={() => {
                   void handleSave();
                 }}
-                className="inline-flex h-9 items-center gap-2 rounded-full bg-teal-700 px-4 text-sm font-semibold text-white shadow-sm shadow-teal-900/20 transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none dark:disabled:bg-slate-800 dark:disabled:text-slate-500"
+                className="inline-flex h-9 items-center gap-2 rounded-full bg-action px-4 text-sm font-semibold text-on-action shadow-sm shadow-ink/20 transition hover:bg-action-hover disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none dark:disabled:bg-slate-800 dark:disabled:text-slate-500"
               >
                 <Save className="size-4" aria-hidden="true" />
                 {isSaving ? "Guardando…" : "Guardar"}

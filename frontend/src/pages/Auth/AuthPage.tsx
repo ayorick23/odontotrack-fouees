@@ -61,7 +61,7 @@ export function AuthPage() {
     // el panel deja un margen leve y tiene esquinas redondeadas.
     <div className="relative min-h-svh overflow-hidden bg-white dark:bg-slate-900">
       <div className="absolute right-5 top-5 z-30">
-        <ThemeToggle />
+        <ThemeToggle className="glass-chip size-10" />
       </div>
 
       <div className="relative min-h-svh md:h-svh">
@@ -128,21 +128,21 @@ function BrandPanel({
 }) {
   return (
     <div
-      className={`relative isolate h-full overflow-hidden rounded-[28px] bg-teal-950 text-white ${
+      className={`relative isolate h-full overflow-hidden rounded-[28px] bg-ink text-white ${
         compact ? "px-6 py-6" : "p-12 lg:p-16"
       }`}
     >
       {/* Manchas de color difuminadas: el "degradado" del panel. */}
-      <div className="absolute -left-[10%] -top-[15%] -z-10 aspect-square w-[70%] rounded-full bg-teal-400/70 blur-[90px]" />
+      <div className="absolute -left-[10%] -top-[15%] -z-10 aspect-square w-[70%] rounded-full bg-lime/70 blur-[90px]" />
       <div className="absolute -right-[15%] top-[30%] -z-10 aspect-square w-[55%] rounded-full bg-cyan-300/45 blur-[90px]" />
       <div className="absolute -bottom-[25%] left-[15%] -z-10 aspect-square w-[75%] rounded-full bg-sky-600/70 blur-[100px]" />
-      <div className="absolute inset-0 -z-10 bg-gradient-to-t from-teal-950/70 via-transparent to-transparent" />
+      <div className="absolute inset-0 -z-10 bg-gradient-to-t from-ink/70 via-transparent to-transparent" />
 
       <div
         className={`flex h-full ${compact ? "items-center gap-4" : "flex-col justify-between"}`}
       >
         <div className="flex items-center gap-3">
-          <span className="grid size-14 place-items-center rounded-full bg-white/95 p-2 shadow-lg shadow-teal-950/30">
+          <span className="grid size-14 place-items-center rounded-full bg-white/95 p-2 shadow-lg shadow-ink/30">
             <img
               src={logoSello}
               alt="Universidad Evangélica de El Salvador"

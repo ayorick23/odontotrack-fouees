@@ -19,7 +19,7 @@ import {
   UserPlus,
   Users,
   UserX,
-} from "lucide-react";
+} from "../../components/icons";
 import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 
@@ -134,7 +134,7 @@ export function Dashboard() {
         <button
           type="button"
           onClick={load}
-          className="mt-4 rounded-full bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800"
+          className="mt-4 rounded-full bg-action px-4 py-2 text-sm font-semibold text-on-action hover:bg-action-hover"
         >
           Reintentar
         </button>
@@ -151,7 +151,7 @@ export function Dashboard() {
         className="grid h-full min-h-[44rem] grid-rows-[auto_auto_minmax(0,1.1fr)_minmax(0,1fr)] gap-4"
         translate="no"
       >
-        <p className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">
+        <p className="anim-rise text-[30px] leading-none font-bold tracking-[-0.035em] text-ink dark:text-white">
           {greeting()}
           {name ? `, ${name}` : ""}
         </p>
@@ -222,7 +222,7 @@ function StudentLayout({ data }: { data: StudentData }) {
           {data.cases.length === 0 ? (
             <p className="py-6 text-center text-sm text-slate-400">
               No tienes casos activos.{" "}
-              <Link to="/assignments" className="font-semibold text-teal-700 dark:text-teal-300">
+              <Link to="/assignments" className="font-semibold text-lime-ink">
                 Elige uno del banco
               </Link>
               .
@@ -310,13 +310,13 @@ function TasksCard({ tasks }: { tasks: StudentData["tasks"] }) {
       </div>
       {tasks.length === 0 ? (
         <p className="flex flex-1 items-center gap-2 text-sm text-slate-300">
-          <Check className="size-4 text-teal-400" /> Estás al día.
+          <Check className="size-4 text-lime-ink" /> Estás al día.
         </p>
       ) : (
         <ul className="space-y-2.5 overflow-y-auto text-sm">
           {tasks.map((task, index) => (
             <li key={`${task.kind}-${task.patient_id}-${index}`}>
-              <Link to={`/patients/${task.patient_id}`} className="flex items-start gap-2.5 hover:text-teal-200">
+              <Link to={`/patients/${task.patient_id}`} className="flex items-start gap-2.5 hover:text-lime">
                 <span className="mt-0.5 size-4 shrink-0 rounded-full border border-slate-500" />
                 <div>
                   <p>{task.title}</p>
@@ -382,7 +382,7 @@ function ValidationQueue({ data }: { data: SupervisionData }) {
     >
       {data.queue.length === 0 ? (
         <p className="flex items-center justify-center gap-2 py-6 text-sm text-slate-400">
-          <Check className="size-4 text-teal-600" /> No hay diagnósticos por validar.
+          <Check className="size-4 text-lime-ink" /> No hay diagnósticos por validar.
         </p>
       ) : (
         <ul className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -397,7 +397,7 @@ function ValidationQueue({ data }: { data: SupervisionData }) {
               <span className="shrink-0 text-[11px] text-slate-400">{since(row.created_at)}</span>
               <Link
                 to="/supervision"
-                className="shrink-0 rounded-full bg-teal-700 px-3 py-1 text-[11px] font-semibold text-white hover:bg-teal-800"
+                className="shrink-0 rounded-full bg-action px-3 py-1 text-[11px] font-semibold text-on-action hover:bg-action-hover"
               >
                 Revisar
               </Link>
@@ -505,8 +505,9 @@ function AdminLayout({
   const { status } = useChartTheme();
   const [period, setPeriod] = useState<SeriesPeriod>("1a");
   const [series, setSeries] = useState<DashboardSeries | null>(null);
-  // Segunda serie: el violeta validado junto al teal (ver chartColors.ts).
-  const violet = status.pendiente;
+  // Segunda serie en lima (el color de "pendiente", ver chartColors.ts): la
+  // primera va en tinta, como la maqueta aprobada.
+  const accent = status.pendiente;
 
   useEffect(() => {
     getDashboardSeries({ period })
@@ -524,17 +525,17 @@ function AdminLayout({
           title="Registrados y asignaciones por mes"
           className="lg:col-span-2"
           action={
-            <div className="flex gap-1" role="group" aria-label="Período">
+            <div className="glass-chip flex gap-0.5 rounded-full p-0.5" role="group" aria-label="Período">
               {PERIODS.map((item) => (
                 <button
                   key={item.value}
                   type="button"
                   aria-pressed={period === item.value}
                   onClick={() => setPeriod(item.value)}
-                  className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                  className={`press rounded-full px-2.5 py-1 text-[11px] font-semibold transition ${
                     period === item.value
-                      ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900"
-                      : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+                      ? "bg-white text-ink shadow-sm dark:bg-white/15 dark:text-white"
+                      : "text-slate-500 hover:text-ink dark:text-slate-400 dark:hover:text-white"
                   }`}
                 >
                   {item.label}
@@ -550,7 +551,7 @@ function AdminLayout({
                   labels={series.months.map((month) => month.label.split(" ")[0])}
                   series={[
                     { name: "Registrados", color: SINGLE_SERIES_COLOR, values: series.months.map((month) => month.patients) },
-                    { name: "Asignaciones", color: violet, values: series.months.map((month) => month.assignments) },
+                    { name: "Asignaciones", color: accent, values: series.months.map((month) => month.assignments) },
                   ]}
                 />
               ) : (
@@ -560,10 +561,10 @@ function AdminLayout({
             <div className="flex gap-4 pt-1">
               {[
                 ["Registrados", SINGLE_SERIES_COLOR],
-                ["Asignaciones", violet],
+                ["Asignaciones", accent],
               ].map(([label, color]) => (
-                <span key={label} className="flex items-center gap-1.5 text-[11px] text-slate-500">
-                  <span className="size-2 rounded-full" style={{ background: color }} />
+                <span key={label} className="flex items-center gap-1.5 text-[11.5px] font-medium text-slate-600 dark:text-slate-400">
+                  <span className="h-[3px] w-3.5 rounded-full" style={{ background: color }} />
                   {label}
                 </span>
               ))}

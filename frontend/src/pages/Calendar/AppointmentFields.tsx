@@ -29,7 +29,7 @@ export function draftStartIso(draft: AppointmentDraft): string {
 
 const labelClass = "block text-sm text-slate-600 dark:text-slate-300";
 const inputClass =
-  "mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-teal-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100";
+  "mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-focus dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100";
 
 export function AppointmentFields({
   draft,

@@ -54,8 +54,8 @@ export const KIND_STYLE: Record<
 > = {
   programada: {
     label: APPOINTMENT_STATUS_LABELS.programada,
-    bar: "#0d9488",
-    chip: "bg-teal-50 text-teal-900 dark:bg-teal-950/60 dark:text-teal-100",
+    bar: "#16181c",
+    chip: "bg-lime-soft text-lime-ink",
   },
   pendiente: {
     label: "Sin registrar",
@@ -64,7 +64,7 @@ export const KIND_STYLE: Record<
   },
   atendida: {
     label: APPOINTMENT_STATUS_LABELS.atendida,
-    bar: "#6250d6",
+    bar: "#8b7fe8",
     chip: "bg-violet-50 text-violet-900 dark:bg-violet-950/60 dark:text-violet-100",
   },
   cancelada: {

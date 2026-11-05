@@ -15,8 +15,8 @@ select {
 }
 
 .odontogram-fouees {
-  --odon-accent: #0f8f82;
-  --odon-accent2: #2ad4c5;
+  --odon-accent: #16181c;
+  --odon-accent2: #c8e43c;
   overflow: visible;
 }
 
@@ -104,14 +104,14 @@ select {
 }
 
 .odontogram-fouees .tooth-tile.active {
-  border-color: #0f8f82;
+  border-color: #16181c;
   border-width: 2px;
-  background: rgb(15 143 130 / 0.12);
-  box-shadow: 0 0 0 3px rgb(15 143 130 / 0.28);
+  background: rgb(220 242 106 / 0.28);
+  box-shadow: 0 0 0 3px rgb(200 228 60 / 0.45);
 }
 
 .odontogram-fouees .tooth-tile.active:after {
-  border-color: #0f8f82;
+  border-color: #16181c;
   border-style: solid;
   animation: none;
 }
@@ -137,17 +137,17 @@ select {
 }
 
 :is(.dark) .odontogram-fouees .tooth-tile:hover {
-  background: rgb(15 143 130 / 0.18);
+  background: rgb(220 242 106 / 0.1);
 }
 
 :is(.dark) .odontogram-fouees .tooth-tile.active {
-  border-color: #2ad4c5;
-  background: rgb(15 143 130 / 0.22);
-  box-shadow: 0 0 0 3px rgb(42 212 197 / 0.35);
+  border-color: #dcf26a;
+  background: rgb(220 242 106 / 0.14);
+  box-shadow: 0 0 0 3px rgb(220 242 106 / 0.3);
 }
 
 :is(.dark) .odontogram-fouees .tooth-tile.active:after {
-  border-color: #2ad4c5;
+  border-color: #dcf26a;
 }
 
 :is(.dark) .odontogram-fouees .tooth-tile.active .tooth-svg svg {
@@ -226,7 +226,7 @@ select {
 }
 
 .odontogram-fouees .tooth-label-cell[data-state="done"] {
-  color: #0f766e;
+  color: #4f6500;
 }
 
 :is(.dark) .odontogram-fouees .tooth-label-cell[data-state="finding"] {
@@ -238,7 +238,7 @@ select {
 }
 
 :is(.dark) .odontogram-fouees .tooth-label-cell[data-state="done"] {
-  color: #5eead4;
+  color: #dcf26a;
 }
 
 /* react-advanced-odontogram/style.css trae una regla `select { … }` global

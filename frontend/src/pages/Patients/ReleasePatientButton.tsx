@@ -1,4 +1,4 @@
-import { Undo2 } from "lucide-react";
+import { Undo2 } from "../../components/icons";
 import { useState } from "react";
 import { toast } from "sonner";
 

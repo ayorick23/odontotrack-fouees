@@ -97,7 +97,7 @@ export function PatientClinicalTabs({
               onClick={() => setTab(item.id)}
               className={`rounded-full px-3 py-1.5 text-sm font-semibold transition ${
                 selected
-                  ? "bg-[#2ad4c5] text-white"
+                  ? "bg-action text-on-action"
                   : "text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
               }`}
             >

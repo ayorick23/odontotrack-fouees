@@ -57,7 +57,7 @@ export function OdontogramChartViews() {
             }}
             className={`rounded-full px-2.5 py-1 text-xs font-semibold transition ${
               on
-                ? "bg-white text-teal-800 shadow-sm dark:bg-slate-900 dark:text-teal-200"
+                ? "bg-white text-lime-ink shadow-sm dark:bg-slate-900 "
                 : "text-slate-500 hover:text-slate-700 dark:text-slate-400"
             }`}
           >

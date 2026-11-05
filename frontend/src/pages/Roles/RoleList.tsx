@@ -1,4 +1,4 @@
-import { Plus, Search, Shield } from "lucide-react";
+import { Plus, Search, Shield } from "../../components/icons";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -78,7 +78,7 @@ export function RoleList() {
         header: "Rol",
         render: (role: RoleRecord) => (
           <div className="flex items-center gap-3">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-teal-50 text-teal-700 dark:bg-teal-950/60 dark:text-teal-300">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-lime-soft text-lime-ink">
               <Shield className="size-4" />
             </span>
             <div>
@@ -325,7 +325,7 @@ function CreateRoleModal({
             className={`mt-1 w-full rounded-xl border bg-white px-3 py-2 text-sm text-slate-800 outline-none dark:bg-slate-800 dark:text-slate-100 ${
               error
                 ? "border-red-400 focus:border-red-500 dark:border-red-500"
-                : "border-slate-200 focus:border-[#2ad4c5] dark:border-slate-700"
+                : "border-slate-200 focus:border-action dark:border-slate-700"
             }`}
           />
         </label>
@@ -334,7 +334,7 @@ function CreateRoleModal({
           <input
             value={description}
             onChange={(event) => setDescription(event.target.value)}
-            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-[#2ad4c5] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-action dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
           />
         </label>
         {error ? (
