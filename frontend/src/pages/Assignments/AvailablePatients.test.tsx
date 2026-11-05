@@ -1,5 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AvailablePatients } from "./AvailablePatients";
@@ -33,6 +34,7 @@ vi.mock("../../services/patients", async () => {
 vi.mock("../../services/catalogs", () => ({
   listClinicalAreas: api.listClinicalAreas,
   areaLabel: (_areas: unknown, slug: string) => slug,
+  treatmentLabel: (_areas: unknown, slug: string) => slug,
 }));
 
 vi.mock("../../services/assignments", async () => {
@@ -63,6 +65,14 @@ const ana = {
 };
 
 const luis = { ...ana, id: 6, first_name: "Luis", dui: "DISP-002" };
+
+function renderPage(url = "/assignments") {
+  return render(
+    <MemoryRouter initialEntries={[url]}>
+      <AvailablePatients />
+    </MemoryRouter>,
+  );
+}
 
 function assignmentFor(patient: number) {
   return {
@@ -95,7 +105,7 @@ describe("AvailablePatients", () => {
     auth.permissions = ["assignments.claim"];
     api.claimAvailablePatients.mockResolvedValue([assignmentFor(4)]);
     const user = userEvent.setup();
-    render(<AvailablePatients />);
+    renderPage();
 
     expect(await screen.findByText("Ana Disponible")).toBeInTheDocument();
     await user.click(screen.getAllByRole("button", { name: "Elegir" })[0]);
@@ -119,7 +129,7 @@ describe("AvailablePatients", () => {
     auth.permissions = ["assignments.assign_student"];
     api.assignPatients.mockResolvedValue([assignmentFor(4)]);
     const user = userEvent.setup();
-    render(<AvailablePatients />);
+    renderPage();
 
     expect(await screen.findByText("Ana Disponible")).toBeInTheDocument();
     await user.click(screen.getAllByRole("button", { name: "Asignar" })[0]);
@@ -149,7 +159,7 @@ describe("AvailablePatients", () => {
     auth.permissions = ["assignments.assign_student"];
     api.assignPatients.mockResolvedValue([assignmentFor(4), assignmentFor(6)]);
     const user = userEvent.setup();
-    render(<AvailablePatients />);
+    renderPage();
 
     await user.click(
       await screen.findByRole("checkbox", { name: "Seleccionar a Ana Disponible" }),
@@ -157,7 +167,7 @@ describe("AvailablePatients", () => {
     await user.click(
       screen.getByRole("checkbox", { name: "Seleccionar a Luis Disponible" }),
     );
-    await user.click(screen.getByRole("button", { name: /Asignar seleccionados \(2\)/ }));
+    await user.click(screen.getByRole("button", { name: "Asignar 2 pacientes" }));
 
     expect(
       screen.getByRole("heading", { name: "Asignar 2 pacientes" }),
@@ -173,5 +183,36 @@ describe("AvailablePatients", () => {
         reason: "",
       });
     });
+  });
+
+  it("asks for the longest wait first and keeps filters from the URL", async () => {
+    auth.permissions = ["assignments.assign_student"];
+    renderPage("/assignments?clinical_area=endodoncia&tooth=18");
+
+    expect(await screen.findByText("Ana Disponible")).toBeInTheDocument();
+    expect(api.listAvailablePatients).toHaveBeenCalledWith(
+      expect.objectContaining({
+        clinicalArea: "endodoncia",
+        tooth: "18",
+        ordering: "created_at",
+      }),
+    );
+    expect(screen.getByRole("button", { name: /Limpiar filtros/ })).toBeInTheDocument();
+  });
+
+  it("selects the whole page from the header checkbox", async () => {
+    auth.permissions = ["assignments.assign_student"];
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(
+      await screen.findByRole("checkbox", { name: "Seleccionar todos los de esta página" }),
+    );
+    expect(screen.getByRole("checkbox", { name: "Seleccionar a Ana Disponible" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Seleccionar a Luis Disponible" })).toBeChecked();
+    expect(screen.getByText("seleccionados")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Quitar selección" }));
+    expect(screen.queryByRole("region", { name: "Pacientes seleccionados" })).toBeNull();
   });
 });

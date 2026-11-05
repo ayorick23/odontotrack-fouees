@@ -235,6 +235,9 @@ function practiceQuery(params: PracticeFilters): Record<string, string> {
 export function listAvailablePatients(params: {
   page?: number;
   search?: string;
+  clinicalArea?: string;
+  /** "created_at" = los que llevan más tiempo esperando primero. */
+  ordering?: DirectoryOrdering;
 } & PracticeFilters = {}): Promise<PaginatedResponse<PatientListItem>> {
   const query: Record<string, string | number> = practiceQuery(params);
   if (params.page && params.page > 1) {
@@ -242,6 +245,12 @@ export function listAvailablePatients(params: {
   }
   if (params.search) {
     query.search = params.search;
+  }
+  if (params.clinicalArea) {
+    query.clinical_area = params.clinicalArea;
+  }
+  if (params.ordering) {
+    query.ordering = params.ordering;
   }
   return api
     .get<PaginatedResponse<PatientListItem>>("/patients/available/", {

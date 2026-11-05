@@ -68,8 +68,11 @@ class PatientViewSet(viewsets.ModelViewSet):
                 Patient.objects.prefetch_related("assignments__student")
                 .select_related("clinical_area", "clinical_treatment", "odontogram")
                 .available()
+                .by_clinical_area(params.get("clinical_area"))
                 .by_indicated_practice(params.get("tooth"), params.get("treatment"))
-                .order_by("id")
+                # Mismo ?ordering= del directorio; la pantalla de
+                # asignaciones pide created_at (más tiempo en espera primero).
+                .order_by(*directory_ordering(params.get("ordering")))
             )
         queryset = Patient.objects.prefetch_related("assignments__student")
         if self.action not in ("list", "export"):
