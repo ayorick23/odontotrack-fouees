@@ -39,7 +39,10 @@ export function ListFilter({
             id={id}
             aria-labelledby={labelId}
             className={`h-full w-full min-w-0 border-0 bg-transparent pl-3 font-medium shadow-none dark:bg-transparent dark:hover:bg-transparent ${
-              active ? "pr-9 text-lime-ink " : "text-slate-700 dark:text-slate-200"
+              active
+                ? // Activo: la ✕ ocupa el lugar de la flecha (se oculta el ícono).
+                  "pr-9 text-lime-ink [&>svg:last-child]:hidden"
+                : "text-slate-700 dark:text-slate-200"
             }`}
           >
             <SelectValue />
@@ -65,7 +68,7 @@ export function ListFilter({
             type="button"
             onClick={() => onChange(FILTER_ALL)}
             aria-label={`Quitar filtro de ${label.toLowerCase()}`}
-            className="absolute right-8 flex size-5 items-center justify-center rounded-full text-lime-ink transition hover:bg-lime-soft"
+            className="press absolute right-2.5 flex size-6 items-center justify-center rounded-full text-lime-ink transition hover:bg-lime-soft"
           >
             <X className="size-3.5" aria-hidden="true" />
           </button>

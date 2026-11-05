@@ -534,7 +534,7 @@ export function PatientList() {
                 </HeaderCell>
               </tr>
             </thead>
-            <tbody>
+            <tbody key={`${page}-${ordering}`} className="anim-fade">
               {state.patients.map((patient) => (
                 <PatientRow
                   key={patient.id}

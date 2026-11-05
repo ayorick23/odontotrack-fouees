@@ -71,7 +71,15 @@ export function TipLayer({ children }: { children: ReactNode }) {
         <div
           role="tooltip"
           className="pointer-events-none fixed z-50 whitespace-pre-line rounded-xl bg-ink px-2.5 py-1.5 text-xs text-white shadow-xl dark:bg-white dark:text-ink"
-          style={{ left: tip.x + 14, top: tip.y + 14 }}
+          // Cerca del borde derecho o inferior se voltea hacia el cursor:
+          // nunca sale de la pantalla (antes generaba scroll).
+          style={{
+            left: tip.x + 14,
+            top: tip.y + 14,
+            transform: `translate(${tip.x > window.innerWidth - 260 ? "calc(-100% - 28px)" : "0"}, ${
+              tip.y > window.innerHeight - 120 ? "calc(-100% - 28px)" : "0"
+            })`,
+          }}
         >
           {tip.text}
         </div>

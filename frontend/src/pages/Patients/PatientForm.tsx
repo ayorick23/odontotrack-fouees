@@ -4,8 +4,8 @@ import {
   CircleCheckBig,
   Clock3,
   UserCheck,
-  UserPlus,
   type AppIcon,
+  Plus,
 } from "../../components/icons";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Controller, useForm } from "react-hook-form";
@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "../../components/ui/select";
 import { useAuth } from "../../hooks/useAuth";
+import { GLASS_PANEL, PRIMARY_ICON_DOT, SOLID_BLOCK } from "../../components/listing/styles";
 import { primaryActionClass, secondaryActionClass } from "../../lib/actions";
 import { isValidPhone } from "../../lib/phones";
 import {
@@ -56,12 +57,11 @@ const DUI_FORMAT_ERROR = "Usa el formato 00000000-0";
 const PHONE_ERROR = "Completa el número con los dígitos del país";
 const MAX_PHOTO_BYTES = 2 * 1024 * 1024;
 const ALLOWED_PHOTO_TYPES = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
-const cardClass =
-  "rounded-2xl bg-white p-5 dark:bg-slate-900 sm:p-6";
+// Campos como los filtros: fondo arena, sin borde y anillo al enfocar.
 const inputClass =
-  "mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-brand/20 dark:disabled:bg-slate-800/70 dark:disabled:text-slate-400";
+  "mt-1.5 h-10 w-full rounded-xl border border-transparent bg-slate-100 px-3 text-sm font-normal text-ink outline-none transition placeholder:text-slate-400 hover:bg-slate-200/70 focus:bg-white focus:ring-2 focus:ring-focus disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white/[.06] dark:text-slate-100 dark:hover:bg-white/[.09] dark:focus:bg-white/[.08]";
 const selectClass =
-  "mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 shadow-none outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 disabled:cursor-not-allowed disabled:opacity-70 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-800";
+  "mt-1.5 h-10 w-full rounded-xl border-0 bg-slate-100 px-3 text-sm font-normal text-ink shadow-none outline-none transition hover:bg-slate-200/70 focus:ring-2 focus:ring-focus disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white/[.06] dark:text-slate-100 dark:hover:bg-white/[.09]";
 const selectMenuClass =
   "max-h-72 rounded-xl border-slate-200 bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100";
 const STATUS_ICONS: Record<CaseStatus, AppIcon> = {
@@ -379,12 +379,15 @@ export function PatientForm() {
 
   const status = loadedPatient?.case_status ?? "pendiente";
 
+  // Escritorio: todo cabe en la pantalla (sin scroll). Izquierda, datos
+  // personales a toda la altura; derecha, contacto y emergencia. En pantallas
+  // angostas se apila en una columna.
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="flex h-full min-h-0 flex-col gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-1">
         <Link
           to="/patients"
-          className="text-sm font-medium text-lime-ink hover:text-lime-ink"
+          className="inline-flex items-center gap-1 text-sm font-medium text-lime-ink hover:underline"
         >
           ← Volver al directorio
         </Link>
@@ -408,17 +411,19 @@ export function PatientForm() {
 
       <form
         id="patient-form"
-        className="space-y-4"
+        className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]"
         onSubmit={handleSubmit(onSubmit)}
         noValidate
       >
-        <section className={cardClass}>
-          <SectionHeading
-            title="Datos personales"
-            description="Identificación de recepción. El expediente clínico se carga después de asignar."
-          />
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
-            <div className="flex shrink-0 flex-col items-center lg:w-36">
+        <section className={`${GLASS_PANEL} flex min-h-0 flex-col`}>
+          <div className="px-3 pt-2 pb-1">
+            <SectionHeading
+              title="Datos personales"
+              description="Identificación de recepción. El expediente clínico se carga después de asignar."
+            />
+          </div>
+          <div className={`${SOLID_BLOCK} flex min-h-0 flex-1 flex-col gap-4 overflow-auto`}>
+            <div className="flex shrink-0 items-center gap-4">
               <input
                 ref={photoInputRef}
                 type="file"
@@ -434,7 +439,7 @@ export function PatientForm() {
                 type="button"
                 disabled={!canWrite}
                 onClick={() => photoInputRef.current?.click()}
-                className="relative flex size-28 items-center justify-center overflow-hidden rounded-full bg-lime-soft text-lime-ink transition hover:bg-lime-soft disabled:cursor-not-allowed disabled:opacity-70"
+                className="press relative flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-full bg-lime-soft text-lime-ink transition hover:bg-lime disabled:cursor-not-allowed disabled:opacity-70"
                 aria-label="Subir foto del paciente"
               >
                 {displayPhoto ? (
@@ -449,23 +454,26 @@ export function PatientForm() {
                   </span>
                 )}
                 {canWrite ? (
-                  <span className="absolute right-1 bottom-1 flex size-8 items-center justify-center rounded-full bg-brand text-white shadow-sm">
+                  <span className="absolute right-0 bottom-0 flex size-7 items-center justify-center rounded-full bg-action text-on-action shadow-sm">
                     <Camera className="size-3.5" aria-hidden="true" />
                   </span>
                 ) : null}
               </button>
-              {photoError ? (
-                <p className="mt-2 max-w-36 text-center text-xs text-red-600 dark:text-red-400">
-                  {photoError}
+              <div className="min-w-0">
+                <p className="truncate text-lg font-bold tracking-tight text-ink dark:text-white">
+                  {[watch("first_name"), watch("last_name")].filter(Boolean).join(" ") || "Nuevo paciente"}
                 </p>
-              ) : (
-                <p className="mt-2 text-center text-[11px] text-slate-400">
-                  JPG, PNG o WebP · 2 MB
-                </p>
-              )}
+                {photoError ? (
+                  <p className="mt-0.5 text-xs text-red-600 dark:text-red-400">{photoError}</p>
+                ) : (
+                  <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                    Foto opcional · JPG, PNG o WebP · 2 MB
+                  </p>
+                )}
+              </div>
             </div>
 
-            <div className="grid min-w-0 flex-1 gap-4 md:grid-cols-2">
+            <div className="grid min-w-0 gap-x-4 gap-y-3 md:grid-cols-2 lg:flex-1 lg:content-evenly">
               <Field
                 label="Nombres"
                 error={errors.first_name?.message}
@@ -680,12 +688,13 @@ export function PatientForm() {
           </div>
         </section>
 
-        <section className={cardClass}>
+        <div className={`${GLASS_PANEL} flex min-h-0 flex-col gap-2`}>
+        <section className={`${SOLID_BLOCK} flex min-h-0 flex-1 flex-col`}>
           <SectionHeading
             title="Contacto"
             description="Teléfono, WhatsApp y correo para localizar al paciente."
           />
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-x-4 gap-y-3 md:grid-cols-2 lg:flex-1 lg:content-evenly">
             <Field label="Teléfono" error={errors.phone_number?.message} required>
 <Controller
                 name="phone_number"
@@ -750,12 +759,12 @@ export function PatientForm() {
           </div>
         </section>
 
-        <section className={cardClass}>
+        <section className={`${SOLID_BLOCK} flex min-h-0 flex-1 flex-col`}>
           <SectionHeading
             title="Contacto de emergencia"
             description="Persona a quien llamar si no se localiza al paciente."
           />
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-x-4 gap-y-3 md:grid-cols-2 lg:flex-1 lg:content-evenly">
             <Field
               label="Nombre"
               error={errors.emergency_contact_name?.message}
@@ -830,15 +839,6 @@ export function PatientForm() {
             </Field>
           </div>
         </section>
-
-        <div className="flex flex-wrap justify-end gap-2">
-          <FormActions
-            status={status}
-            canWrite={canWrite}
-            isEditing={isEditing}
-            isSubmitting={isSubmitting}
-            hideStatus
-          />
         </div>
       </form>
     </div>
@@ -869,9 +869,13 @@ function FormActions({
           type="submit"
           form="patient-form"
           disabled={isSubmitting}
-          className={primaryActionClass}
+          className={`${primaryActionClass} ${isEditing ? "" : "anim-spin-plus py-1.5 pl-1.5"}`}
         >
-          {isEditing ? null : <UserPlus className="size-4" />}
+          {isEditing ? null : (
+            <span className={PRIMARY_ICON_DOT}>
+              <Plus className="size-4" weight="bold" aria-hidden="true" />
+            </span>
+          )}
           {submitLabel(isEditing, isSubmitting)}
         </button>
       ) : null}
@@ -887,11 +891,9 @@ function SectionHeading({
   description: string;
 }) {
   return (
-    <div className="mb-5">
-      <h2 className="text-base font-semibold text-slate-800 dark:text-slate-100">
-        {title}
-      </h2>
-      <p className="mt-0.5 text-sm text-slate-400">{description}</p>
+    <div className="mb-4">
+      <h2 className="text-[15px] font-semibold tracking-tight text-ink dark:text-white">{title}</h2>
+      <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{description}</p>
     </div>
   );
 }
@@ -929,7 +931,7 @@ function Field({
   children: ReactNode;
 }) {
   return (
-    <label className={`block text-sm font-medium text-slate-600 dark:text-slate-300 ${className}`}>
+    <label className={`block text-xs font-medium text-slate-500 dark:text-slate-400 ${className}`}>
       {label}
       {required ? (
         <span className="ml-0.5 text-red-500" aria-hidden="true">

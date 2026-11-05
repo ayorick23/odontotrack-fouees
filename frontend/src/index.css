@@ -161,16 +161,19 @@ body,
   min-height: 100%;
 }
 
-body {
+/* "html body" y no "body": la librería del odontograma trae
+   `body{font-family: system-ui…; background: radial-gradient(…)}` sin capa,
+   que al abrir una ficha cambiaba la fuente de toda la app. */
+html body {
   margin: 0;
-  background-color: #e9e8e3;
+  background: #e9e8e3;
   color: #16181c;
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
 }
 
 html.dark body {
-  background-color: #0e1013;
+  background: #0e1013;
   color: #eceef1;
 }
 
@@ -257,17 +260,12 @@ html.dark body {
     background: rgb(255 255 255 / 0.34);
     backdrop-filter: blur(28px) saturate(1.4);
     -webkit-backdrop-filter: blur(28px) saturate(1.4);
-    border: 1px solid rgb(255 255 255 / 0.6);
-    box-shadow:
-      0 1px 0 rgb(255 255 255 / 0.7) inset,
-      0 20px 50px -28px rgb(30 30 40 / 0.25);
+    /* Sin borde ni brillo interior: se separa del fondo solo por opacidad. */
+    box-shadow: 0 20px 50px -28px rgb(30 30 40 / 0.22);
   }
   .dark .glass {
     background: rgb(28 31 37 / 0.45);
-    border-color: rgb(255 255 255 / 0.07);
-    box-shadow:
-      0 1px 0 rgb(255 255 255 / 0.05) inset,
-      0 20px 50px -28px rgb(0 0 0 / 0.6);
+    box-shadow: 0 20px 50px -28px rgb(0 0 0 / 0.6);
   }
   /* Chip translúcido (grupos de botones, íconos en círculo). */
   .glass-chip {
@@ -383,7 +381,7 @@ html.dark body {
 }
 /* Entrada escalonada (style={{ animationDelay }}). */
 .anim-rise {
-  animation: anim-rise 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation: anim-rise 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
 }
 @keyframes anim-rise {
   from {
@@ -395,24 +393,36 @@ html.dark body {
    AppLayout pone .anim-page en el contenedor de la ruta (key = pathname):
    el contenido entra con fundido, sube un poco y se enfoca; sus bloques
    aparecen escalonados. */
+/* Solo opacidad + subida corta (sin blur: recalcular el vidrio de toda la
+   página en cada cuadro la trababa). fill-mode "backwards" y no "both": un
+   transform que queda aplicado convierte al contenedor en la referencia de
+   todo lo `position: fixed` de adentro (tooltips, modales) y los desplaza. */
 .anim-page {
-  animation: anim-page 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation: anim-page 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
 }
 @keyframes anim-page {
   from {
     opacity: 0;
-    transform: translateY(14px) scale(0.995);
-    filter: blur(6px);
+    transform: translateY(8px);
   }
 }
 .anim-page > * > * {
-  animation: anim-rise 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation: anim-rise 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
 }
-.anim-page > * > *:nth-child(2) { animation-delay: 0.05s; }
-.anim-page > * > *:nth-child(3) { animation-delay: 0.1s; }
-.anim-page > * > *:nth-child(4) { animation-delay: 0.15s; }
-.anim-page > * > *:nth-child(5) { animation-delay: 0.2s; }
-.anim-page > * > *:nth-child(n + 6) { animation-delay: 0.25s; }
+.anim-page > * > *:nth-child(2) { animation-delay: 0.04s; }
+.anim-page > * > *:nth-child(3) { animation-delay: 0.08s; }
+.anim-page > * > *:nth-child(n + 4) { animation-delay: 0.12s; }
+
+/* Cambio de página dentro de un listado: las filas entran con fundido. */
+.anim-fade {
+  animation: anim-fade 0.25s ease-out backwards;
+}
+@keyframes anim-fade {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
 
 /* View Transitions (NavLink viewTransition): la página no hace fundido de
    pantalla completa (lo anima .anim-page); solo la píldora lima del menú
@@ -446,6 +456,7 @@ html.dark body {
   .app-blob,
   .anim-page,
   .anim-page > * > *,
+  .anim-fade,
   ::view-transition-group(nav-pill),
   .anim-rise,
   .anim-draw,

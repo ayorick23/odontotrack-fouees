@@ -96,7 +96,9 @@ export function Navbar({
       </div>
 
       <div className="flex items-center gap-2">
-        <div className="glass flex items-center gap-0.5 rounded-full p-1">
+        {/* Sin .glass a propósito: un backdrop-filter aquí impediría que el
+            panel de notificaciones (hijo) desenfoque la página. */}
+        <div className="flex items-center gap-0.5 rounded-full bg-white/55 p-1 shadow-[0_10px_30px_-18px_rgba(22,24,28,0.35)] dark:bg-white/[.06]">
           {can(user, "patients.view") ? <QuickSearch onSearch={navigate} /> : null}
           <ThemeToggle />
           {can(user, "notifications.view") ? <NotificationBell /> : null}
@@ -113,7 +115,7 @@ export function Navbar({
               <DropdownMenu.Content
                 align="end"
                 sideOffset={8}
-                className="z-50 w-60 rounded-2xl bg-white p-1.5 shadow-[0_12px_40px_-8px_rgba(22,24,28,0.25)] dark:bg-slate-900 dark:ring-1 dark:ring-white/10"
+                className="z-50 w-60 rounded-2xl bg-white/75 p-1.5 shadow-[0_20px_50px_-16px_rgba(22,24,28,0.3)] ring-1 ring-ink/5 backdrop-blur-xl backdrop-saturate-150 dark:bg-[#1f2228]/80 dark:ring-white/10"
               >
                 <div className="px-3 py-2">
                   <p className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">

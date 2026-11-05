@@ -241,6 +241,15 @@ select {
   color: #dcf26a;
 }
 
+/* La librería también trae `.hidden{display:none!important}` global y sin
+   capa: queda cargada al salir de la ficha y le gana a `hidden md:flex` de
+   Tailwind en toda la app (desaparecían la lupa, el panel del login y el
+   fundido entre Ingresar y Crear cuenta). Fuera del odontograma se le
+   devuelve el control a Tailwind; más especificidad + !important le gana. */
+:not(.odontogram-fouees *).hidden {
+  display: revert-layer !important;
+}
+
 /* react-advanced-odontogram/style.css trae una regla `select { … }` global
    y sin capa. Como Tailwind 4 pone sus utilidades en @layer, esa regla les
    ganaba a todos los <select> de la app (filtros de Usuarios, campos del
