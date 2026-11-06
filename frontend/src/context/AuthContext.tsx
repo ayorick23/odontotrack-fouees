@@ -31,6 +31,8 @@ export interface AuthUser {
   email: string;
   role: UserRole;
   permissions: string[];
+  /** URL absoluta de la foto de perfil (se cambia en /perfil). */
+  photo?: string | null;
 }
 
 export const ROLE_LABELS: Record<UserRole, string> = {

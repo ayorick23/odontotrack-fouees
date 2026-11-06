@@ -328,6 +328,17 @@ export function initials(user: AuthUser): string {
 }
 
 export function Avatar({ user, size = "size-9" }: { user: AuthUser; size?: string }) {
+  // Con foto de perfil (/perfil) se muestra la foto; si no, las iniciales.
+  if (user.photo) {
+    return (
+      <img
+        src={user.photo}
+        alt=""
+        aria-hidden="true"
+        className={`${size} shrink-0 rounded-full object-cover`}
+      />
+    );
+  }
   return (
     <span
       className={`grid ${size} shrink-0 place-items-center rounded-full bg-lavender text-sm font-semibold text-ink`}

@@ -1,4 +1,4 @@
-import { KeyRound, LogOut, Search } from "./icons";
+import { KeyRound, LogOut, Search, UserCircle } from "./icons";
 import { DropdownMenu } from "radix-ui";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -33,6 +33,7 @@ const PAGE_META: Record<string, { title: string; crumb: string }> = {
   "/roles": { title: "Roles y permisos", crumb: "Sistema › Roles" },
   "/catalogs": { title: "Catálogos clínicos", crumb: "Sistema › Catálogos" },
   "/support": { title: "Soporte técnico", crumb: "Dashboard › Soporte" },
+  "/perfil": { title: "Mi perfil", crumb: "Cuenta › Perfil" },
 };
 
 const DASHBOARD_TITLES: Record<AuthUser["role"], string> = {
@@ -124,6 +125,13 @@ export function Navbar({
                   <p className="truncate text-xs text-slate-500">{ROLE_LABELS[user.role]}</p>
                 </div>
                 <DropdownMenu.Separator className="my-1 h-px bg-slate-100 dark:bg-slate-800" />
+                <DropdownMenu.Item
+                  onSelect={() => navigate("/perfil")}
+                  className="flex cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-sm text-slate-700 outline-none data-[highlighted]:bg-slate-100 dark:text-slate-200 dark:data-[highlighted]:bg-slate-800"
+                >
+                  <UserCircle className="size-4" />
+                  Mi perfil
+                </DropdownMenu.Item>
                 <DropdownMenu.Item
                   onSelect={() => setPasswordOpen(true)}
                   className="flex cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-sm text-slate-700 outline-none data-[highlighted]:bg-slate-100 dark:text-slate-200 dark:data-[highlighted]:bg-slate-800"

@@ -145,6 +145,10 @@ function navLeaves(): readonly NavLeaf[] {
 
 export function canAccessPath(pathname: string, user: AuthUser): boolean {
   const normalized = pathname.replace(/\/$/, "") || "/";
+  // Mi perfil: cualquier usuario autenticado, sin permiso ACL (como PATCH /me).
+  if (normalized === "/perfil") {
+    return true;
+  }
   const leaves = navLeaves();
   const exact = leaves.find((leaf) => leaf.to === normalized);
   if (exact) {

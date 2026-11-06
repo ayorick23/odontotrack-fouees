@@ -68,10 +68,12 @@ class UserSerializer(serializers.ModelSerializer):
             "last_name",
             "role",
             "is_active",
+            "photo",
             "last_login",
             "date_joined",
         ]
-        read_only_fields = ["id", "last_login", "date_joined"]
+        # La foto solo la cambia su dueño (PATCH /me, accounts/profile.py).
+        read_only_fields = ["id", "photo", "last_login", "date_joined"]
 
 
 def _validated_new_password(value: str, user) -> str:

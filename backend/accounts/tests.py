@@ -444,6 +444,124 @@ class CurrentUserTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
 
+def _jpeg(name="perfil.jpg"):
+    from io import BytesIO
+
+    from django.core.files.uploadedfile import SimpleUploadedFile
+    from PIL import Image
+
+    buffer = BytesIO()
+    Image.new("RGB", (8, 8), color="#dcf26a").save(buffer, format="JPEG")
+    return SimpleUploadedFile(name, buffer.getvalue(), content_type="image/jpeg")
+
+
+class ProfileUpdateTests(APITestCase):
+    """PATCH /me: cada quien edita su foto, nombre y apellido (y nada más)."""
+
+    def setUp(self):
+        import shutil
+        import tempfile
+
+        from django.test import override_settings
+
+        media = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, media, ignore_errors=True)
+        settings_override = override_settings(MEDIA_ROOT=media)
+        settings_override.enable()
+        self.addCleanup(settings_override.disable)
+
+        sync_acl()
+        self.user = User.objects.create_user(
+            username="rgarcia",
+            email="roberto.garcia@fouees.edu.sv",
+            password=VALID_PASSWORD,
+            first_name="Roberto",
+            last_name="García",
+            role=User.Role.RECEPCION,
+        )
+        self.client.force_authenticate(self.user)
+
+    def test_updates_own_name(self):
+        response = self.client.patch(
+            ME_URL, {"first_name": "Rob", "last_name": "García López"}, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["first_name"], "Rob")
+        self.assertIn("permissions", response.data)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.last_name, "García López")
+
+    def test_blank_name_is_rejected(self):
+        response = self.client.patch(ME_URL, {"first_name": ""}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["first_name"], ["El nombre es obligatorio."])
+
+    def test_cannot_change_role_email_username_or_status(self):
+        response = self.client.patch(
+            ME_URL,
+            {
+                "role": User.Role.ADMIN,
+                "email": "otro@fouees.edu.sv",
+                "username": "admin",
+                "is_active": False,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.role, User.Role.RECEPCION)
+        self.assertEqual(self.user.email, "roberto.garcia@fouees.edu.sv")
+        self.assertEqual(self.user.username, "rgarcia")
+        self.assertTrue(self.user.is_active)
+
+    def test_upload_replace_and_remove_photo(self):
+        first = self.client.patch(ME_URL, {"photo": _jpeg("a.jpg")}, format="multipart")
+        self.assertEqual(first.status_code, status.HTTP_200_OK)
+        self.assertTrue(first.data["photo"].startswith("http"))
+        self.user.refresh_from_db()
+        old_name = self.user.photo.name
+        storage = self.user.photo.storage
+        self.assertTrue(storage.exists(old_name))
+
+        second = self.client.patch(ME_URL, {"photo": _jpeg("b.jpg")}, format="multipart")
+        self.assertEqual(second.status_code, status.HTTP_200_OK)
+        self.user.refresh_from_db()
+        self.assertNotEqual(self.user.photo.name, old_name)
+        self.assertFalse(storage.exists(old_name))
+
+        current = self.user.photo.name
+        removed = self.client.patch(ME_URL, {"photo": None}, format="json")
+        self.assertEqual(removed.status_code, status.HTTP_200_OK)
+        self.assertIsNone(removed.data["photo"])
+        self.assertFalse(storage.exists(current))
+
+    def test_rejects_non_image_and_oversized_photo(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        text = SimpleUploadedFile("nota.txt", b"hola", content_type="text/plain")
+        response = self.client.patch(ME_URL, {"photo": text}, format="multipart")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+        huge = SimpleUploadedFile(
+            "grande.jpg", b"0" * (2 * 1024 * 1024 + 1), content_type="image/jpeg"
+        )
+        response = self.client.patch(ME_URL, {"photo": huge}, format="multipart")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["photo"], ["La foto no puede superar 2 MB."])
+
+    def test_admin_cannot_set_photo_of_another_user(self):
+        admin = User.objects.create_user(
+            username="vmartinez", password=VALID_PASSWORD, role=User.Role.ADMIN
+        )
+        self.client.force_authenticate(admin)
+        response = self.client.patch(
+            f"{USERS_URL}{self.user.id}/", {"photo": _jpeg()}, format="multipart"
+        )
+        self.assertIn(response.status_code, (status.HTTP_200_OK, status.HTTP_400_BAD_REQUEST))
+        self.user.refresh_from_db()
+        self.assertFalse(self.user.photo)
+
+
 class RolePermissionTests(APITestCase):
     def setUp(self):
         self.factory = APIRequestFactory()

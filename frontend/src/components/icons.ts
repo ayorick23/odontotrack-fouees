@@ -34,6 +34,7 @@ export {
   UsersIcon as Users,
   UserCheckIcon as UserCheck,
   UserPlusIcon as UserPlus,
+  UserCircleIcon as UserCircle,
   UserMinusIcon as UserX,
   UserGearIcon as UserCog,
   StethoscopeIcon as Stethoscope,
