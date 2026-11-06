@@ -1,6 +1,7 @@
 import { listStudents, type Student  } from "@/services/students";
 import {useEffect, useMemo, useState} from "react";
 import { Table } from "../../components/Table";
+import { displayName } from "../../context/AuthContext";
 import { primaryActionClass } from "../../lib/actions";
 
 const PAGE_SIZE = 20;
@@ -55,13 +56,18 @@ export function Students() {
       header: "Nombre",
       render: (student: Student) => (
         <span className="font-medium text-slate-800 dark:text-slate-100">
-          {student.name}
+          {displayName(student)}
         </span>
       ),
     },
     {
+      header: "Usuario",
+      render: (student: Student) => student.username,
+    },
+    {
       header:"Correo",
-      render: (student: Student) => student.email,
+      // Hay cuentas sin correo: sin el guion la fila podía quedar en blanco.
+      render: (student: Student) => student.email || "—",
     },
   ],
   [],

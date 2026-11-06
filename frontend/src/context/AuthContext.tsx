@@ -41,7 +41,9 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   soporte: "Soporte técnico",
 };
 
-export function displayName(user: AuthUser): string {
+export function displayName(
+  user: Pick<AuthUser, "first_name" | "last_name" | "username">,
+): string {
   const fullName = `${user.first_name} ${user.last_name}`.trim();
   return fullName || user.username;
 }
