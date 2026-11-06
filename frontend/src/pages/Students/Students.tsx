@@ -1,7 +1,6 @@
 import { listStudents, type Student  } from "@/services/students";
 import {useEffect, useMemo, useState} from "react";
 import { Table } from "../../components/Table";
-import { displayName } from "../../context/AuthContext";
 import { primaryActionClass } from "../../lib/actions";
 
 const PAGE_SIZE = 20;
@@ -51,26 +50,32 @@ export function Students() {
   }, [page, reloadToken]);
 
 
+  // La columna Usuario solo existe en el formato completo del API (admin);
+  // docente y recepción reciben la vista reducida (ver services/students.ts).
+  const showUsername =
+    state.status === "ready" &&
+    state.students.some((student) => student.username !== null);
+
   const columns = useMemo(
-    () =>  [{
-      header: "Nombre",
-      render: (student: Student) => (
-        <span className="font-medium text-slate-800 dark:text-slate-100">
-          {displayName(student)}
-        </span>
-      ),
-    },
-    {
-      header: "Usuario",
-      render: (student: Student) => student.username,
-    },
-    {
-      header:"Correo",
-      // Hay cuentas sin correo: sin el guion la fila podía quedar en blanco.
-      render: (student: Student) => student.email || "—",
-    },
-  ],
-  [],
+    () => [
+      {
+        header: "Nombre",
+        render: (student: Student) => (
+          <span className="font-medium text-slate-800 dark:text-slate-100">
+            {student.name}
+          </span>
+        ),
+      },
+      ...(showUsername
+        ? [{ header: "Usuario", render: (student: Student) => student.username }]
+        : []),
+      {
+        header: "Correo",
+        // Hay cuentas sin correo: sin el guion la fila podía quedar en blanco.
+        render: (student: Student) => student.email || "—",
+      },
+    ],
+    [showUsername],
   );
 
   const pageCount = state.status === "ready" ? Math.max(Math.ceil(state.count / PAGE_SIZE), 1) : 1; 
