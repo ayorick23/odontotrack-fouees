@@ -38,7 +38,6 @@ import {
 import { useAuth } from "../../hooks/useAuth";
 import { listClinicalAreas, type ClinicalAreaRecord } from "../../services/catalogs";
 import {
-  CASE_STATUS_LABELS,
   deletePatient,
   exportPatients,
   listAssignees,
@@ -52,6 +51,7 @@ import {
   type PatientListItem,
 } from "../../services/patients";
 import { CASE_STATUS_ORDER, useChartTheme } from "../Dashboard/chartColors";
+import { CaseStatusBadge } from "./CaseStatusBadge";
 import { IndicatedPractices } from "./IndicatedPractices";
 import { PatientArea, PatientIdentity } from "./PatientCells";
 import {
@@ -668,7 +668,7 @@ function PatientRow({
         )}
       </td>
       <td className={CELL}>
-        <StatusBadge status={patient.case_status} />
+        <CaseStatusBadge status={patient.case_status} />
       </td>
       <td className={`${CELL} whitespace-nowrap`}>
         <p className="text-slate-700 dark:text-slate-200">
@@ -735,15 +735,6 @@ function initialsOf(name: string): string {
     .join("");
 }
 
-function StatusBadge({ status }: { status: CaseStatus }) {
-  const { status: colors } = useChartTheme();
-  return (
-    <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 px-2.5 py-1 text-xs font-medium whitespace-nowrap text-slate-700 dark:border-slate-700 dark:text-slate-200">
-      <span className="size-1.5 rounded-full" style={{ background: colors[status] }} aria-hidden="true" />
-      {CASE_STATUS_LABELS[status]}
-    </span>
-  );
-}
 
 function EmptyDirectory({
   filtered,
