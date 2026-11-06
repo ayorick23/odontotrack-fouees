@@ -1,23 +1,19 @@
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import {
-  CircleCheckBig,
-  Clock3,
-  Pencil,
-  UserCheck,
-  type AppIcon,
-} from "../../components/icons";
+import { Pencil } from "../../components/icons";
 import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { can } from "../../acl/can";
 import { GLASS_PANEL, SOLID_BLOCK } from "../../components/listing/styles";
+import { CaseStatusBadge } from "./CaseStatusBadge";
 import { FinalizeCaseButton } from "./FinalizeCaseButton";
 import { ReleasePatientButton } from "./ReleasePatientButton";
 import { PatientClinicalTabs, hasClinicalTabs } from "./PatientClinicalTabs";
 import { useAuth } from "../../hooks/useAuth";
 import { useTheme } from "../../hooks/useTheme";
 import { primaryActionClass } from "../../lib/actions";
+import { ageLabel } from "../../lib/age";
 import { phoneHref } from "../../lib/phones";
 import {
   areaLabel,
@@ -26,13 +22,11 @@ import {
   type ClinicalAreaRecord,
 } from "../../services/catalogs";
 import {
-  CASE_STATUS_LABELS,
   EMERGENCY_RELATIONSHIP_LABELS,
   getPatient,
   patientDocumentLabel,
   patientFullName,
   patientInitials,
-  type CaseStatus,
   type Patient,
 } from "../../services/patients";
 
@@ -44,12 +38,6 @@ const PatientOdontogramSection = lazy(() =>
 
 /** Bloque sólido dentro del marco de vidrio (doble fondo). */
 const cardClass = SOLID_BLOCK;
-
-const STATUS_ICONS: Record<CaseStatus, AppIcon> = {
-  pendiente: Clock3,
-  en_proceso: UserCheck,
-  finalizado: CircleCheckBig,
-};
 
 type LoadState =
   | { status: "loading" }
@@ -132,7 +120,7 @@ export function PatientDetail() {
   const treatmentName = patient.clinical_subcategory
     ? treatmentLabel(areas, patient.clinical_subcategory)
     : null;
-  const age = patientAge(patient.date_of_birth);
+  const age = ageLabel(patient.date_of_birth);
   const relationship = patient.emergency_contact_relationship
     ? EMERGENCY_RELATIONSHIP_LABELS[patient.emergency_contact_relationship]
     : null;
@@ -211,86 +199,79 @@ export function PatientDetail() {
         </p>
       ) : null}
 
-      <div className={GLASS_PANEL}>
-      <section className={cardClass}>
-        <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
-          {patient.photo ? (
-            <img
-              src={patient.photo}
-              alt={`Foto de ${patientFullName(patient)}`}
-              className="size-28 shrink-0 rounded-full object-cover"
-            />
-          ) : (
-            <span
-              className="flex size-28 shrink-0 items-center justify-center rounded-full bg-lime-soft text-2xl font-semibold text-lime-ink"
-              aria-hidden="true"
-            >
-              {patientInitials(patient)}
-            </span>
-          )}
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <h1 className="text-[26px] leading-tight font-bold tracking-[-0.03em] text-ink dark:text-white">
-                {patientFullName(patient)}
-              </h1>
-              <StatusBadge status={patient.case_status} />
-            </div>
-            <dl className="mt-5 grid gap-4 sm:grid-cols-2">
-              <Fact label="Documento">{patientDocumentLabel(patient)}</Fact>
-              <Fact label="Nacimiento">
-                {patient.date_of_birth ? (
-                  <>
-                    {formatBirthDate(patient.date_of_birth)}
-                    {age ? (
-                      <span className="font-normal text-slate-500">
-                        {" "}
-                        · {age}
-                      </span>
-                    ) : null}
-                  </>
-                ) : (
-                  emptyValue()
-                )}
-              </Fact>
-              <Fact label="Área">{areaName ?? emptyValue("Sin área")}</Fact>
-              <Fact label="Tratamiento">
-                {treatmentName ?? emptyValue("Sin tratamiento")}
-              </Fact>
-              <Fact label="Estudiante">
-                {patient.assigned_to ?? emptyValue("Sin asignar")}
-              </Fact>
-              <Fact label="Registrado">
-                {format(new Date(patient.created_at), "d 'de' MMMM 'de' yyyy", {
-                  locale: es,
-                })}
-                {patient.created_by_name ? (
-                  <span className="font-normal text-slate-500">
-                    {" "}
-                    · por {patient.created_by_name}
-                  </span>
-                ) : null}
-              </Fact>
-              <Fact label="Primer diagnóstico">
-                {patient.first_diagnosis_by ?? emptyValue("Sin diagnóstico")}
-              </Fact>
-              {patient.assignment_note ? (
-                <Fact label="Nota de asignación" className="sm:col-span-2">
-                  {patient.assignment_note}
-                </Fact>
-              ) : null}
-            </dl>
-          </div>
-        </div>
-      </section>
-      </div>
-
-      {/* Dos bloques sólidos dentro de un mismo marco de vidrio. */}
+      {/* Doble fondo: identidad arriba y, debajo, contacto y emergencia
+          lado a lado, todo dentro del mismo marco de vidrio. */}
       <div className={`${GLASS_PANEL} grid gap-2 lg:grid-cols-2`}>
+        <section className={`${cardClass} lg:col-span-2`}>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+            {patient.photo ? (
+              <img
+                src={patient.photo}
+                alt={`Foto de ${patientFullName(patient)}`}
+                className="size-20 shrink-0 rounded-full object-cover"
+              />
+            ) : (
+              <span
+                className="flex size-20 shrink-0 items-center justify-center rounded-full bg-lime-soft text-xl font-semibold text-lime-ink"
+                aria-hidden="true"
+              >
+                {patientInitials(patient)}
+              </span>
+            )}
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <h1 className="text-[26px] leading-tight font-bold tracking-[-0.03em] text-ink dark:text-white">
+                  {patientFullName(patient)}
+                </h1>
+                <CaseStatusBadge status={patient.case_status} />
+              </div>
+              {/* Datos de identificación en una sola línea. */}
+              <p className="mt-1.5 flex flex-wrap gap-x-2 gap-y-0.5 text-sm text-slate-500 dark:text-slate-400">
+                <span className="font-medium text-slate-700 dark:text-slate-200">
+                  {patientDocumentLabel(patient)}
+                </span>
+                <span aria-hidden="true">·</span>
+                <span>
+                  {patient.date_of_birth ? (
+                    <>
+                      {formatBirthDate(patient.date_of_birth)}
+                      {age ? ` (${age})` : null}
+                    </>
+                  ) : (
+                    "Sin fecha de nacimiento"
+                  )}
+                </span>
+                <span aria-hidden="true">·</span>
+                <span>
+                  Registrado el{" "}
+                  {format(new Date(patient.created_at), "d 'de' MMMM 'de' yyyy", { locale: es })}
+                  {patient.created_by_name ? ` por ${patient.created_by_name}` : null}
+                </span>
+              </p>
+            </div>
+          </div>
+
+          {/* Seguimiento del caso: una fila de cuatro datos. */}
+          <dl className="mt-5 grid gap-x-6 gap-y-4 border-t border-ink/5 pt-4 sm:grid-cols-2 lg:grid-cols-4 dark:border-white/10">
+            <Fact label="Estudiante">{patient.assigned_to ?? emptyValue("Sin asignar")}</Fact>
+            <Fact label="Primer diagnóstico">
+              {patient.first_diagnosis_by ?? emptyValue("Sin diagnóstico")}
+            </Fact>
+            <Fact label="Área clínica">{areaName ?? emptyValue("Sin área")}</Fact>
+            <Fact label="Tratamiento">{treatmentName ?? emptyValue("Sin tratamiento")}</Fact>
+            {patient.assignment_note ? (
+              <Fact label="Nota de asignación" className="sm:col-span-2 lg:col-span-4">
+                {patient.assignment_note}
+              </Fact>
+            ) : null}
+          </dl>
+        </section>
+
         <section className={cardClass}>
-          <h2 className="mb-4 text-base font-semibold text-slate-800 dark:text-slate-100">
+          <h2 className="mb-3 text-[15px] font-semibold tracking-tight text-ink dark:text-white">
             Contacto
           </h2>
-          <dl className="grid gap-4 sm:grid-cols-2">
+          <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
             <Fact label="Teléfono">
               <PhoneLink value={patient.phone_number} />
             </Fact>
@@ -299,35 +280,26 @@ export function PatientDetail() {
             </Fact>
             <Fact label="Correo">
               {patient.email.trim() ? (
-                <a
-                  href={`mailto:${patient.email}`}
-                  className="text-lime-ink hover:underline"
-                >
+                <a href={`mailto:${patient.email}`} className="break-all text-lime-ink hover:underline">
                   {patient.email}
                 </a>
               ) : (
                 emptyValue()
               )}
             </Fact>
-            <Fact label="Dirección" className="sm:col-span-2">
-              {patient.address.trim() || emptyValue()}
-            </Fact>
+            <Fact label="Dirección">{patient.address.trim() || emptyValue()}</Fact>
           </dl>
         </section>
 
         <section className={cardClass}>
-          <h2 className="mb-4 text-base font-semibold text-slate-800 dark:text-slate-100">
+          <h2 className="mb-3 text-[15px] font-semibold tracking-tight text-ink dark:text-white">
             Contacto de emergencia
           </h2>
-          <dl className="grid gap-4 sm:grid-cols-2">
-            <Fact label="Nombre">
-              {patient.emergency_contact_name.trim() || emptyValue()}
-            </Fact>
+          <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
+            <Fact label="Nombre">{patient.emergency_contact_name.trim() || emptyValue()}</Fact>
+            <Fact label="Parentesco">{relationship ?? emptyValue("Sin parentesco")}</Fact>
             <Fact label="Teléfono">
               <PhoneLink value={patient.emergency_contact_phone} />
-            </Fact>
-            <Fact label="Parentesco">
-              {relationship ?? emptyValue("Sin parentesco")}
             </Fact>
           </dl>
         </section>
@@ -375,10 +347,10 @@ function Fact({
 }) {
   return (
     <div className={className}>
-      <dt className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+      <dt className="text-xs text-slate-500 dark:text-slate-400">
         {label}
       </dt>
-      <dd className="mt-1 text-sm leading-6 font-medium wrap-break-word text-slate-800 dark:text-slate-100">
+      <dd className="mt-0.5 text-sm leading-6 font-medium wrap-break-word text-slate-800 dark:text-slate-100">
         {children}
       </dd>
     </div>
@@ -408,24 +380,6 @@ function emptyValue(label = "Sin registrar") {
   );
 }
 
-function StatusBadge({ status }: { status: CaseStatus }) {
-  const Icon = STATUS_ICONS[status];
-  const styles: Record<CaseStatus, string> = {
-    pendiente:
-      "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300",
-    en_proceso: "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300",
-    finalizado: "bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300",
-  };
-
-  return (
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${styles[status]}`}
-    >
-      <Icon className="size-3.5" aria-hidden="true" />
-      {CASE_STATUS_LABELS[status]}
-    </span>
-  );
-}
 
 function formatBirthDate(value: string | null): ReactNode {
   if (!value) {
@@ -440,24 +394,3 @@ function formatBirthDate(value: string | null): ReactNode {
   });
 }
 
-function patientAge(dateOfBirth: string | null): string | null {
-  if (!dateOfBirth) {
-    return null;
-  }
-  const [year, month, day] = dateOfBirth.split("-").map(Number);
-  if (!year || !month || !day) {
-    return null;
-  }
-  const today = new Date();
-  let age = today.getFullYear() - year;
-  if (
-    today.getMonth() + 1 < month ||
-    (today.getMonth() + 1 === month && today.getDate() < day)
-  ) {
-    age -= 1;
-  }
-  if (age < 0) {
-    return null;
-  }
-  return age === 1 ? "1 año" : `${age} años`;
-}

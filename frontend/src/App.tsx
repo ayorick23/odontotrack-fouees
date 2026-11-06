@@ -17,6 +17,7 @@ import { Dashboard } from "./pages/Dashboard/Dashboard";
 import { PatientDetail } from "./pages/Patients/PatientDetail";
 import { PatientForm } from "./pages/Patients/PatientForm";
 import { PatientList } from "./pages/Patients/PatientList";
+import { Profile } from "./pages/Profile/Profile";
 import { RoleForm } from "./pages/Roles/RoleForm";
 import { RoleList } from "./pages/Roles/RoleList";
 import { CatalogList } from "./pages/Catalogs/CatalogList";
@@ -71,6 +72,7 @@ const router = createBrowserRouter(
         <Route path="/roles/:id/edit" element={<RoleForm />} />
         <Route path="/roles/:id" element={<RoleForm />} />
         <Route path="/support" element={<Support />} />
+        <Route path="/perfil" element={<Profile />} />
       </Route>
     </>,
   ),

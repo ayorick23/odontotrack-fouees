@@ -12,6 +12,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from .models import Notification, Role
 from .permissions import HasRequiredAcl
 from .permissions_catalog import catalog_payload
+from .profile import ProfileUpdateSerializer
 from .serializers import (
     ChangeOwnPasswordSerializer,
     EmailOrUsernameTokenObtainPairSerializer,
@@ -119,9 +120,18 @@ class UserViewSet(viewsets.ModelViewSet):
         assert_can_delete_user(self.request.user, instance)
         instance.delete()
 
-    @action(detail=False, methods=["get"])
+    @extend_schema(methods=["PATCH"], request=ProfileUpdateSerializer, responses=MeSerializer)
+    @action(detail=False, methods=["get", "patch"])
     def me(self, request):
-        serializer = MeSerializer(request.user)
+        # PATCH: cada quien edita su foto, nombre y apellido (accounts/profile.py).
+        if request.method == "PATCH":
+            payload = ProfileUpdateSerializer(
+                request.user, data=request.data, partial=True, context={"request": request}
+            )
+            payload.is_valid(raise_exception=True)
+            payload.save()
+        # Con request en el contexto, la foto sale como URL absoluta.
+        serializer = MeSerializer(request.user, context={"request": request})
         return Response(serializer.data)
 
     @extend_schema(request=ChangeOwnPasswordSerializer, responses={204: None})

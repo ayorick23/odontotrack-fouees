@@ -424,23 +424,6 @@ html.dark body {
   }
 }
 
-/* View Transitions (NavLink viewTransition): la página no hace fundido de
-   pantalla completa (lo anima .anim-page); solo la píldora lima del menú
-   se desliza del ítem anterior al nuevo (view-transition-name: nav-pill). */
-::view-transition-old(root),
-::view-transition-new(root) {
-  animation: none;
-}
-::view-transition-group(nav-pill) {
-  animation-duration: 0.45s;
-  animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-::view-transition-old(nav-pill),
-::view-transition-new(nav-pill) {
-  height: 100%;
-  animation-duration: 0.45s;
-}
-
 /* Línea de gráfico que se dibuja al cargar. */
 .anim-draw {
   stroke-dasharray: 1600;
@@ -457,7 +440,6 @@ html.dark body {
   .anim-page,
   .anim-page > * > *,
   .anim-fade,
-  ::view-transition-group(nav-pill),
   .anim-rise,
   .anim-draw,
   .anim-out:hover svg,

@@ -16,7 +16,14 @@ import {
   UserSwitch,
 } from "./icons";
 import { Tooltip } from "radix-ui";
-import { useEffect, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { NavLink, useLocation } from "react-router-dom";
 
 import logoSello from "../assets/logo-uees-sello.png";
@@ -105,6 +112,63 @@ export function Sidebar({
     };
   }, [user, location.pathname]);
 
+  // Píldora lima: un solo fondo detrás de los ítems que se desliza al activo.
+  // Solo se mueve el fondo; textos e íconos se quedan en su lugar.
+  const itemsRef = useRef<HTMLDivElement>(null);
+  const pillRef = useRef<HTMLSpanElement>(null);
+  const placePill = useCallback((animate: boolean) => {
+    const items = itemsRef.current;
+    const pill = pillRef.current;
+    if (!items || !pill) {
+      return;
+    }
+    // NavLink marca el activo con aria-current; el botón de Pacientes, con
+    // data-nav-active cuando el grupo está cerrado y un hijo está activo.
+    const active = items.querySelector<HTMLElement>('[aria-current="page"], [data-nav-active]');
+    if (!active) {
+      pill.style.opacity = "0";
+      return;
+    }
+    // offset* (y no getBoundingClientRect) ignora el scale de .press al hacer clic.
+    let x = 0;
+    let y = 0;
+    for (let el: HTMLElement | null = active; el && el !== items; el = el.offsetParent as HTMLElement | null) {
+      x += el.offsetLeft;
+      y += el.offsetTop;
+    }
+    const jump = !animate || pill.style.opacity !== "1";
+    if (jump) {
+      pill.style.transition = "none";
+    }
+    pill.style.transform = `translate(${x}px, ${y}px)`;
+    pill.style.width = `${active.offsetWidth}px`;
+    pill.style.height = `${active.offsetHeight}px`;
+    pill.style.opacity = "1";
+    if (jump) {
+      void pill.offsetWidth; // aplica la posición antes de devolver la transición
+      pill.style.transition = "";
+    }
+  }, []);
+
+  // Al cambiar de ruta, se desliza.
+  useLayoutEffect(() => {
+    placePill(true);
+  }, [location.pathname, placePill]);
+
+  // Si cambia el tamaño del menú (colapsar, abrir/cerrar Pacientes, cargar
+  // secciones), se recoloca al instante para no quedarse atrás.
+  const hasUser = user !== null;
+  useEffect(() => {
+    const items = itemsRef.current;
+    // Sin ResizeObserver (jsdom en los tests) la píldora solo sigue a la ruta.
+    if (!hasUser || !items || typeof ResizeObserver === "undefined") {
+      return;
+    }
+    const observer = new ResizeObserver(() => placePill(false));
+    observer.observe(items);
+    return () => observer.disconnect();
+  }, [hasUser, placePill]);
+
   const width = collapsed ? "w-[72px]" : "w-60";
 
   if (user === null) {
@@ -149,56 +213,78 @@ export function Sidebar({
           </Fade>
         </div>
 
-        <nav className="mt-5 flex flex-1 flex-col gap-3 overflow-y-auto overflow-x-hidden px-3">
-          {NAV_SECTIONS.map((section) => {
-            const entries = visible.filter((entry) => entry.section === section.id);
-            if (entries.length === 0) {
-              return null;
-            }
-            return (
-              <div key={section.id}>
-                <div className={`${SECTION_ROW} flex items-center px-3.5`}>
-                  {collapsed ? (
-                    <span className="h-px w-5 bg-slate-300 dark:bg-slate-700" aria-hidden="true" />
-                  ) : (
-                    <p className="whitespace-nowrap text-[10.5px] font-semibold uppercase tracking-[.14em] text-slate-400 dark:text-slate-500">
-                      {section.label}
-                    </p>
-                  )}
-                </div>
-                <div className="flex flex-col gap-0.5">
-                  {entries.map((entry) =>
-                    "children" in entry ? (
-                      <PatientsGroup
-                        key={entry.label}
-                        entry={entry}
-                        user={user}
-                        collapsed={collapsed}
-                        counters={counters}
-                      />
+        <nav className="mt-5 flex-1 overflow-y-auto overflow-x-hidden px-3">
+          <div ref={itemsRef} className="relative flex flex-col gap-3">
+            {/* Va primero y posicionado: los ítems (relative) se pintan encima. */}
+            <span
+              ref={pillRef}
+              aria-hidden="true"
+              className="pointer-events-none absolute left-0 top-0 rounded-full bg-lime opacity-0 shadow-[0_8px_20px_-10px_rgba(150,180,20,.9)] transition-[transform,width,height,opacity] duration-[450ms] ease-[cubic-bezier(0.2,0.8,0.2,1)] motion-reduce:transition-none"
+            />
+            {NAV_SECTIONS.map((section) => {
+              const entries = visible.filter((entry) => entry.section === section.id);
+              if (entries.length === 0) {
+                return null;
+              }
+              return (
+                <div key={section.id}>
+                  {/* relative: queda encima de la píldora cuando pasa por aquí. */}
+                  <div className={`${SECTION_ROW} relative flex items-center px-3.5`}>
+                    {collapsed ? (
+                      <span className="h-px w-5 bg-slate-300 dark:bg-slate-700" aria-hidden="true" />
                     ) : (
-                      <SidebarLink
-                        key={entry.to}
-                        to={entry.to}
-                        label={entry.label}
-                        icon={navIcon(entry.icon)}
-                        collapsed={collapsed}
-                        badge={badgeFor(entry.to, counters)}
-                      />
-                    ),
-                  )}
+                      <p className="whitespace-nowrap text-[10.5px] font-semibold uppercase tracking-[.14em] text-slate-400 dark:text-slate-500">
+                        {section.label}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-0.5">
+                    {entries.map((entry) =>
+                      "children" in entry ? (
+                        <PatientsGroup
+                          key={entry.label}
+                          entry={entry}
+                          user={user}
+                          collapsed={collapsed}
+                          counters={counters}
+                        />
+                      ) : (
+                        <SidebarLink
+                          key={entry.to}
+                          to={entry.to}
+                          label={entry.label}
+                          icon={navIcon(entry.icon)}
+                          collapsed={collapsed}
+                          badge={badgeFor(entry.to, counters)}
+                        />
+                      ),
+                    )}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </nav>
 
         <div className="mt-4 flex h-12 items-center gap-3 overflow-hidden px-3">
-          <WithTooltip label={`${displayName(user)} · ${ROLE_LABELS[user.role]}`} enabled={collapsed}>
+          {collapsed ? (
+            // Colapsado no cabe nombre ni botón aparte: el hueco del avatar pasa a
+            // ser el de cerrar sesión (nombre y rol siguen en el menú de cuenta).
+            <WithTooltip label="Cerrar sesión" enabled>
+              <button
+                type="button"
+                onClick={onLogout}
+                aria-label="Cerrar sesión"
+                className="press anim-out glass-chip grid size-12 shrink-0 cursor-pointer place-items-center rounded-full text-slate-500 transition-colors hover:bg-white hover:text-ink dark:hover:bg-white/10 dark:hover:text-white"
+              >
+                <LogOut className="size-[18px]" />
+              </button>
+            </WithTooltip>
+          ) : (
             <span className="grid size-12 shrink-0 place-items-center">
               <Avatar user={user} />
             </span>
-          </WithTooltip>
+          )}
           <Fade hidden={collapsed}>
             <p className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
               {displayName(user)}
@@ -242,6 +328,17 @@ export function initials(user: AuthUser): string {
 }
 
 export function Avatar({ user, size = "size-9" }: { user: AuthUser; size?: string }) {
+  // Con foto de perfil (/perfil) se muestra la foto; si no, las iniciales.
+  if (user.photo) {
+    return (
+      <img
+        src={user.photo}
+        alt=""
+        aria-hidden="true"
+        className={`${size} shrink-0 rounded-full object-cover`}
+      />
+    );
+  }
   return (
     <span
       className={`grid ${size} shrink-0 place-items-center rounded-full bg-lavender text-sm font-semibold text-ink`}
@@ -312,8 +409,11 @@ const ITEM =
 // Liso: sin caja; al pasar el mouse, un velo blanco muy suave.
 const ITEM_IDLE =
   "text-slate-600 hover:bg-white/45 hover:text-ink dark:text-slate-400 dark:hover:bg-white/[.06] dark:hover:text-white";
-// Activo: píldora lima con texto tinta (igual en claro y oscuro).
-const ITEM_ACTIVE = "bg-lime text-ink shadow-[0_8px_20px_-10px_rgba(150,180,20,.9)]";
+// Activo: texto tinta sobre la píldora lima, que es un fondo aparte que se
+// desliza (ver placePill en Sidebar); el ítem no lleva fondo propio.
+// El texto pasa a tinta con retraso, cuando la píldora ya llegó: si cambiara
+// al instante, en oscuro quedaría tinta sobre el fondo oscuro durante el viaje.
+const ITEM_ACTIVE = "text-ink delay-200";
 
 function PatientsGroup({
   entry,
@@ -348,6 +448,8 @@ function PatientsGroup({
           onClick={() => setOpen((current) => !current)}
           aria-expanded={open}
           aria-label={collapsed ? entry.label : undefined}
+          // Grupo cerrado con un hijo activo: la píldora va a este botón.
+          data-nav-active={childActive && !open ? "" : undefined}
           className={`${ITEM} ${ROW} text-left ${
             childActive && !open ? ITEM_ACTIVE : ITEM_IDLE
           }`}
@@ -408,10 +510,6 @@ function SidebarLink({
       <NavLink
         to={to}
         end={to === "/patients"}
-        // View Transition: el ítem activo se llama "nav-pill", así la píldora
-        // lima se desliza del ítem anterior al nuevo (index.css).
-        viewTransition
-        style={({ isActive }) => (isActive ? { viewTransitionName: "nav-pill" } : undefined)}
         aria-label={collapsed ? label : undefined}
         className={({ isActive }) => `${ITEM} ${row} ${isActive ? ITEM_ACTIVE : ITEM_IDLE}`}
       >

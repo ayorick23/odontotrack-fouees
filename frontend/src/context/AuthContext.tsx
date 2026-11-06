@@ -31,6 +31,8 @@ export interface AuthUser {
   email: string;
   role: UserRole;
   permissions: string[];
+  /** URL absoluta de la foto de perfil (se cambia en /perfil). */
+  photo?: string | null;
 }
 
 export const ROLE_LABELS: Record<UserRole, string> = {
@@ -41,7 +43,9 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   soporte: "Soporte técnico",
 };
 
-export function displayName(user: AuthUser): string {
+export function displayName(
+  user: Pick<AuthUser, "first_name" | "last_name" | "username">,
+): string {
   const fullName = `${user.first_name} ${user.last_name}`.trim();
   return fullName || user.username;
 }

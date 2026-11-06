@@ -1,12 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import {
-  Camera,
-  CircleCheckBig,
-  Clock3,
-  UserCheck,
-  type AppIcon,
-  Plus,
-} from "../../components/icons";
+import { Camera, Plus } from "../../components/icons";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -25,9 +18,9 @@ import {
 import { useAuth } from "../../hooks/useAuth";
 import { GLASS_PANEL, PRIMARY_ICON_DOT, SOLID_BLOCK } from "../../components/listing/styles";
 import { primaryActionClass, secondaryActionClass } from "../../lib/actions";
+import { ageLabel } from "../../lib/age";
 import { isValidPhone } from "../../lib/phones";
 import {
-  CASE_STATUS_LABELS,
   DOCUMENT_TYPE_LABELS,
   DOCUMENT_TYPES,
   EMERGENCY_RELATIONSHIP_LABELS,
@@ -48,6 +41,7 @@ import {
   listClinicalAreas,
   type ClinicalAreaRecord,
 } from "../../services/catalogs";
+import { CaseStatusBadge } from "./CaseStatusBadge";
 
 const AREA_NONE = "sin-area";
 const SUBCATEGORY_NONE = "sin-tratamiento";
@@ -64,11 +58,6 @@ const selectClass =
   "mt-1.5 h-10 w-full rounded-xl border-0 bg-slate-100 px-3 text-sm font-normal text-ink shadow-none outline-none transition hover:bg-slate-200/70 focus:ring-2 focus:ring-focus disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white/[.06] dark:text-slate-100 dark:hover:bg-white/[.09]";
 const selectMenuClass =
   "max-h-72 rounded-xl border-slate-200 bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100";
-const STATUS_ICONS: Record<CaseStatus, AppIcon> = {
-  pendiente: Clock3,
-  en_proceso: UserCheck,
-  finalizado: CircleCheckBig,
-};
 
 const patientFormSchema = z.object({
   first_name: z.string().trim().min(1, "El nombre es obligatorio").max(100),
@@ -379,11 +368,11 @@ export function PatientForm() {
 
   const status = loadedPatient?.case_status ?? "pendiente";
 
-  // Escritorio: todo cabe en la pantalla (sin scroll). Izquierda, datos
-  // personales a toda la altura; derecha, contacto y emergencia. En pantallas
-  // angostas se apila en una columna.
+  // Dos columnas con alto natural (sin estirar los campos a toda la
+  // pantalla): izquierda, datos personales y motivo de consulta; derecha,
+  // contacto y emergencia. En pantallas angostas se apila en una columna.
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3">
+    <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-3 px-1">
         <Link
           to="/patients"
@@ -411,18 +400,18 @@ export function PatientForm() {
 
       <form
         id="patient-form"
-        className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]"
+        className="grid items-start gap-3 lg:grid-cols-2"
         onSubmit={handleSubmit(onSubmit)}
         noValidate
       >
-        <section className={`${GLASS_PANEL} flex min-h-0 flex-col`}>
+        <section className={`${GLASS_PANEL} flex flex-col`}>
           <div className="px-3 pt-2 pb-1">
             <SectionHeading
               title="Datos personales"
               description="Identificación de recepción. El expediente clínico se carga después de asignar."
             />
           </div>
-          <div className={`${SOLID_BLOCK} flex min-h-0 flex-1 flex-col gap-4 overflow-auto`}>
+          <div className={`${SOLID_BLOCK} flex flex-col gap-5`}>
             <div className="flex shrink-0 items-center gap-4">
               <input
                 ref={photoInputRef}
@@ -473,7 +462,7 @@ export function PatientForm() {
               </div>
             </div>
 
-            <div className="grid min-w-0 gap-x-4 gap-y-3 md:grid-cols-2 lg:flex-1 lg:content-evenly">
+            <div className="grid min-w-0 gap-x-4 gap-y-4 sm:grid-cols-2">
               <Field
                 label="Nombres"
                 error={errors.first_name?.message}
@@ -586,96 +575,9 @@ export function PatientForm() {
                 </Field>
               )}
               <Field
-                label="Área clínica"
-                error={errors.clinical_area?.message}
-              >
-                <Controller
-                  name="clinical_area"
-                  control={control}
-                  render={({ field }) => (
-                    <Select
-                      value={field.value === "" ? AREA_NONE : field.value}
-                      onValueChange={(value) => {
-                        field.onChange(value === AREA_NONE ? "" : value);
-                        setValue("clinical_subcategory", "");
-                      }}
-                      disabled={!canWrite}
-                    >
-                      <SelectTrigger aria-label="Área clínica" className={selectClass}>
-                        <SelectValue placeholder="Sin área" />
-                      </SelectTrigger>
-                      <SelectContent
-                        position="popper"
-                        align="start"
-                        className={selectMenuClass}
-                      >
-                        <SelectItem value={AREA_NONE}>Sin área</SelectItem>
-                        {areas
-                          .filter(
-                            (area) =>
-                              area.is_active || area.slug === selectedArea,
-                          )
-                          .map((area) => (
-                            <SelectItem key={area.slug} value={area.slug}>
-                              {area.name}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-              </Field>
-              <Field
-                label="Tratamiento"
-                error={errors.clinical_subcategory?.message}
-              >
-                <Controller
-                  name="clinical_subcategory"
-                  control={control}
-                  render={({ field }) => (
-                    <Select
-                      value={
-                        field.value === "" ? SUBCATEGORY_NONE : field.value
-                      }
-                      onValueChange={(value) =>
-                        field.onChange(
-                          value === SUBCATEGORY_NONE ? "" : value,
-                        )
-                      }
-                      disabled={!canWrite || subcategoryOptions.length === 0}
-                    >
-                      <SelectTrigger aria-label="Tratamiento" className={selectClass}>
-                        <SelectValue
-                          placeholder={
-                            selectedArea
-                              ? subcategoryOptions.length === 0
-                                ? "Sin tratamientos en el catálogo"
-                                : "Sin tratamiento"
-                              : "Selecciona un área primero"
-                          }
-                        />
-                      </SelectTrigger>
-                      <SelectContent
-                        position="popper"
-                        align="start"
-                        className={selectMenuClass}
-                      >
-                        <SelectItem value={SUBCATEGORY_NONE}>
-                          Sin tratamiento
-                        </SelectItem>
-                        {subcategoryOptions.map((treatment) => (
-                          <SelectItem key={treatment.slug} value={treatment.slug}>
-                            {treatment.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-              </Field>
-              <Field
                 label="Fecha de nacimiento"
                 error={errors.date_of_birth?.message}
+                hint={ageLabel(watch("date_of_birth")) ?? undefined}
               >
                 <input
                   type="date"
@@ -685,16 +587,119 @@ export function PatientForm() {
                 />
               </Field>
             </div>
+
+            {/* Opcional. Se queda en la ficha porque lo usan el filtro por área
+                (directorio y asignaciones), el gráfico "Pacientes por área
+                clínica" del dashboard y la exportación a Excel. */}
+            <div className="border-t border-ink/5 pt-4 dark:border-white/10">
+              <h3 className="text-sm font-semibold text-ink dark:text-white">
+                Motivo de consulta{" "}
+                <span className="font-normal text-slate-400">(opcional)</span>
+              </h3>
+              <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                Ayuda a encontrar al paciente al filtrar por área en el directorio y en asignaciones.
+              </p>
+              <div className="mt-3 grid min-w-0 gap-x-4 gap-y-4 sm:grid-cols-2">
+                <Field
+                  label="Área clínica"
+                  error={errors.clinical_area?.message}
+                >
+                  <Controller
+                    name="clinical_area"
+                    control={control}
+                    render={({ field }) => (
+                      <Select
+                        value={field.value === "" ? AREA_NONE : field.value}
+                        onValueChange={(value) => {
+                          field.onChange(value === AREA_NONE ? "" : value);
+                          setValue("clinical_subcategory", "");
+                        }}
+                        disabled={!canWrite}
+                      >
+                        <SelectTrigger aria-label="Área clínica" className={selectClass}>
+                          <SelectValue placeholder="Sin área" />
+                        </SelectTrigger>
+                        <SelectContent
+                          position="popper"
+                          align="start"
+                          className={selectMenuClass}
+                        >
+                          <SelectItem value={AREA_NONE}>Sin área</SelectItem>
+                          {areas
+                            .filter(
+                              (area) =>
+                                area.is_active || area.slug === selectedArea,
+                            )
+                            .map((area) => (
+                              <SelectItem key={area.slug} value={area.slug}>
+                                {area.name}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                </Field>
+                <Field
+                  label="Tratamiento"
+                  error={errors.clinical_subcategory?.message}
+                >
+                  <Controller
+                    name="clinical_subcategory"
+                    control={control}
+                    render={({ field }) => (
+                      <Select
+                        value={
+                          field.value === "" ? SUBCATEGORY_NONE : field.value
+                        }
+                        onValueChange={(value) =>
+                          field.onChange(
+                            value === SUBCATEGORY_NONE ? "" : value,
+                          )
+                        }
+                        disabled={!canWrite || subcategoryOptions.length === 0}
+                      >
+                        <SelectTrigger aria-label="Tratamiento" className={selectClass}>
+                          <SelectValue
+                            placeholder={
+                              selectedArea
+                                ? subcategoryOptions.length === 0
+                                  ? "Sin tratamientos en el catálogo"
+                                  : "Sin tratamiento"
+                                : "Selecciona un área primero"
+                            }
+                          />
+                        </SelectTrigger>
+                        <SelectContent
+                          position="popper"
+                          align="start"
+                          className={selectMenuClass}
+                        >
+                          <SelectItem value={SUBCATEGORY_NONE}>
+                            Sin tratamiento
+                          </SelectItem>
+                          {subcategoryOptions.map((treatment) => (
+                            <SelectItem key={treatment.slug} value={treatment.slug}>
+                              {treatment.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                </Field>
+              </div>
+            </div>
           </div>
         </section>
 
-        <div className={`${GLASS_PANEL} flex min-h-0 flex-col gap-2`}>
-        <section className={`${SOLID_BLOCK} flex min-h-0 flex-1 flex-col`}>
+        <div className={`${GLASS_PANEL} flex flex-col gap-2`}>
+        <section className={SOLID_BLOCK}>
           <SectionHeading
             title="Contacto"
             description="Teléfono, WhatsApp y correo para localizar al paciente."
           />
-          <div className="grid gap-x-4 gap-y-3 md:grid-cols-2 lg:flex-1 lg:content-evenly">
+          <div className="grid gap-x-4 gap-y-4 sm:grid-cols-2">
             <Field label="Teléfono" error={errors.phone_number?.message} required>
 <Controller
                 name="phone_number"
@@ -759,12 +764,12 @@ export function PatientForm() {
           </div>
         </section>
 
-        <section className={`${SOLID_BLOCK} flex min-h-0 flex-1 flex-col`}>
+        <section className={SOLID_BLOCK}>
           <SectionHeading
             title="Contacto de emergencia"
             description="Persona a quien llamar si no se localiza al paciente."
           />
-          <div className="grid gap-x-4 gap-y-3 md:grid-cols-2 lg:flex-1 lg:content-evenly">
+          <div className="grid gap-x-4 gap-y-4 sm:grid-cols-2">
             <Field
               label="Nombre"
               error={errors.emergency_contact_name?.message}
@@ -775,31 +780,6 @@ export function PatientForm() {
                 disabled={!canWrite}
                 className={inputClass}
                 {...register("emergency_contact_name")}
-              />
-            </Field>
-            <Field
-              label="Teléfono"
-              error={errors.emergency_contact_phone?.message}
-              required
-            >
-<Controller
-                name="emergency_contact_phone"
-                control={control}
-                render={({ field }) => (
-                  <PhoneInput
-                    label="Teléfono de emergencia"
-                    autoComplete="off"
-                    disabled={!canWrite}
-                    inputClassName={inputClass}
-                    selectClassName={selectClass}
-                    menuClassName={selectMenuClass}
-                    name={field.name}
-                    inputRef={field.ref}
-                    value={field.value}
-                    onBlur={field.onBlur}
-                    onChange={field.onChange}
-                  />
-                )}
               />
             </Field>
             <Field
@@ -837,6 +817,31 @@ export function PatientForm() {
                 )}
               />
             </Field>
+            <Field
+              label="Teléfono"
+              error={errors.emergency_contact_phone?.message}
+              required
+            >
+<Controller
+                name="emergency_contact_phone"
+                control={control}
+                render={({ field }) => (
+                  <PhoneInput
+                    label="Teléfono de emergencia"
+                    autoComplete="off"
+                    disabled={!canWrite}
+                    inputClassName={inputClass}
+                    selectClassName={selectClass}
+                    menuClassName={selectMenuClass}
+                    name={field.name}
+                    inputRef={field.ref}
+                    value={field.value}
+                    onBlur={field.onBlur}
+                    onChange={field.onChange}
+                  />
+                )}
+              />
+            </Field>
           </div>
         </section>
         </div>
@@ -860,7 +865,7 @@ function FormActions({
 }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {hideStatus ? null : <StatusPill status={status} />}
+      {hideStatus ? null : <CaseStatusBadge status={status} />}
       <Link to="/patients" className={secondaryActionClass}>
         Cancelar
       </Link>
@@ -898,34 +903,19 @@ function SectionHeading({
   );
 }
 
-function StatusPill({ status }: { status: CaseStatus }) {
-  const Icon = STATUS_ICONS[status];
-  const styles: Record<CaseStatus, string> = {
-    pendiente:
-      "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300",
-    en_proceso: "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300",
-    finalizado: "bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300",
-  };
-
-  return (
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${styles[status]}`}
-    >
-      <Icon className="size-3.5" aria-hidden="true" />
-      {CASE_STATUS_LABELS[status]}
-    </span>
-  );
-}
 
 function Field({
   label,
   error,
+  hint,
   required = false,
   className = "",
   children,
 }: {
   label: string;
   error?: string;
+  /** Ayuda bajo el campo (p. ej. la edad calculada); el error tiene prioridad. */
+  hint?: string;
   required?: boolean;
   className?: string;
   children: ReactNode;
@@ -943,6 +933,8 @@ function Field({
         <span className="mt-1 block text-xs font-normal text-red-600 dark:text-red-400">
           {error}
         </span>
+      ) : hint ? (
+        <span className="mt-1 block text-xs font-normal text-slate-500 dark:text-slate-400">{hint}</span>
       ) : null}
     </label>
   );

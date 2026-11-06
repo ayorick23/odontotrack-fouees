@@ -1,5 +1,6 @@
 import { listStudents, type Student  } from "@/services/students";
 import {useEffect, useMemo, useState} from "react";
+import { GLASS_PANEL, PANEL_HEADER, SECONDARY_BUTTON, SOLID_BLOCK } from "../../components/listing/styles";
 import { Table } from "../../components/Table";
 import { primaryActionClass } from "../../lib/actions";
 
@@ -50,28 +51,57 @@ export function Students() {
   }, [page, reloadToken]);
 
 
+  // La columna Usuario solo existe en el formato completo del API (admin);
+  // docente y recepción reciben la vista reducida (ver services/students.ts).
+  const showUsername =
+    state.status === "ready" &&
+    state.students.some((student) => student.username !== null);
+
   const columns = useMemo(
-    () =>  [{
-      header: "Nombre",
-      render: (student: Student) => (
-        <span className="font-medium text-slate-800 dark:text-slate-100">
-          {student.name}
-        </span>
-      ),
-    },
-    {
-      header:"Correo",
-      render: (student: Student) => student.email,
-    },
-  ],
-  [],
+    () => [
+      {
+        header: "Nombre",
+        render: (student: Student) => (
+          <span className="flex items-center gap-3">
+            <span
+              className="grid size-8 shrink-0 place-items-center rounded-full bg-lavender text-xs font-semibold text-ink"
+              aria-hidden="true"
+            >
+              {initialsOf(student.name)}
+            </span>
+            <span className="font-medium text-slate-800 dark:text-slate-100">{student.name}</span>
+          </span>
+        ),
+      },
+      ...(showUsername
+        ? [{ header: "Usuario", render: (student: Student) => student.username }]
+        : []),
+      {
+        header: "Correo",
+        // Hay cuentas sin correo: sin el guion la fila podía quedar en blanco.
+        render: (student: Student) => student.email || "—",
+      },
+    ],
+    [showUsername],
   );
 
   const pageCount = state.status === "ready" ? Math.max(Math.ceil(state.count / PAGE_SIZE), 1) : 1; 
 
 
   return (
-    <section className="rounded-2xl bg-white p-4 dark:bg-slate-900 sm:p-5">
+    // Doble fondo: título y conteo sobre el vidrio, la tabla en el bloque sólido.
+    <section className={GLASS_PANEL}>
+      <div className={PANEL_HEADER}>
+        <div>
+          <h2 className="text-[15px] font-semibold tracking-tight text-ink dark:text-white">Estudiantes</h2>
+          <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+            {state.status === "ready"
+              ? `${state.count} ${state.count === 1 ? "estudiante registrado" : "estudiantes registrados"}`
+              : "Quienes pueden tomar pacientes del banco"}
+          </p>
+        </div>
+      </div>
+      <div className={SOLID_BLOCK}>
       {state.status === "loading" ? (
         <p className="px-2 py-10 text-center text-sm text-slate-500 dark:text-slate-400">
           Cargando estudiantes...
@@ -114,6 +144,7 @@ export function Students() {
           ) : null}
         </>
       ) : null}
+      </div>
     </section>
   );
 }
@@ -137,14 +168,14 @@ function Pagination({
 return (
     <div className="mt-4 flex flex-col gap-3 border-t border-slate-100 px-1 pt-4 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800">
       <p>
-        Mostrar {from} a {to} de {count} estudiantes
+        Mostrando {from} a {to} de {count} estudiantes
       </p>
       <div className="flex gap-2">
         <button
           type="button"
           disabled={page <= 1}
           onClick={() => onPageChange(page - 1)}
-          className="rounded-full border border-slate-200 px-3 py-1.5 text-slate-600 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:text-slate-300"
+          className={SECONDARY_BUTTON}
         >
           Anterior
         </button>
@@ -152,11 +183,16 @@ return (
           type="button"
           disabled={page >= pageCount}
           onClick={() => onPageChange(page + 1)}
-          className="rounded-full border border-slate-200 px-3 py-1.5 text-slate-600 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:text-slate-300"
+          className={SECONDARY_BUTTON}
         >
           Siguiente
         </button>
       </div>
     </div>
   );
+}
+
+function initialsOf(name: string): string {
+  const parts = name.split(/\s+/).filter(Boolean);
+  return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase() || "?";
 }

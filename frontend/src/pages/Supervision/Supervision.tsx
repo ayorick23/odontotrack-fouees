@@ -1,11 +1,12 @@
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 
 import { can } from "../../acl/can";
 import { ConfirmDeleteDialog } from "../../components/ConfirmDeleteDialog";
+import { GLASS_PANEL, PANEL_HEADER, PRIMARY_BUTTON, SOLID_BLOCK } from "../../components/listing/styles";
 import { Table } from "../../components/Table";
 import { useAuth } from "../../hooks/useAuth";
 import { primaryActionClass, secondaryActionClass } from "../../lib/actions";
@@ -29,13 +30,17 @@ type LoadState<T> =
   | { status: "error"; message: string }
   | { status: "ready"; data: T };
 
-const cardClass =
-  "rounded-2xl bg-white p-4 dark:bg-slate-900 sm:p-5";
 
 const diagnosisStateLabel: Record<InProgressAssignment["diagnosis_state"], string>  = {
-  none: "Sin diagnostico",
+  none: "Sin diagnóstico",
   pending: "Por validar",
-  validated: "Valido",
+  validated: "Validado",
+};
+
+const diagnosisStateStyle: Record<InProgressAssignment["diagnosis_state"], string> = {
+  none: "bg-slate-100 text-slate-500 dark:bg-white/[.06] dark:text-slate-400",
+  pending: "bg-amber-100 text-amber-800 dark:bg-amber-400/15 dark:text-amber-300",
+  validated: "bg-lime-soft text-lime-ink",
 };
 
 
@@ -50,7 +55,7 @@ export function Supervision() {
   const [inProgressToken, setInProgressToken] = useState(0);
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4">
       <PendingDiagnoses
         canValidate={canValidate}
         onValidated={() => {
@@ -132,12 +137,11 @@ function PendingDiagnoses({
   }
 
   return (
-    <section className={cardClass} aria-labelledby="pending-diagnoses-title">
-      <SectionHeader
+    <SupervisionPanel
         id="pending-diagnoses-title"
         title="Diagnósticos por validar"
         count={state.status === "ready" ? state.data.count : null}
-      />
+    >
 
       {state.status === "loading" ? <LoadingMessage text="Cargando diagnósticos..." /> : null}
 
@@ -160,13 +164,13 @@ function PendingDiagnoses({
             {state.data.items.map((diagnosis) => (
               <li
                 key={diagnosis.id}
-                className="rounded-xl border border-slate-100 p-4 dark:border-slate-800"
+                className="lift rounded-2xl bg-slate-50 p-4 transition dark:bg-white/[.03]"
               >
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
                     <Link
                       to={`/patients/${diagnosis.patient}`}
-                      className="font-semibold text-slate-800 hover:text-brand dark:text-slate-100"
+                      className="font-semibold text-ink hover:text-lime-ink hover:underline dark:text-white"
                     >
                       {diagnosis.patient_name}
                     </Link>
@@ -178,7 +182,7 @@ function PendingDiagnoses({
                   {canValidate ? (
                     <button
                       type="button"
-                      className={primaryActionClass}
+                      className={PRIMARY_BUTTON}
                       disabled={validatingId !== null}
                       onClick={() => handleValidate(diagnosis)}
                     >
@@ -200,7 +204,7 @@ function PendingDiagnoses({
           ) : null}
         </>
       ) : null}
-    </section>
+    </SupervisionPanel>
   );
 }
 
@@ -275,7 +279,7 @@ function FinalizableCases({
         render: (row: FinalizableAssignment) => (
           <Link
             to={`/patients/${row.patient}`}
-            className="font-medium text-slate-800 hover:text-brand dark:text-slate-100"
+            className="font-medium text-slate-800 hover:text-lime-ink hover:underline dark:text-slate-100"
           >
             {row.patient_name}
           </Link>
@@ -305,12 +309,11 @@ function FinalizableCases({
   );
 
   return (
-    <section className={cardClass} aria-labelledby="finalizable-title">
-      <SectionHeader
+    <SupervisionPanel
         id="finalizable-title"
         title="Casos listos para finalizar"
         count={state.status === "ready" ? state.data.length : null}
-      />
+    >
 
       {state.status === "loading" ? <LoadingMessage text="Cargando casos..." /> : null}
 
@@ -346,7 +349,7 @@ function FinalizableCases({
         onCancel={closeDialog}
         onConfirm={handleFinalize}
       />
-    </section>
+    </SupervisionPanel>
   );
 }
 
@@ -385,7 +388,7 @@ function InProgressCases({ reloadToken }: { reloadToken: number }) {
         render: (row: InProgressAssignment) => (
           <Link
             to={`/patients/${row.patient}`}
-            className="font-medium text-slate-800 hover:text-brand dark:text-slate-100"
+            className="font-medium text-slate-800 hover:text-lime-ink hover:underline dark:text-slate-100"
           >
             {row.patient_name}
           </Link>
@@ -399,19 +402,25 @@ function InProgressCases({ reloadToken }: { reloadToken: number }) {
       },
       {
         header: "Diagnóstico",
-        render: (row: InProgressAssignment) => diagnosisStateLabel[row.diagnosis_state],
+        // Ámbar = pide acción (como el contador del menú); lima = listo.
+        render: (row: InProgressAssignment) => (
+          <span
+            className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${diagnosisStateStyle[row.diagnosis_state]}`}
+          >
+            {diagnosisStateLabel[row.diagnosis_state]}
+          </span>
+        ),
       },
     ],
     [],
   );
 
   return (
-    <section className={cardClass} aria-labelledby="in-progress-title">
-      <SectionHeader
+    <SupervisionPanel
         id="in-progress-title"
         title="Casos asignados"
         count={state.status === "ready" ? state.data.length : null}
-      />
+    >
 
       {state.status === "loading" ? <LoadingMessage text="Cargando casos..." /> : null}
 
@@ -431,31 +440,42 @@ function InProgressCases({ reloadToken }: { reloadToken: number }) {
           emptyMessage="No hay casos asignados."
         />
       ) : null}
-    </section>
+    </SupervisionPanel>
   );
 }
 
 
-function SectionHeader({
+/**
+ * Sección con doble fondo: título y conteo sobre el vidrio, contenido en el
+ * bloque sólido (identidad 2026-11).
+ */
+function SupervisionPanel({
   id,
   title,
   count,
+  children,
 }: {
   id: string;
   title: string;
   count: number | null;
+  children: ReactNode;
 }) {
   return (
-    <div className="mb-4 flex items-center gap-2 px-1">
-      <h2 id={id} className="text-base font-semibold text-slate-800 dark:text-slate-100">
-        {title}
-      </h2>
-      {count !== null ? (
-        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-          {count}
-        </span>
-      ) : null}
-    </div>
+    <section className={GLASS_PANEL} aria-labelledby={id}>
+      <div className={PANEL_HEADER}>
+        <div className="flex items-center gap-2">
+          <h2 id={id} className="text-[15px] font-semibold tracking-tight text-ink dark:text-white">
+            {title}
+          </h2>
+          {count !== null ? (
+            <span className="num rounded-full bg-ink px-2 py-0.5 text-[11px] font-bold text-lime dark:bg-lime dark:text-ink">
+              {count}
+            </span>
+          ) : null}
+        </div>
+      </div>
+      <div className={SOLID_BLOCK}>{children}</div>
+    </section>
   );
 }
 

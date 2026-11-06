@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 
+import { LIST_CELL, LIST_FIRST_CELL, LIST_HEADER_CELL } from "./listing/styles";
+
 interface TableColumn<Row> {
   header: string;
   render: (row: Row) => ReactNode;
@@ -12,14 +14,22 @@ interface TableProps<Row> {
   emptyMessage?: string;
   getRowKey?: (row: Row, index: number) => string | number;
   caption?: string;
+  /** Ancho mínimo antes de desplazar en horizontal (por defecto 720 px). */
+  minWidth?: string;
 }
 
+/**
+ * Tabla simple con el estilo de los listados (identidad 2026-11): encabezado
+ * en píldora arena y barra de acento a la izquierda al pasar el mouse, igual
+ * que el directorio de pacientes.
+ */
 export function Table<Row>({
   columns,
   rows,
   emptyMessage = "No hay datos para mostrar.",
   getRowKey,
   caption,
+  minWidth = "min-w-[720px]",
 }: TableProps<Row>) {
   if (rows.length === 0) {
     return (
@@ -31,16 +41,16 @@ export function Table<Row>({
 
   return (
     <div className="relative overflow-x-auto">
-      <table className="w-full min-w-[720px] border-collapse text-left text-sm">
+      <table className={`w-full ${minWidth} border-separate border-spacing-0 text-left text-sm`}>
         {caption ? <caption className="sr-only">{caption}</caption> : null}
         <thead>
-          <tr className="border-b border-slate-100 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:border-slate-800">
-            {columns.map((column) => (
+          <tr>
+            {columns.map((column, index) => (
               <th
                 key={column.header}
                 scope="col"
-                className={`whitespace-nowrap px-4 py-3 font-semibold ${
-                  column.align === "right" ? "text-right" : "text-left"
+                className={`${LIST_HEADER_CELL} ${index === 0 ? "pl-4" : ""} ${
+                  column.align === "right" ? "pr-4 text-right" : "text-left"
                 }`}
               >
                 {column.header}
@@ -49,16 +59,13 @@ export function Table<Row>({
           </tr>
         </thead>
         <tbody>
-          {rows.map((row, index) => (
-            <tr
-              key={getRowKey ? getRowKey(row, index) : index}
-              className="border-b border-slate-50 transition-colors last:border-0 hover:bg-slate-50/80 dark:border-slate-800/80 dark:hover:bg-slate-800/50"
-            >
-              {columns.map((column) => (
+          {rows.map((row, rowIndex) => (
+            <tr key={getRowKey ? getRowKey(row, rowIndex) : rowIndex} className="group">
+              {columns.map((column, index) => (
                 <td
                   key={column.header}
-                  className={`px-4 py-3.5 text-slate-700 dark:text-slate-200 ${
-                    column.align === "right" ? "text-right" : "text-left"
+                  className={`${LIST_CELL} ${index === 0 ? LIST_FIRST_CELL : ""} text-slate-700 dark:text-slate-200 ${
+                    column.align === "right" ? "pr-4 text-right" : "text-left"
                   }`}
                 >
                   {column.render(row)}

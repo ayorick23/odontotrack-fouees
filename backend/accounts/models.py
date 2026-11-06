@@ -77,6 +77,8 @@ class User(AbstractUser):
         default=Role.ESTUDIANTE,
         help_text="Identidad del usuario. Los permisos salen de la matriz ACL del rol.",
     )
+    # Foto de perfil: la cambia cada quien en /perfil (PATCH /me, accounts/profile.py).
+    photo = models.ImageField(upload_to="users/photos/", null=True, blank=True)
 
     def __str__(self):
         return f"{self.get_full_name() or self.username} ({self.role})"

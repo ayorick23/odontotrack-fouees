@@ -61,5 +61,9 @@ export function folderBody(firstActive: boolean): string {
   return `rounded-[18px] bg-surface ${firstActive ? "rounded-tl-none" : ""}`;
 }
 
+/** Buscador o select compacto sobre el vidrio (encabezado de un panel). */
+export const GLASS_CONTROL =
+  "glass-chip rounded-full px-3 py-2 text-sm text-slate-600 outline-none transition hover:bg-white focus-within:ring-2 focus-within:ring-focus dark:text-slate-300 dark:hover:bg-white/10";
+
 /** Valor de "sin filtro" en los selects de los listados. */
 export const FILTER_ALL = "todos";
