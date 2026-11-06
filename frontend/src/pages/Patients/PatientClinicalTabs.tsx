@@ -204,7 +204,7 @@ function DiagnosisTab({
                       type="button"
                       disabled={validatingId !== null}
                       onClick={() => handleValidate(item.id)}
-                      className="rounded-full bg-brand px-3 py-1 text-xs font-semibold text-white transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
+                      className="press rounded-full bg-action px-3 py-1 text-xs font-semibold text-on-action transition hover:bg-action-hover disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {validatingId === item.id ? "Validando..." : "Validar"}
                     </button>
@@ -531,7 +531,7 @@ function ValidationBadge({
 }) {
   if (validated) {
     return (
-      <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
+      <span className="rounded-full bg-lime-soft px-2 py-0.5 text-[11px] font-semibold text-lime-ink">
         Validado{name ? ` · ${name}` : ""}
       </span>
     );
