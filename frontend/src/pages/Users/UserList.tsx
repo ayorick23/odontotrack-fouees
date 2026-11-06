@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import { can } from "../../acl/can";
 import { ConfirmDeleteDialog } from "../../components/ConfirmDeleteDialog";
+import { GLASS_CONTROL, GLASS_PANEL, PANEL_HEADER, PRIMARY_BUTTON, PRIMARY_ICON_DOT, SOLID_BLOCK } from "../../components/listing/styles";
 import { Table } from "../../components/Table";
 import { ROLE_LABELS, type UserRole } from "../../context/AuthContext";
 import { useAuth } from "../../hooks/useAuth";
@@ -23,8 +24,8 @@ import { UserFormModal } from "./UserFormModal";
 const PAGE_SIZE = 20;
 const SEARCH_DELAY_MS = 300;
 
-const filterClass =
-  "rounded-full bg-white px-3 py-2 text-sm text-slate-600 shadow-sm outline-none dark:bg-slate-900 dark:text-slate-300 dark:ring-1 dark:ring-white/10";
+// Controles sobre el vidrio, como los del directorio.
+const filterClass = GLASS_CONTROL;
 
 type LoadState =
   | { status: "loading" }
@@ -233,9 +234,17 @@ export function UserList() {
   const pageCount = state.status === "ready" ? Math.max(Math.ceil(state.count / PAGE_SIZE), 1) : 1;
 
   return (
-    <section className="space-y-4">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">Cuentas</h2>
+    // Doble fondo: título y filtros sobre el vidrio, la tabla en el bloque sólido.
+    <section className={GLASS_PANEL}>
+      <div className={PANEL_HEADER}>
+        <div>
+          <h2 className="text-[15px] font-semibold tracking-tight text-ink dark:text-white">Cuentas</h2>
+          <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+            {state.status === "ready"
+              ? `${state.count} ${state.count === 1 ? "cuenta" : "cuentas"}`
+              : "Usuarios con acceso al sistema"}
+          </p>
+        </div>
         <div className="flex flex-wrap items-center gap-2">
           <label className={`flex items-center gap-2 ${filterClass}`}>
             <Search className="size-4 shrink-0" />
@@ -288,16 +297,18 @@ export function UserList() {
                 setFormUser(null);
                 setFormOpen(true);
               }}
-              className={primaryActionClass}
+              className={`${PRIMARY_BUTTON} anim-spin-plus py-1.5 pl-1.5`}
             >
-              <Plus className="size-4" />
+              <span className={PRIMARY_ICON_DOT}>
+                <Plus className="size-4" weight="bold" aria-hidden="true" />
+              </span>
               Nueva cuenta
             </button>
           ) : null}
         </div>
       </div>
 
-      <section className="rounded-2xl bg-white p-4 dark:bg-slate-900 sm:p-5">
+      <section className={SOLID_BLOCK}>
         {state.status === "loading" ? (
           <p className="px-2 py-10 text-center text-sm text-slate-400">Cargando cuentas...</p>
         ) : null}
@@ -411,7 +422,7 @@ function fullName(user: UserAccount): string {
 
 function StatusBadge({ active }: { active: boolean }) {
   return active ? (
-    <span className="inline-flex rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
+    <span className="inline-flex rounded-full bg-lime-soft px-2.5 py-0.5 text-xs font-semibold text-lime-ink">
       Activa
     </span>
   ) : (

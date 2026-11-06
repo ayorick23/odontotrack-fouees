@@ -4,6 +4,7 @@ import { toast } from "sonner";
 
 import { can } from "../../acl/can";
 import { ConfirmDeleteDialog } from "../../components/ConfirmDeleteDialog";
+import { GLASS_PANEL, PANEL_HEADER, SOLID_BLOCK } from "../../components/listing/styles";
 import { useAuth } from "../../hooks/useAuth";
 import { dangerActionClass, primaryActionClass } from "../../lib/actions";
 import {
@@ -24,6 +25,10 @@ type LoadState =
       role: RoleRecord;
       catalog: CatalogSection[];
     };
+
+// Campos como los del formulario de paciente: fondo arena, sin borde.
+const INPUT =
+  "mt-1.5 h-10 w-full rounded-xl border border-transparent bg-slate-100 px-3 text-sm font-normal text-ink outline-none transition placeholder:text-slate-400 hover:bg-slate-200/70 focus:bg-white focus:ring-2 focus:ring-focus disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white/[.06] dark:text-slate-100 dark:hover:bg-white/[.09] dark:focus:bg-white/[.08]";
 
 export function RoleForm() {
   const { id } = useParams();
@@ -236,36 +241,49 @@ export function RoleForm() {
         onConfirm={() => void confirmDelete()}
       />
 
-      <section className="rounded-2xl bg-white p-5 shadow-sm dark:bg-slate-900 dark:ring-1 dark:ring-white/10">
-        <div className="grid gap-4 md:grid-cols-2">
-          <label className="text-sm font-medium text-slate-600 dark:text-slate-300">
+      <section className={GLASS_PANEL}>
+        <div className={PANEL_HEADER}>
+          <h2 className="text-[15px] font-semibold tracking-tight text-ink dark:text-white">Datos del rol</h2>
+        </div>
+        <div className={`${SOLID_BLOCK} grid gap-4 md:grid-cols-2`}>
+          <label className="text-xs font-medium text-slate-500 dark:text-slate-400">
             Nombre
             <input
               value={name}
               onChange={(event) => setName(event.target.value)}
               disabled={!canWrite}
-              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-action dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+              className={INPUT}
             />
           </label>
-          <label className="text-sm font-medium text-slate-600 dark:text-slate-300">
+          <label className="text-xs font-medium text-slate-500 dark:text-slate-400">
             Descripción
             <input
               value={description}
               onChange={(event) => setDescription(event.target.value)}
               disabled={!canWrite}
-              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-action dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+              className={INPUT}
             />
           </label>
         </div>
       </section>
 
-      <section className="rounded-2xl bg-white p-5 shadow-sm dark:bg-slate-900 dark:ring-1 dark:ring-white/10">
+      <section className={GLASS_PANEL}>
+        <div className={PANEL_HEADER}>
+          <div>
+            <h2 className="text-[15px] font-semibold tracking-tight text-ink dark:text-white">Permisos</h2>
+            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+              {selected.size} {selected.size === 1 ? "permiso marcado" : "permisos marcados"}
+            </p>
+          </div>
+        </div>
+        <div className={SOLID_BLOCK}>
         <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Buscar módulo o permiso..."
-            className="w-full max-w-sm rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-action dark:border-slate-700 dark:bg-slate-800"
+            aria-label="Buscar módulo o permiso"
+            className={`${INPUT} mt-0 max-w-sm`}
           />
           <div className="flex flex-wrap items-center gap-3">
             <p className="text-xs font-medium text-slate-400">
@@ -396,6 +414,7 @@ export function RoleForm() {
               </div>
             );
           })}
+        </div>
         </div>
       </section>
     </div>
