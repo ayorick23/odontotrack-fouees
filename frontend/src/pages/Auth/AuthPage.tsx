@@ -22,6 +22,8 @@ const PANEL_TEXT: Record<AuthMode, { kicker: string; title: string }> = {
 
 // Curva suave de entrada y salida para el deslizamiento del panel.
 const EASE = "ease-[cubic-bezier(0.65,0,0.35,1)]";
+// Una sola duración para panel y formularios: todo se mueve al mismo ritmo.
+const DURATION = "duration-700";
 
 /**
  * Ingresar y Crear cuenta en una sola tarjeta (rutas /login y /registro).
@@ -77,9 +79,12 @@ export function AuthPage() {
           <RegisterForm onSwitch={() => switchTo("login")} />
         </FormSlot>
 
-        {/* Panel deslizante: a la derecha al ingresar, a la izquierda al registrarse. */}
+        {/* Panel deslizante: a la derecha al ingresar, a la izquierda al registrarse.
+            will-change lo deja en su propia capa con las manchas difuminadas ya
+            pintadas; sin eso el navegador las rasteriza al arrancar la animación
+            y todo se congela un instante (el "frenazo"). */}
         <div
-          className={`absolute inset-y-0 left-0 z-20 hidden w-1/2 p-3 transition-transform duration-700 motion-reduce:transition-none md:block ${EASE} ${
+          className={`absolute inset-y-0 left-0 z-20 hidden w-1/2 p-3 transition-transform will-change-transform ${DURATION} motion-reduce:transition-none md:block ${EASE} ${
             isLogin ? "translate-x-full" : "translate-x-0"
           }`}
           aria-hidden="true"
@@ -100,18 +105,16 @@ function FormSlot({
   active: boolean;
   children: ReactNode;
 }) {
-  // El formulario que sale se corre hacia donde va el panel y se desvanece.
-  const offset = side === "left" ? "-translate-x-6" : "translate-x-6";
+  // Solo fundido, con la misma duración y curva que el panel: el único que se
+  // desplaza es el panel, que tapa al formulario que sale y destapa al que entra.
   return (
     <section
       inert={!active}
       aria-hidden={!active}
       className={`${active ? "flex" : "hidden md:flex"} items-center justify-center px-6 py-10 sm:px-12 md:absolute md:inset-y-0 md:w-1/2 md:overflow-y-auto ${
         side === "left" ? "md:left-0" : "md:right-0"
-      } transition-[opacity,transform] duration-500 motion-reduce:transition-none ${EASE} ${
-        active
-          ? "translate-x-0 opacity-100 delay-200"
-          : `pointer-events-none opacity-0 ${offset}`
+      } transition-opacity ${DURATION} motion-reduce:transition-none ${EASE} ${
+        active ? "opacity-100" : "pointer-events-none opacity-0"
       }`}
     >
       {children}

@@ -194,11 +194,24 @@ export function Sidebar({
         </nav>
 
         <div className="mt-4 flex h-12 items-center gap-3 overflow-hidden px-3">
-          <WithTooltip label={`${displayName(user)} · ${ROLE_LABELS[user.role]}`} enabled={collapsed}>
+          {collapsed ? (
+            // Colapsado no cabe nombre ni botón aparte: el hueco del avatar pasa a
+            // ser el de cerrar sesión (nombre y rol siguen en el menú de cuenta).
+            <WithTooltip label="Cerrar sesión" enabled>
+              <button
+                type="button"
+                onClick={onLogout}
+                aria-label="Cerrar sesión"
+                className="press anim-out glass-chip grid size-12 shrink-0 cursor-pointer place-items-center rounded-full text-slate-500 transition-colors hover:bg-white hover:text-ink dark:hover:bg-white/10 dark:hover:text-white"
+              >
+                <LogOut className="size-[18px]" />
+              </button>
+            </WithTooltip>
+          ) : (
             <span className="grid size-12 shrink-0 place-items-center">
               <Avatar user={user} />
             </span>
-          </WithTooltip>
+          )}
           <Fade hidden={collapsed}>
             <p className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
               {displayName(user)}

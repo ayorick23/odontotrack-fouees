@@ -32,7 +32,7 @@ import {
   type DashboardSeries,
   type SeriesPeriod,
 } from "../../services/dashboard";
-import { SINGLE_SERIES_COLOR, useChartTheme } from "./chartColors";
+import { useChartTheme } from "./chartColors";
 import {
   AgendaToday,
   AreaStatusBars,
@@ -505,9 +505,11 @@ function AdminLayout({
   const { status } = useChartTheme();
   const [period, setPeriod] = useState<SeriesPeriod>("1a");
   const [series, setSeries] = useState<DashboardSeries | null>(null);
-  // Segunda serie en lima (el color de "pendiente", ver chartColors.ts): la
-  // primera va en tinta, como la maqueta aprobada.
+  // Segunda serie en lima (el color de "pendiente", ver chartColors.ts); la
+  // primera en tinta, como la maqueta aprobada, y hueso en oscuro (con
+  // var(--action) quedaba lima también y no se distinguían).
   const accent = status.pendiente;
+  const base = status.en_proceso;
 
   useEffect(() => {
     getDashboardSeries({ period })
@@ -550,7 +552,7 @@ function AdminLayout({
                 <LineChart
                   labels={series.months.map((month) => month.label.split(" ")[0])}
                   series={[
-                    { name: "Registrados", color: SINGLE_SERIES_COLOR, values: series.months.map((month) => month.patients) },
+                    { name: "Registrados", color: base, values: series.months.map((month) => month.patients) },
                     { name: "Asignaciones", color: accent, values: series.months.map((month) => month.assignments) },
                   ]}
                 />
@@ -560,7 +562,7 @@ function AdminLayout({
             </div>
             <div className="flex gap-4 pt-1">
               {[
-                ["Registrados", SINGLE_SERIES_COLOR],
+                ["Registrados", base],
                 ["Asignaciones", accent],
               ].map(([label, color]) => (
                 <span key={label} className="flex items-center gap-1.5 text-[11.5px] font-medium text-slate-600 dark:text-slate-400">

@@ -547,9 +547,12 @@ export function LineChart({
   labels: string[];
   series: Array<{ name: string; color: string; values: number[] }>;
 }) {
+  // El SVG se estira al tamaño de la tarjeta (preserveAspectRatio="none"), así que
+  // dentro solo van formas; las etiquetas de los ejes son HTML posicionado en %
+  // con las mismas escalas, para que el texto nunca se deforme.
   const W = 640;
   const H = 200;
-  const P = { l: 30, r: 18, t: 10, b: 22 };
+  const P = { l: 8, r: 8, t: 6, b: 4 };
   if (labels.length < 2) {
     return <p className="py-8 text-center text-sm text-slate-400">Sin datos en este período.</p>;
   }
@@ -558,13 +561,24 @@ export function LineChart({
   const x = (index: number) => P.l + index * step;
   const y = (value: number) => P.t + (1 - value / max) * (H - P.t - P.b);
   const every = labels.length > 12 ? Math.ceil(labels.length / 12) : 1;
+  const ticks = [0, 1, 2, 3, 4].map((k) => (max / 4) * k);
+  const axisText = "num pointer-events-none absolute whitespace-nowrap text-[10.5px] leading-none text-slate-400";
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="h-full w-full">
-      {[0, 1, 2, 3, 4].map((k) => {
-        const value = (max / 4) * k;
-        return (
-          <g key={k}>
+    <div className="flex h-full flex-col">
+      <div className="relative ml-7 min-h-0 flex-1">
+        {ticks.map((value) => (
+          <span
+            key={value}
+            className={`${axisText} right-full mr-2 -translate-y-1/2`}
+            style={{ top: `${(y(value) / H) * 100}%` }}
+          >
+            {value}
+          </span>
+        ))}
+        <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="absolute inset-0 h-full w-full overflow-visible">
+          {ticks.map((value) => (
             <line
+              key={value}
               x1={P.l}
               x2={W - P.r}
               y1={y(value)}
@@ -573,55 +587,58 @@ export function LineChart({
               strokeDasharray="2 5"
               vectorEffect="non-scaling-stroke"
             />
-            <text x={P.l - 6} y={y(value) + 3} textAnchor="end" className="fill-slate-400" fontSize="10">
-              {value}
-            </text>
-          </g>
-        );
-      })}
-      {labels.map((label, index) =>
-        index % every === 0 ? (
-          <text key={`${label}-${index}`} x={x(index)} y={H - 6} textAnchor="middle" className="fill-slate-400" fontSize="10">
-            {label}
-          </text>
-        ) : null,
-      )}
-      {series.map((item, seriesIndex) => {
-        const d = smoothPath(item.values.map((value, index): [number, number] => [x(index), y(value)]));
-        return (
-          <g key={item.name}>
-            {seriesIndex === 0 ? (
-              <path
-                d={`${d} L${x(labels.length - 1)} ${y(0)} L${x(0)} ${y(0)} Z`}
-                style={{ fill: item.color, fillOpacity: 0.08 }}
-              />
-            ) : null}
-            <path
-              d={d}
-              fill="none"
-              style={{ stroke: item.color }}
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              vectorEffect="non-scaling-stroke"
-              className="anim-draw"
+          ))}
+          {series.map((item, seriesIndex) => {
+            const d = smoothPath(item.values.map((value, index): [number, number] => [x(index), y(value)]));
+            return (
+              <g key={item.name}>
+                {seriesIndex === 0 ? (
+                  <path
+                    d={`${d} L${x(labels.length - 1)} ${y(0)} L${x(0)} ${y(0)} Z`}
+                    style={{ fill: item.color, fillOpacity: 0.08 }}
+                  />
+                ) : null}
+                <path
+                  d={d}
+                  fill="none"
+                  style={{ stroke: item.color }}
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  vectorEffect="non-scaling-stroke"
+                  className="anim-draw"
+                />
+              </g>
+            );
+          })}
+          <line data-crossline x1="0" x2="0" y1={P.t} y2={H - P.b} className="stroke-ink/20 dark:stroke-white/20" vectorEffect="non-scaling-stroke" style={{ visibility: "hidden" }} />
+          {labels.map((label, index) => (
+            <rect
+              key={`hit-${index}`}
+              x={x(index) - step / 2}
+              y={P.t}
+              width={step}
+              height={H - P.t - P.b}
+              fill="transparent"
+              data-cross={x(index)}
+              data-tip={[label, ...series.map((item) => `${item.name}: ${item.values[index]}`)].join("\n")}
             />
-          </g>
-        );
-      })}
-      <line data-crossline x1="0" x2="0" y1={P.t} y2={H - P.b} className="stroke-ink/20 dark:stroke-white/20" vectorEffect="non-scaling-stroke" style={{ visibility: "hidden" }} />
-      {labels.map((label, index) => (
-        <rect
-          key={`hit-${index}`}
-          x={x(index) - step / 2}
-          y={P.t}
-          width={step}
-          height={H - P.t - P.b}
-          fill="transparent"
-          data-cross={x(index)}
-          data-tip={[label, ...series.map((item) => `${item.name}: ${item.values[index]}`)].join("\n")}
-        />
-      ))}
-    </svg>
+          ))}
+        </svg>
+      </div>
+      <div className="relative ml-7 mt-1.5 h-3.5 shrink-0">
+        {labels.map((label, index) =>
+          index % every === 0 ? (
+            <span
+              key={`${label}-${index}`}
+              className={`${axisText} top-0 -translate-x-1/2`}
+              style={{ left: `${(x(index) / W) * 100}%` }}
+            >
+              {label}
+            </span>
+          ) : null,
+        )}
+      </div>
+    </div>
   );
 }
 
